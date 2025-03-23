@@ -1,35 +1,39 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, BrowserRouter } from "react-router-dom";
+import './App.css';
+import Achievement from './components/student/achievement';
+import StudentDashboard from './components/student/student-dashboard';
+import Attendance from './components/student/attendance';
+import Holiday from './components/student/holiday';
+import Feedback from './components/student/feedback';
+import StaticStudentComponent from './components/student/staticStudentComponent';
+import 'bootstrap-icons/font/bootstrap-icons.css';
+import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+import Profile from './components/student/profile';
+import LeaveApplication from './components/student/leave';
+import StudentResult from './components/student/result';
+
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
     <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
+    
+    <BrowserRouter>
+    <StaticStudentComponent/>
+      <Routes>
+        <Route path="/feedback" element={<Feedback />} />
+        <Route path="/achievement" element={<Achievement />} />
+        <Route path="/" element={<StudentDashboard />} />
+        <Route path="/attendance" element={<Attendance />} />
+        <Route path="/holiday" element={<Holiday />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/leave_application" element={<LeaveApplication />} />
+        <Route path="/result" element={<StudentResult />} />
+      </Routes>
+    </BrowserRouter>
+    
     </>
-  )
+  );
 }
 
-export default App
+export default App;
