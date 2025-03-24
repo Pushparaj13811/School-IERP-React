@@ -1,9 +1,19 @@
+import React from 'react';
 import { lazy } from 'react';
 import { UserRole } from '../utils/roles';
 
 // Lazy-loaded components for better performance
-const Dashboard = lazy(() => import('../pages/student/Dashboard'));
-const Profile = lazy(() => import('../pages/student/Profile'));
+const StudentDashboard = lazy(() => import('../pages/student/Dashboard'));
+const TeacherDashboard = lazy(() => import('../pages/teacher/Dashboard'));
+const ParentDashboard = lazy(() => import('../pages/parent/Dashboard'));
+const AdminDashboard = lazy(() => import('../pages/admin/Dashboard'));
+
+// Profile components
+const StudentProfile = lazy(() => import('../pages/student/Profile'));
+const TeacherProfile = lazy(() => import('../pages/teacher/Profile'));
+const ParentProfile = lazy(() => import('../pages/parent/Profile'));
+const AdminProfile = lazy(() => import('../pages/admin/Profile'));
+
 const Attendance = lazy(() => import('../pages/student/Attendance'));
 const Holiday = lazy(() => import('../pages/student/Holiday'));
 const Achievement = lazy(() => import('../pages/student/Achievement'));
@@ -15,17 +25,62 @@ const TimeTable = lazy(() => import('../pages/student/TimeTable'));
 const Announcements = lazy(() => import('../pages/student/Announcements'));
 const Logout = lazy(() => import('../pages/Logout'));
 
+// Admin pages
+const AddTeacher = lazy(() => import('../pages/admin/AddTeacher'));
+const AddParents = lazy(() => import('../pages/admin/AddParents'));
+const AddStudents = lazy(() => import('../pages/admin/AddStudents'));
+const CreateAnnouncement = lazy(() => import('../pages/admin/CreateAnnouncement'));
+const Report = lazy(() => import('../pages/admin/Report'));
+const StudentsList = lazy(() => import('../pages/admin/StudentsList'));
+const TeachersList = lazy(() => import('../pages/admin/TeachersList'));
+const ParentsList = lazy(() => import('../pages/admin/ParentsList'));
+
+interface RouteComponentProps {
+  user: { role: UserRole } | null;
+}
+
+type RouteComponent = React.FC<RouteComponentProps>;
+
+interface Route {
+  path: string;
+  component: RouteComponent | React.FC;
+  roles: UserRole[];
+  exact?: boolean;
+}
+
 // Route definitions with role-based permissions
-export const routes = [
+export const routes: Route[] = [
   {
     path: '/',
-    component: Dashboard,
+    component: ({ user }: RouteComponentProps) => {
+      switch (user?.role) {
+        case UserRole.ADMIN:
+          return <AdminDashboard />;
+        case UserRole.TEACHER:
+          return <TeacherDashboard />;
+        case UserRole.PARENT:
+          return <ParentDashboard />;
+        default:
+          return <StudentDashboard />;
+      }
+    },
     roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN, UserRole.PARENT],
     exact: true,
   },
   {
     path: '/profile',
-    component: Profile,
+    component: ({ user }: RouteComponentProps) => {
+      switch (user?.role) {
+        case UserRole.ADMIN:
+          return <AdminProfile />;
+        case UserRole.TEACHER:
+          return <TeacherProfile />;
+        case UserRole.PARENT:
+          return <ParentProfile />;
+        default:
+          return <StudentProfile />;
+      }
+    },
     roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN, UserRole.PARENT],
   },
   {
@@ -78,6 +133,63 @@ export const routes = [
     component: Logout,
     roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN, UserRole.PARENT],
   },
+  // Admin routes
+  {
+    path: '/students',
+    component: StudentsList,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: '/teachers',
+    component: TeachersList,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: '/parents',
+    component: ParentsList,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: 'teachers/add-teacher',
+    component: AddTeacher,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: 'parents/add-parents',
+    component: AddParents,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: 'students/add-students',
+    component: AddStudents,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: 'announcements/create-announcement',
+    component: CreateAnnouncement,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: '/report',
+    component: Report,
+    roles: [UserRole.ADMIN, UserRole.PARENT],
+  },
+  // Profile view routes
+  {
+    path: '/student-profile/:id',
+    component: StudentProfile,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: '/teacher-profile/:id',
+    component: TeacherProfile,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: '/parent-profile/:id',
+    component: ParentProfile,
+    roles: [UserRole.ADMIN],
+  },
 ];
 
 // Route groups for sidebar navigation
@@ -101,5 +213,17 @@ export const routeGroups = [
     title: 'Others',
     icon: 'bi-three-dots',
     routes: ['/leave', '/holiday', '/achievement', '/feedback', '/announcements'],
+  },
+  {
+    title: 'User Management',
+    icon: 'bi-people',
+    routes: [
+      '/teacher/add-teacher',
+      '/parents/add-parents',
+      '/students/add-students',
+      '/students',
+      '/teachers',
+      '/parents'
+    ],
   },
 ]; 
