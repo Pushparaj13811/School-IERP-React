@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { Suspense, lazy } from 'react';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { routes } from './routes';
 import AuthLayout from "./components/layout/AuthLayout";
@@ -21,50 +21,60 @@ const LoadingFallback = () => (
   </div>
 );
 
+const AppRoutes = () => {
+  const { user } = useAuth();
+
+  return (
+    <Router>
+      <Suspense fallback={<LoadingFallback />}>
+        <Routes>
+          {/* Public routes */}
+          <Route element={<PublicLayout />}>
+            <Route path="/login" element={<Login />} />
+          </Route>
+          
+          {/* Unauthorized page - accessible to everyone */}
+          <Route path="/unauthorized" element={<Unauthorized />} />
+          
+          {/* Logout route */}
+          <Route path="/logout" element={<Logout />} />
+          
+          {/* Protected routes with authenticated layout */}
+          <Route element={<AuthLayout />}>
+            {routes.map((route) => {
+              // Skip logout route as it's handled separately
+              if (route.path === '/logout') return null;
+              
+              const RouteComponent = route.component;
+              
+              return (
+                <Route
+                  key={route.path}
+                  path={route.path}
+                  element={
+                    <ProtectedRoute allowedRoles={route.roles}>
+                      <Suspense fallback={<LoadingFallback />}>
+                        <RouteComponent user={user} />
+                      </Suspense>
+                    </ProtectedRoute>
+                  }
+                />
+              );
+            })}
+          </Route>
+          
+          {/* Catch all - redirect to login */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
+    </Router>
+  );
+};
+
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Suspense fallback={<LoadingFallback />}>
-          <Routes>
-            {/* Public routes */}
-            <Route element={<PublicLayout />}>
-              <Route path="/login" element={<Login />} />
-            </Route>
-            
-            {/* Unauthorized page - accessible to everyone */}
-            <Route path="/unauthorized" element={<Unauthorized />} />
-            
-            {/* Logout route */}
-            <Route path="/logout" element={<Logout />} />
-            
-            {/* Protected routes with authenticated layout */}
-            <Route element={<AuthLayout />}>
-              {routes.map((route) => {
-                // Skip logout route as it's handled separately
-                if (route.path === '/logout') return null;
-                
-                return (
-                  <Route
-                    key={route.path}
-                    path={route.path}
-                    element={
-                      <ProtectedRoute allowedRoles={route.roles}>
-                        <Suspense fallback={<LoadingFallback />}>
-                          <route.component />
-                        </Suspense>
-                      </ProtectedRoute>
-                    }
-                  />
-                );
-              })}
-            </Route>
-            
-            {/* Catch all - redirect to login */}
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </Suspense>
-      </Router>
+      <AppRoutes />
     </AuthProvider>
   );
 }

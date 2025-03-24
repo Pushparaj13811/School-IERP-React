@@ -37,11 +37,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     { icon: 'bi-clipboard-data', label: 'Report', path: '/report' },
     
     { icon: 'bi-people', label: 'User Management', isGroup: true },
-    { icon: 'bi-person-plus', label: 'Add Teacher', path: '/add-teacher' },
-    { icon: 'bi-people', label: 'Add Parents', path: '/add-parents' },
-    { icon: 'bi-mortarboard', label: 'Add Students', path: '/add-students' },
+    { icon: 'bi-person-plus', label: 'Teacher', path: '/teachers' },
+    { icon: 'bi-people', label: 'Parents', path: '/parents' },
+    { icon: 'bi-mortarboard', label: 'Students', path: '/students' },
     
-    { icon: 'bi-megaphone', label: 'Add Announcements', path: '/create-announcement' },
+    { icon: 'bi-megaphone', label: 'Add Announcements', path: '/announcements/create-announcement' },
     
     { icon: 'bi-box-arrow-right', label: 'Logout', path: '/logout' },
   ];
