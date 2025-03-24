@@ -12,6 +12,7 @@ import Leave from './pages/student/Leave';
 import LeaveApplicationCreate from './pages/student/LeaveApplicationCreate';
 import Feedback from './pages/student/Feedback';
 import TimeTable from './pages/student/TimeTable';
+import Announcements from './pages/student/Announcements';
 
 // Import bootstrap icons
 import 'bootstrap-icons/font/bootstrap-icons.css';
@@ -31,6 +32,7 @@ function App() {
           <Route path="/leave/create" element={<LeaveApplicationCreate />} />
           <Route path="/feedback" element={<Feedback />} />
           <Route path="/time-table" element={<TimeTable />} />
+          <Route path="/announcements" element={<Announcements />} />
           {/* Other routes will be added as the pages are refactored */}
         </Routes>
       </PageLayout>
