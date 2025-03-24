@@ -1,38 +1,71 @@
-import { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, BrowserRouter } from "react-router-dom";
-import './App.css';
-import Achievement from './components/student/achievement';
-import StudentDashboard from './components/student/student-dashboard';
-import Attendance from './components/student/attendance';
-import Holiday from './components/student/holiday';
-import Feedback from './components/student/feedback';
-import StaticStudentComponent from './components/student/staticStudentComponent';
-import 'bootstrap-icons/font/bootstrap-icons.css';
-import 'bootstrap/dist/js/bootstrap.bundle.min.js';
-import Profile from './components/student/profile';
-import LeaveApplication from './components/student/leave';
-import StudentResult from './components/student/result';
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { Suspense, lazy } from 'react';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import { routes } from './routes';
+import AuthLayout from "./components/layout/AuthLayout";
+import PublicLayout from "./components/layout/PublicLayout";
 
+// Import bootstrap icons
+import 'bootstrap-icons/font/bootstrap-icons.css';
+
+// Lazy-loaded pages
+const Login = lazy(() => import('./pages/Login'));
+const Unauthorized = lazy(() => import('./pages/Unauthorized'));
+const Logout = lazy(() => import('./pages/Logout'));
+
+// Loading component
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#292648]"></div>
+  </div>
+);
 
 function App() {
   return (
-    <>
-    
-    <BrowserRouter>
-    <StaticStudentComponent/>
-      <Routes>
-        <Route path="/feedback" element={<Feedback />} />
-        <Route path="/achievement" element={<Achievement />} />
-        <Route path="/" element={<StudentDashboard />} />
-        <Route path="/attendance" element={<Attendance />} />
-        <Route path="/holiday" element={<Holiday />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/leave_application" element={<LeaveApplication />} />
-        <Route path="/result" element={<StudentResult />} />
-      </Routes>
-    </BrowserRouter>
-    
-    </>
+    <AuthProvider>
+      <Router>
+        <Suspense fallback={<LoadingFallback />}>
+          <Routes>
+            {/* Public routes */}
+            <Route element={<PublicLayout />}>
+              <Route path="/login" element={<Login />} />
+            </Route>
+            
+            {/* Unauthorized page - accessible to everyone */}
+            <Route path="/unauthorized" element={<Unauthorized />} />
+            
+            {/* Logout route */}
+            <Route path="/logout" element={<Logout />} />
+            
+            {/* Protected routes with authenticated layout */}
+            <Route element={<AuthLayout />}>
+              {routes.map((route) => {
+                // Skip logout route as it's handled separately
+                if (route.path === '/logout') return null;
+                
+                return (
+                  <Route
+                    key={route.path}
+                    path={route.path}
+                    element={
+                      <ProtectedRoute allowedRoles={route.roles}>
+                        <Suspense fallback={<LoadingFallback />}>
+                          <route.component />
+                        </Suspense>
+                      </ProtectedRoute>
+                    }
+                  />
+                );
+              })}
+            </Route>
+            
+            {/* Catch all - redirect to login */}
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </Suspense>
+      </Router>
+    </AuthProvider>
   );
 }
 
