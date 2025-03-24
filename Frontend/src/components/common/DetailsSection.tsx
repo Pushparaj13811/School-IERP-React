@@ -12,14 +12,14 @@ interface DetailsSectionProps {
 
 const DetailsSection: React.FC<DetailsSectionProps> = ({ title, details }) => {
   return (
-    <div className="p-4 shadow-sm bg-white rounded text-start">
-      <h2 className="text-dark font-bold text-xl">{title}</h2>
-      <hr className="border border-gray-800 mb-4" />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-3">
+    <div className="p-6 shadow-sm bg-white rounded-lg border border-gray-100">
+      <h3 className="text-xl font-bold text-gray-800 mb-3">{title}</h3>
+      <div className="h-px bg-gray-200 w-full mb-4"></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {details.map((detail, index) => (
-          <div key={index} className="flex">
-            <strong className="w-1/3 text-gray-900">{detail.label}:</strong>
-            <p className="w-2/3 text-gray-500">{detail.value}</p>
+          <div key={index} className="flex flex-col">
+            <span className="text-sm text-gray-500 font-medium">{detail.label}</span>
+            <span className="text-base text-gray-800">{detail.value}</span>
           </div>
         ))}
       </div>

@@ -1,5 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { routes } from '../../routes';
 
 interface SidebarProps {
   isVisible: boolean;
@@ -14,7 +16,17 @@ interface MenuItem {
 
 const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
   const location = useLocation();
+  const { user } = useAuth();
   
+  // Function to check if a route is accessible to the user
+  const isRouteAccessible = (path: string | undefined): boolean => {
+    if (!path || !user) return false;
+    
+    const route = routes.find(r => r.path === path);
+    return route ? route.roles.includes(user.role) : false;
+  };
+  
+  // Static menu structure
   const menuItems: MenuItem[] = [
     { icon: 'bi-house-door-fill', label: 'Home', isGroup: true },
     { icon: 'bi-speedometer2', label: 'Dashboard', path: '/' },
@@ -36,6 +48,23 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     { icon: 'bi-box-arrow-right', label: 'Logout', path: '/logout' },
   ];
 
+  // Filter out menu items for which the user doesn't have access permission
+  const filteredMenuItems = menuItems.filter(item => {
+    if (item.isGroup) {
+      // Keep the group header if at least one child is accessible
+      const nextGroupIndex = menuItems.indexOf(item) + 1;
+      const childrenItems = menuItems.slice(nextGroupIndex);
+      const nextGroupItemIndex = childrenItems.findIndex(i => i.isGroup);
+      const groupItems = nextGroupItemIndex === -1 
+        ? childrenItems 
+        : childrenItems.slice(0, nextGroupItemIndex);
+      
+      return groupItems.some(childItem => isRouteAccessible(childItem.path));
+    }
+    
+    return item.path === '/logout' || isRouteAccessible(item.path);
+  });
+
   const sidebarStyles = isVisible 
     ? 'left-0' 
     : '-left-64';
@@ -53,7 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
         </div>
         
         <ul className="py-2">
-          {menuItems.map((item, index) => (
+          {filteredMenuItems.map((item, index) => (
             <li 
               key={index} 
               className={`

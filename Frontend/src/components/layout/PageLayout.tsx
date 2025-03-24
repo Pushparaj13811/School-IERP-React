@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
 
-interface PageLayoutProps {
-  children: React.ReactNode;
-}
-
-const PageLayout: React.FC<PageLayoutProps> = ({ children }) => {
+const PageLayout: React.FC = () => {
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -42,12 +39,12 @@ const PageLayout: React.FC<PageLayoutProps> = ({ children }) => {
       <Sidebar isVisible={sidebarVisible} />
       
       <div 
-        className={`transition-all  duration-300 ${
+        className={`transition-all duration-300 ${
           sidebarVisible ? 'md:ml-64' : 'ml-0'
         }`}
       >
-        <div className="pt-14 min-w-screen min-h-screen">
-          {children}
+        <div className="pt-14 w-full min-h-screen">
+          <Outlet />
         </div>
       </div>
 

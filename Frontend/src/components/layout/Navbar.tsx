@@ -1,11 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 interface NavbarProps {
   toggleSidebar: () => void;
 }
 
 const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
+  const { user, isAuthenticated } = useAuth();
+
   return (
     <div className="fixed top-0 left-0 right-0 bg-[#EEF5FF] z-20 shadow-md">
       <div className="flex items-center justify-between px-4 py-2">
@@ -22,49 +25,64 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
 
         {/* Right side - Search, language, and profile */}
         <div className="flex items-center space-x-4">
-          {/* Search box */}
-          <div className="hidden md:flex items-center relative">
-            <input
-              type="text"
-              placeholder="Search Here"
-              className="bg-white border border-gray-300 rounded-md py-1 px-3 pl-9 text-sm focus:outline-none"
-            />
-            <i className="bi bi-search absolute left-3 text-gray-500"></i>
-          </div>
+          {isAuthenticated && (
+            <>
+              {/* Search box - Only show when authenticated */}
+              <div className="hidden md:flex items-center relative">
+                <input
+                  type="text"
+                  placeholder="Search Here"
+                  className="bg-white border border-gray-300 rounded-md py-1 px-3 pl-9 text-sm focus:outline-none"
+                />
+                <i className="bi bi-search absolute left-3 text-gray-500"></i>
+              </div>
 
-          {/* Language selector */}
-          <div className="hidden md:flex items-center text-gray-700 cursor-pointer">
-            <span>Language</span>
-            <i className="bi bi-chevron-down ml-1"></i>
-          </div>
+              {/* Language selector - Only show when authenticated */}
+              <div className="hidden md:flex items-center text-gray-700 cursor-pointer">
+                <span>Language</span>
+                <i className="bi bi-chevron-down ml-1"></i>
+              </div>
+            </>
+          )}
 
           {/* Profile dropdown */}
           <div className="flex items-center text-gray-700 cursor-pointer">
-            <div className="hidden md:block mr-2 text-right">
-              <div className="font-semibold">Ruchi</div>
-              <div className="text-xs text-gray-500">Student</div>
-            </div>
-            <div className="h-9 w-9 rounded-full bg-[#292648] flex items-center justify-center text-white overflow-hidden">
-              <img 
-                src="https://cdn.pixabay.com/photo/2015/06/22/08/40/child-817373_640.jpg"
-                alt="Profile" 
-                className="h-full w-full object-cover"
-              />
-            </div>
-            <i className="bi bi-chevron-down ml-1"></i>
+            {isAuthenticated ? (
+              <>
+                <div className="hidden md:block mr-2 text-right">
+                  <div className="font-semibold">{user?.name || 'User'}</div>
+                  <div className="text-xs text-gray-500">{user?.role || 'Student'}</div>
+                </div>
+                <div className="h-9 w-9 rounded-full bg-[#292648] flex items-center justify-center text-white overflow-hidden">
+                  <img 
+                    src="https://cdn.pixabay.com/photo/2015/06/22/08/40/child-817373_640.jpg"
+                    alt="Profile" 
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <i className="bi bi-chevron-down ml-1"></i>
+              </>
+            ) : (
+              <Link to="/login" className="flex items-center">
+                <span className="text-[#292648] font-semibold">Login</span>
+                <i className="bi bi-box-arrow-in-right ml-1 text-lg"></i>
+              </Link>
+            )}
           </div>
 
-          {/* Mobile menu button */}
-          <button
-            onClick={toggleSidebar}
-            className="md:hidden text-gray-700 focus:outline-none"
-          >
-            <i className="bi bi-list text-2xl"></i>
-          </button>
+          {/* Mobile menu button - Only show when authenticated */}
+          {isAuthenticated && (
+            <button
+              onClick={toggleSidebar}
+              className="md:hidden text-gray-700 focus:outline-none"
+            >
+              <i className="bi bi-list text-2xl"></i>
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-export default Navbar; 
+export default Navbar;
