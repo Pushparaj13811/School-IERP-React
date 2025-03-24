@@ -150,7 +150,7 @@ export const routes: Route[] = [
     roles: [UserRole.ADMIN],
   },
   {
-    path: 'teacher/add-teacher',
+    path: 'teachers/add-teacher',
     component: AddTeacher,
     roles: [UserRole.ADMIN],
   },
