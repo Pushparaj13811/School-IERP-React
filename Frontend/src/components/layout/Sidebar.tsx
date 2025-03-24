@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { routes } from '../../routes';
+import { UserRole } from '../../utils/roles';
 
 interface SidebarProps {
   isVisible: boolean;
@@ -12,6 +13,7 @@ interface MenuItem {
   label: string;
   path?: string;
   isGroup?: boolean;
+  roles?: UserRole[];
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
@@ -26,14 +28,67 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     return route ? route.roles.includes(user.role) : false;
   };
   
-  // Static menu structure
-  const menuItems: MenuItem[] = [
+  // Define menu items for each role
+  const adminMenuItems: MenuItem[] = [
+    { icon: 'bi-house-door-fill', label: 'Home', isGroup: true },
+    { icon: 'bi-speedometer2', label: 'Dashboard', path: '/' },
+    { icon: 'bi-person', label: 'Profile', path: '/profile' },
+    
+    { icon: 'bi-clipboard-data', label: 'Report', path: '/report' },
+    
+    { icon: 'bi-people', label: 'User Management', isGroup: true },
+    { icon: 'bi-person-plus', label: 'Add Teacher', path: '/add-teacher' },
+    { icon: 'bi-people', label: 'Add Parents', path: '/add-parents' },
+    { icon: 'bi-mortarboard', label: 'Add Students', path: '/add-students' },
+    
+    { icon: 'bi-megaphone', label: 'Add Announcements', path: '/create-announcement' },
+    
+    { icon: 'bi-box-arrow-right', label: 'Logout', path: '/logout' },
+  ];
+  
+  const parentMenuItems: MenuItem[] = [
+    { icon: 'bi-house-door-fill', label: 'Home', isGroup: true },
+    { icon: 'bi-speedometer2', label: 'Dashboard', path: '/' },
+    { icon: 'bi-person', label: 'Profile', path: '/profile' },
+    
+    { icon: 'bi-clipboard-data', label: 'Report', path: '/report' },
+    
+    { icon: 'bi-calendar-check', label: 'Attendance', path: '/attendance' },
+    
+    { icon: 'bi-file-earmark-text', label: 'Result', path: '/result' },
+    
+    { icon: 'bi-three-dots', label: 'Others', isGroup: true },
+    { icon: 'bi-trophy', label: 'Achievements', path: '/achievement' },
+    { icon: 'bi-chat-dots', label: 'Feedback', path: '/feedback' },
+    { icon: 'bi-box-arrow-right', label: 'Logout', path: '/logout' },
+  ];
+  
+  const teacherMenuItems: MenuItem[] = [
     { icon: 'bi-house-door-fill', label: 'Home', isGroup: true },
     { icon: 'bi-speedometer2', label: 'Dashboard', path: '/' },
     { icon: 'bi-person', label: 'Profile', path: '/profile' },
     
     { icon: 'bi-book', label: 'Academics', isGroup: true },
-    { icon: 'bi-calendar2-week', label: 'Time-Table', path: '/time-table' },
+    { icon: 'bi-calendar-check', label: 'Attendance', path: '/attendance' },
+    
+    { icon: 'bi-file-earmark-text', label: 'Exam', isGroup: true },
+    { icon: 'bi-clipboard-data', label: 'Result', path: '/result' },
+    
+    { icon: 'bi-three-dots', label: 'Others', isGroup: true },
+    { icon: 'bi-card-list', label: 'Leave Application', path: '/leave' },
+    { icon: 'bi-calendar-event', label: 'Holidays', path: '/holiday' },
+    { icon: 'bi-chat-dots', label: 'Feedback', path: '/feedback' },
+    { icon: 'bi-bell', label: 'Announcements', path: '/announcements' },
+    { icon: 'bi-box-arrow-right', label: 'Logout', path: '/logout' },
+  ];
+  
+  const studentMenuItems: MenuItem[] = [
+    { icon: 'bi-house-door-fill', label: 'Home', isGroup: true },
+    { icon: 'bi-speedometer2', label: 'Dashboard', path: '/' },
+    { icon: 'bi-person', label: 'Profile', path: '/profile' },
+    
+    { icon: 'bi-book', label: 'Academics', isGroup: true },
+    { icon: 'bi-calendar2-week', label: 'Time Table', path: '/time-table' },
     { icon: 'bi-calendar-check', label: 'Attendance', path: '/attendance' },
     
     { icon: 'bi-file-earmark-text', label: 'Exam', isGroup: true },
@@ -47,6 +102,28 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     { icon: 'bi-bell', label: 'Announcements', path: '/announcements' },
     { icon: 'bi-box-arrow-right', label: 'Logout', path: '/logout' },
   ];
+  
+  // Select menu items based on user role
+  let menuItems: MenuItem[] = [];
+  
+  if (user) {
+    switch(user.role) {
+      case UserRole.ADMIN:
+        menuItems = adminMenuItems;
+        break;
+      case UserRole.PARENT:
+        menuItems = parentMenuItems;
+        break;
+      case UserRole.TEACHER:
+        menuItems = teacherMenuItems;
+        break;
+      case UserRole.STUDENT:
+        menuItems = studentMenuItems;
+        break;
+      default:
+        menuItems = studentMenuItems; // Default to student if role is not recognized
+    }
+  }
 
   // Filter out menu items for which the user doesn't have access permission
   const filteredMenuItems = menuItems.filter(item => {
