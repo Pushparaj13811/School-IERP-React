@@ -63,9 +63,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     { icon: 'bi-calendar-event', label: 'Holidays', path: '/holiday' },
     { icon: 'bi-trophy', label: 'Achievements', path: '/achievement' },
     { icon: 'bi-chat-dots', label: 'Feedback', path: '/feedback' },
+    { icon: 'bi-calendar-event', label: 'Contact Us', path: '/contact_us' },
     { icon: 'bi-box-arrow-right', label: 'Logout', path: '/logout' },
-   // { icon: 'bi-calendar-event', label: 'Contact_Us', path: '/contact_us' },
-
   ];
   
   const teacherMenuItems: MenuItem[] = [
@@ -179,7 +178,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
                   <i className={`bi ${item.icon} mr-3 text-lg`}></i> {item.label}
                 </div>
               ) : (
-                <Link to={item.path || '#'} className="flex items-center px-6 py-3 text-white text-sm">
+                <Link to={item.path || '#'} className="flex items-center px-6 py-3 text-sm text-white">
                   <i className={`bi ${item.icon} mr-3 text-lg`}></i> {item.label}
                 </Link>
               )}

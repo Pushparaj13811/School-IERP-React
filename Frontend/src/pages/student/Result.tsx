@@ -62,8 +62,15 @@ const Result: React.FC = () => {
 
   return (
     <div className="w-full p-4 bg-[#EEF5FF]">
-      {/* Term selector */}
-      <div className="w-full flex justify-end mb-4">
+      
+
+      <div className="w-full p-6 bg-white rounded-lg shadow-sm">
+        <div className="flex d-flex-row">
+        <h2 className="mb-4 text-2xl font-bold text-gray-800">Result</h2>
+          
+          
+          {/* Term selector */}
+      <div className="flex justify-end w-full mb-4">
         <div className="flex items-center">
           <span className="mr-2 font-medium">Term:</span>
           <div className="relative">
@@ -78,17 +85,16 @@ const Result: React.FC = () => {
                 </option>
               ))}
             </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-              <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+            <div className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 pointer-events-none">
+              <svg className="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                 <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
               </svg>
             </div>
           </div>
         </div>
       </div>
-
-      <div className="w-full bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Result</h2>
+        </div>
+        
         
         {/* Results table */}
         <div className="w-full mb-6">
@@ -101,9 +107,9 @@ const Result: React.FC = () => {
         </div>
           
         {/* Result summary */}
-        <div className="w-full mt-6 grid grid-cols-1 md:grid-cols-12 gap-4">
+        <div className="grid w-full grid-cols-1 gap-4 mt-6 md:grid-cols-12">
           <div className="md:col-span-9 bg-[#292648] rounded-lg p-5 text-white">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-2 gap-5 md:grid-cols-3">
               <div>
                 <p className="mb-1 font-semibold">Status:</p>
                 <p className="text-green-400">{resultSummary.status}</p>
@@ -130,7 +136,7 @@ const Result: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="md:col-span-3 bg-white rounded-lg border p-5 text-center">
+          <div className="p-5 text-center bg-white border rounded-lg md:col-span-3">
             <div>
               <p className="mb-1 font-semibold">Class Teacher:</p>
               <p>{resultSummary.classTeacher}</p>
