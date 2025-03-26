@@ -22,7 +22,7 @@ const Leave = lazy(() => import('../pages/student/Leave'));
 const LeaveApplicationCreate = lazy(() => import('../pages/student/LeaveApplicationCreate'));
 const Feedback = lazy(() => import('../pages/student/Feedback'));
 const TimeTable = lazy(() => import('../pages/student/TimeTable'));
-const Announcements = lazy(() => import('../pages/student/Announcements'));
+const Announcements = lazy(() => import('../pages/shared/AnnouncementView'));
 const Logout = lazy(() => import('../pages/Logout'));
 
 // Admin pages
@@ -34,6 +34,12 @@ const Report = lazy(() => import('../pages/admin/Report'));
 const StudentsList = lazy(() => import('../pages/admin/StudentsList'));
 const TeachersList = lazy(() => import('../pages/admin/TeachersList'));
 const ParentsList = lazy(() => import('../pages/admin/ParentsList'));
+
+const ResultEntry = lazy(() => import('../pages/teacher/ResultEntry'));
+const CreateAnnouncementTeacher = lazy(() => import('../pages/teacher/CreateAnnouncement'));
+
+// Update the imports at the top
+const AdminAnnouncements = lazy(() => import('../pages/admin/Announcements'));
 
 interface RouteComponentProps {
   user: { role: UserRole } | null;
@@ -100,7 +106,12 @@ export const routes: Route[] = [
   },
   {
     path: '/result',
-    component: Result,
+    component: ({ user }: RouteComponentProps) => {
+      if (user?.role === UserRole.TEACHER) {
+        return <ResultEntry />;
+      }
+      return <Result />;
+    },
     roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.PARENT],
   },
   {
@@ -125,7 +136,12 @@ export const routes: Route[] = [
   },
   {
     path: '/announcements',
-    component: Announcements,
+    component: ({ user }: RouteComponentProps) => {
+      if (user?.role === UserRole.ADMIN) {
+        return <AdminAnnouncements />;
+      }
+      return <Announcements />;
+    },
     roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN, UserRole.PARENT],
   },
   {
@@ -189,6 +205,11 @@ export const routes: Route[] = [
     path: '/parent-profile/:id',
     component: ParentProfile,
     roles: [UserRole.ADMIN],
+  },
+  {
+    path: '/announcements/create',
+    component: CreateAnnouncementTeacher,
+    roles: [UserRole.TEACHER],
   },
 ];
 
