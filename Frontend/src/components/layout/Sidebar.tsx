@@ -41,7 +41,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     { icon: 'bi-people', label: 'Parents', path: '/parents' },
     { icon: 'bi-mortarboard', label: 'Students', path: '/students' },
     
-    { icon: 'bi-megaphone', label: 'Add Announcements', path: '/announcements/create-announcement' },
+    { icon: 'bi-megaphone', label: 'Announcements', isGroup: true },
+    { icon: 'bi-bell', label: 'View Announcements', path: '/announcements' },
+    { icon: 'bi-plus-circle', label: 'Create Announcement', path: '/announcements/create-announcement' },
     
     { icon: 'bi-box-arrow-right', label: 'Logout', path: '/logout' },
   ];
@@ -78,7 +80,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     { icon: 'bi-card-list', label: 'Leave Application', path: '/leave' },
     { icon: 'bi-calendar-event', label: 'Holidays', path: '/holiday' },
     { icon: 'bi-chat-dots', label: 'Feedback', path: '/feedback' },
-    { icon: 'bi-bell', label: 'Announcements', path: '/announcements' },
+    { icon: 'bi-bell', label: 'View Announcements', path: '/announcements' },
     { icon: 'bi-box-arrow-right', label: 'Logout', path: '/logout' },
   ];
   
@@ -174,7 +176,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
                   <i className={`bi ${item.icon} mr-3 text-lg`}></i> {item.label}
                 </div>
               ) : (
-                <Link to={item.path || '#'} className="flex items-center px-6 py-3 text-white">
+                <Link to={item.path || '#'} className="flex items-center px-6 py-3 text-white text-sm">
                   <i className={`bi ${item.icon} mr-3 text-lg`}></i> {item.label}
                 </Link>
               )}
