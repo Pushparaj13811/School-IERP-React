@@ -68,6 +68,9 @@ model Student {
   monthlyAttendance MonthlyAttendance[]
   subjectResults    SubjectResult[]
   overallResults    OverallResult[]
+  leaveApplications LeaveApplication[]  @relation("StudentLeaveApplications")
+  achievements      Achievement[]
+  Feedback          Feedback[]
 
   @@map("students")
 }
@@ -92,14 +95,17 @@ model Teacher {
   profilePictureId Int? @unique
 
   // Relations
-  user           User             @relation(fields: [userId], references: [id])
-  designation    Designation      @relation(fields: [designationId], references: [id])
-  address        Address          @relation(fields: [addressId], references: [id])
-  profilePicture ProfilePicture?  @relation(fields: [profilePictureId], references: [id])
-  subjects       TeacherSubject[]
-  classes        TeacherClass[]
-  periods        Period[]
-  classResults   OverallResult[] // For class teacher role
+  user              User               @relation(fields: [userId], references: [id])
+  designation       Designation        @relation(fields: [designationId], references: [id])
+  address           Address            @relation(fields: [addressId], references: [id])
+  profilePicture    ProfilePicture?    @relation(fields: [profilePictureId], references: [id])
+  subjects          TeacherSubject[]
+  classes           TeacherClass[]
+  periods           Period[]
+  classResults      OverallResult[] // For class teacher role
+  leaveApplications LeaveApplication[] @relation("TeacherLeaveApplications")
+  achievements      Achievement[]
+  Feedback          Feedback[]
 
   @@map("teachers")
 }
@@ -123,6 +129,7 @@ model Parent {
   address        Address         @relation(fields: [addressId], references: [id])
   profilePicture ProfilePicture? @relation(fields: [profilePictureId], references: [id])
   children       Student[]
+  Feedback       Feedback[]
 
   @@map("parents")
 }
@@ -190,9 +197,11 @@ model Admin {
   profilePictureId Int? @unique
 
   // Relations
-  user           User            @relation(fields: [userId], references: [id])
-  address        Address         @relation(fields: [addressId], references: [id])
-  profilePicture ProfilePicture? @relation(fields: [profilePictureId], references: [id])
+  user              User               @relation(fields: [userId], references: [id])
+  address           Address            @relation(fields: [addressId], references: [id])
+  profilePicture    ProfilePicture?    @relation(fields: [profilePictureId], references: [id])
+  leaveApplications LeaveApplication[] @relation("AdminLeaveApplications")
+  Feedback          Feedback[]
 
   @@map("admins")
 }
@@ -444,6 +453,41 @@ model OverallResult {
   @@map("overall_results")
 }
 
+model LeaveType {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique // e.g., "Sick Leave", "Personal Leave"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  leaveApplications LeaveApplication[]
+
+  @@map("leave_types")
+}
+
+model LeaveApplication {
+  id            Int           @id @default(autoincrement())
+  applicantId   Int // ID of the person applying (student/teacher)
+  applicantType ApplicantType
+  leaveTypeId   Int
+  subject       String
+  fromDate      DateTime
+  toDate        DateTime
+  description   String
+  status        LeaveStatus   @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
+  student   Student?  @relation("StudentLeaveApplications", fields: [applicantId], references: [id], map: "leave_applications_student_fkey")
+  teacher   Teacher?  @relation("TeacherLeaveApplications", fields: [applicantId], references: [id], map: "leave_applications_teacher_fkey")
+  admin     Admin?    @relation("AdminLeaveApplications", fields: [applicantId], references: [id], map: "leave_applications_admin_fkey")
+
+  @@map("leave_applications")
+}
+
 enum Role {
   ADMIN
   STUDENT
@@ -463,4 +507,124 @@ enum ResultStatus {
   ABSENT
 }
 
+enum ApplicantType {
+  STUDENT
+  TEACHER
+  ADMIN
+}
 
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model HolidayType {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique // e.g., "Religious", "National", "School", "Saturday"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  holidays Holiday[]
+
+  @@map("holiday_types")
+}
+
+model Holiday {
+  id                Int      @id @default(autoincrement())
+  name              String
+  description       String?
+  fromDate          DateTime
+  toDate            DateTime
+  holidayTypeId     Int
+  isRecurring       Boolean  @default(false)
+  recurrencePattern String? // e.g., "3rd Saturday", "Every Saturday"
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  holidayType HolidayType @relation(fields: [holidayTypeId], references: [id])
+
+  @@unique([fromDate, toDate, name])
+  @@map("holidays")
+}
+
+model AchievementType {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique // e.g., "Academic", "Sports", "Cultural", "Leadership"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  achievements Achievement[]
+
+  @@map("achievement_types")
+}
+
+model Achievement {
+  id                Int      @id @default(autoincrement())
+  activityType      String
+  title             String
+  organization      String
+  numberOfDays      Int
+  fromDate          DateTime
+  toDate            DateTime
+  description       String
+  testimonial       String?
+  achievementTypeId Int
+  certificateUrl    String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Foreign keys
+  studentId Int?
+  teacherId Int?
+
+  // Relations
+  achievementType AchievementType @relation(fields: [achievementTypeId], references: [id])
+  student         Student?        @relation(fields: [studentId], references: [id])
+  teacher         Teacher?        @relation(fields: [teacherId], references: [id])
+
+  @@map("achievements")
+}
+
+model FeedbackType {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique // e.g., "Academic", "Infrastructure", "Teacher", "General"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  feedbacks Feedback[]
+
+  @@map("feedback_types")
+}
+
+model Feedback {
+  id             Int      @id @default(autoincrement())
+  subject        String
+  description    String
+  feedbackTypeId Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Foreign keys
+  studentId Int?
+  teacherId Int?
+  parentId  Int?
+  adminId   Int?
+
+  // Relations
+  feedbackType FeedbackType @relation(fields: [feedbackTypeId], references: [id])
+  student      Student?     @relation(fields: [studentId], references: [id], map: "feedbacks_student_fkey")
+  teacher      Teacher?     @relation(fields: [teacherId], references: [id], map: "feedbacks_teacher_fkey")
+  parent       Parent?      @relation(fields: [parentId], references: [id], map: "feedbacks_parent_fkey")
+  admin        Admin?       @relation(fields: [adminId], references: [id], map: "feedbacks_admin_fkey")
+
+  @@map("feedbacks")
+}
