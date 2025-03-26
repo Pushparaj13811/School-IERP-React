@@ -106,6 +106,7 @@ model Teacher {
   leaveApplications LeaveApplication[] @relation("TeacherLeaveApplications")
   achievements      Achievement[]
   Feedback          Feedback[]
+  announcements     Announcement[]     @relation("TeacherAnnouncements")
 
   @@map("teachers")
 }
@@ -147,6 +148,7 @@ model Class {
   timetables     Timetable[]
   periods        Period[]
   SubjectResult  SubjectResult[]
+  announcements  AnnouncementClass[]
 
   @@map("classes")
 }
@@ -202,6 +204,7 @@ model Admin {
   profilePicture    ProfilePicture?    @relation(fields: [profilePictureId], references: [id])
   leaveApplications LeaveApplication[] @relation("AdminLeaveApplications")
   Feedback          Feedback[]
+  announcements     Announcement[]     @relation("AdminAnnouncements")
 
   @@map("admins")
 }
@@ -277,6 +280,7 @@ model Section {
   students   Student[]
   timetables Timetable[]
   periods    Period[]
+  announcements AnnouncementSection[]
 
   @@unique([classId, name])
   @@map("sections")
@@ -627,4 +631,94 @@ model Feedback {
   admin        Admin?       @relation(fields: [adminId], references: [id], map: "feedbacks_admin_fkey")
 
   @@map("feedbacks")
+}
+
+model Announcement {
+  id          Int      @id @default(autoincrement())
+  title       String
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  expiresAt   DateTime?
+  isActive    Boolean  @default(true)
+  priority    Priority @default(NORMAL)
+  
+  // Foreign keys
+  createdById Int
+  createdByRole Role
+  teacherId   Int?
+  adminId     Int?
+
+  // Relations
+  targetClasses    AnnouncementClass[]
+  targetSections   AnnouncementSection[]
+  targetRoles      AnnouncementRole[]
+  attachments      AnnouncementAttachment[]
+  teacher          Teacher?    @relation("TeacherAnnouncements", fields: [teacherId], references: [id])
+  admin            Admin?      @relation("AdminAnnouncements", fields: [adminId], references: [id])
+
+  @@map("announcements")
+}
+
+model AnnouncementClass {
+  id             Int          @id @default(autoincrement())
+  announcementId Int
+  classId        Int
+  createdAt      DateTime     @default(now())
+
+  // Relations
+  announcement   Announcement @relation(fields: [announcementId], references: [id])
+  class          Class        @relation(fields: [classId], references: [id])
+
+  @@unique([announcementId, classId])
+  @@map("announcement_classes")
+}
+
+model AnnouncementSection {
+  id             Int          @id @default(autoincrement())
+  announcementId Int
+  sectionId      Int
+  createdAt      DateTime     @default(now())
+
+  // Relations
+  announcement   Announcement @relation(fields: [announcementId], references: [id])
+  section        Section      @relation(fields: [sectionId], references: [id])
+
+  @@unique([announcementId, sectionId])
+  @@map("announcement_sections")
+}
+
+model AnnouncementRole {
+  id             Int          @id @default(autoincrement())
+  announcementId Int
+  role           Role
+  createdAt      DateTime     @default(now())
+
+  // Relations
+  announcement   Announcement @relation(fields: [announcementId], references: [id])
+
+  @@unique([announcementId, role])
+  @@map("announcement_roles")
+}
+
+model AnnouncementAttachment {
+  id             Int          @id @default(autoincrement())
+  announcementId Int
+  fileName       String
+  fileUrl        String
+  fileType       String
+  fileSize       Int
+  createdAt      DateTime     @default(now())
+
+  // Relations
+  announcement   Announcement @relation(fields: [announcementId], references: [id])
+
+  @@map("announcement_attachments")
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
 }
