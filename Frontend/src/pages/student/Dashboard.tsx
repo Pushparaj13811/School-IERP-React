@@ -8,19 +8,18 @@ interface StatCardProps {
   color: string;
   onClick?: () => void;
 }
-
 const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color, onClick }) => {
   return (
     <div 
-      className="rounded-md overflow-hidden shadow-sm cursor-pointer" 
+      className="overflow-hidden rounded-md shadow-sm cursor-pointer" 
       onClick={onClick}
     >
       <div className={`flex items-center justify-between p-4 ${color}`}>
         <div className="flex-1">
-          <div className="text-white text-xs">{title}</div>
-          <div className="text-white text-3xl font-bold">{value}</div>
+          <div className="text-xs text-white">{title}</div>
+          <div className="text-3xl font-bold text-white">{value}</div>
         </div>
-        <div className="text-white text-4xl">
+        <div className="text-4xl text-white">
           <i className={`bi ${icon}`}></i>
         </div>
       </div>
@@ -44,7 +43,14 @@ const StudentDetail: React.FC<StudentDetailProps> = ({ label, value }) => {
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-
+  
+  const navigateProfileSection = () => {
+    navigate('/profile');
+  };
+  const navigateToAnnoucementPage = () =>{
+    navigate('/announcements')
+  };
+  
   // Student details data
   const studentDetails = [
     { label: 'Student No.', value: '22SOECE11630' },
@@ -85,7 +91,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-2 md:grid-cols-4">
         <StatCard
           title="Exam Result"
           value="01"
@@ -117,22 +123,22 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Student details and announcements */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
         {/* Student details */}
-        <div className="md:col-span-7 bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-xl font-bold mb-4">My Details</h3>
+        <div className="p-6 bg-white rounded-lg shadow-sm md:col-span-7">
+          <h3 className="mb-4 text-xl font-bold">My Details</h3>
           <hr className="mb-4" />
 
           <div className="flex mb-6">
             <div className="mr-6">
-              <div className="w-36 h-36 rounded-full overflow-hidden border-4 border-blue-100">
+              <div className="overflow-hidden border-4 border-blue-100 rounded-full cursor-pointer w-36 h-36" onClick={navigateProfileSection}>
                 <img
                   src="https://cdn.pixabay.com/photo/2015/06/22/08/40/child-817373_640.jpg"
                   alt="Profile"
-                  className="w-full h-full object-cover"
+                  className="object-cover w-full h-full"
                 />
               </div>
-              <div className="flex mt-4 justify-center space-x-2">
+              <div className="flex justify-center mt-4 space-x-2">
                 <button className="bg-[#292648] text-white px-4 py-2 rounded text-sm">Edit</button>
                 <button className="bg-[#292648] text-white px-4 py-2 rounded text-sm">Download</button>
               </div>
@@ -153,8 +159,8 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Announcements */}
-        <div className="md:col-span-5 bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-xl font-bold mb-4">Announcements</h3>
+        <div className="p-6 bg-white rounded-lg shadow-sm md:col-span-5">
+          <h3 className="mb-4 text-xl font-bold">Announcements</h3>
           <hr className="mb-4" />
 
           <div className="space-y-6">
@@ -162,12 +168,12 @@ const Dashboard: React.FC = () => {
               <div key={announcement.id} className="mb-4">
                 <div className="text-xs text-gray-500">{announcement.date}</div>
                 <div className="flex items-center mt-1">
-                  <span className="text-gray-700 font-semibold">📢 {announcement.title}</span>
-                  <span className="text-blue-500 text-xs ml-2">📄</span>
+                  <span className="font-semibold text-gray-700">📢 {announcement.title}</span>
+                  <span className="ml-2 text-xs text-blue-500">📄</span>
                 </div>
-                <p className="text-sm text-gray-600 mt-1">{announcement.content}</p>
-                <div className="text-right mt-2">
-                  <button className="text-[#292648] font-bold text-sm">View More</button>
+                <p className="mt-1 text-sm text-gray-600">{announcement.content}</p>
+                <div className="mt-2 text-right">
+                  <button className="text-sm text-white bg-[#292648]" onClick={navigateToAnnoucementPage} >View More</button>
                 </div>
                 <hr className="mt-4" />
               </div>

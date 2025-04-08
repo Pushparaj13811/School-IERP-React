@@ -37,6 +37,7 @@ const ParentsList = lazy(() => import('../pages/admin/ParentsList'));
 
 const ResultEntry = lazy(() => import('../pages/teacher/ResultEntry'));
 const CreateAnnouncementTeacher = lazy(() => import('../pages/teacher/CreateAnnouncement'));
+const Contact = lazy(() => import('../pages/shared/Contact'));
 
 // Update the imports at the top
 const AdminAnnouncements = lazy(() => import('../pages/admin/Announcements'));
@@ -105,6 +106,11 @@ export const routes: Route[] = [
     roles: [UserRole.STUDENT, UserRole.PARENT],
   },
   {
+    path:'/contact_us',
+    component: Contact,
+    roles: [UserRole.PARENT],
+  },
+  {
     path: '/result',
     component: ({ user }: RouteComponentProps) => {
       if (user?.role === UserRole.TEACHER) {
@@ -127,7 +133,7 @@ export const routes: Route[] = [
   {
     path: '/feedback',
     component: Feedback,
-    roles: [UserRole.STUDENT],
+    roles: [UserRole.STUDENT,UserRole.PARENT],
   },
   {
     path: '/time-table',
@@ -188,7 +194,7 @@ export const routes: Route[] = [
   {
     path: '/report',
     component: Report,
-    roles: [UserRole.ADMIN, UserRole.PARENT],
+    roles: [UserRole.ADMIN],
   },
   // Profile view routes
   {

@@ -45,8 +45,8 @@ const Leave: React.FC = () => {
 
   return (
     <div className="p-4 bg-[#EEF5FF]">
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex justify-between items-center mb-6">
+        <div className="p-6 bg-white rounded-lg shadow-sm">
+          <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-800">Leave Application</h2>
             <button 
               onClick={handleAddLeave}
@@ -56,7 +56,7 @@ const Leave: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {leaveApplications.map((leave) => (
               <div key={leave.id} className="bg-[#EBF4FF] rounded-lg border border-gray-200 overflow-hidden">
                 <div className="bg-[#292648] text-white p-3">

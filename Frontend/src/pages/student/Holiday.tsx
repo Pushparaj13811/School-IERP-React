@@ -215,34 +215,34 @@ const Holiday: React.FC = () => {
   return (
     <div className="p-4 bg-[#EEF5FF]">
       {/* Holiday Details Header */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Holiday Details</h2>
+      <div className="p-6 bg-white rounded-lg shadow-sm">
+        <h2 className="mb-4 text-2xl font-bold text-gray-800">Holiday Details</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
           {/* Holiday highlight card - left side */}
-          <div className="md:col-span-5 bg-[#F8FAFF] rounded-lg overflow-hidden shadow-sm">
-            <div className="text-center p-8">
-              <div className="text-sm text-gray-600 mb-1">{highlightedHoliday.month}</div>
+          <div className="md:col-span-5 bg-[#EDF6FF] rounded-lg overflow-hidden shadow-sm">
+            <div className="p-8 text-center">
+              <div className="mb-1 text-sm text-gray-600">{highlightedHoliday.month}</div>
               <div className="text-[80px] font-bold text-[#C32232] leading-none mb-1">{highlightedHoliday.day}</div>
-              <div className="text-sm text-gray-600 mb-4">{highlightedHoliday.weekday}</div>
+              <div className="mb-4 text-sm text-gray-600">{highlightedHoliday.weekday}</div>
               
               <div className="h-[1px] bg-gray-300 my-4 mx-12"></div>
               
-              <div className="font-bold text-xl text-gray-800 mb-2">{highlightedHoliday.date}</div>
+              <div className="mb-2 text-xl font-bold text-gray-800">{highlightedHoliday.date}</div>
               <div className="font-bold text-xl text-[#C32232] mb-4">{highlightedHoliday.name}</div>
               
-              <p className="text-sm text-gray-600 px-4">
+              <p className="px-4 text-sm text-gray-600">
                 {highlightedHoliday.description}
               </p>
             </div>
           </div>
           
           {/* Holiday calendar - right side */}
-          <div className="md:col-span-7 overflow-hidden">
+          <div className="overflow-hidden md:col-span-7">
             <div className="bg-[#292648] text-white py-3 px-6 flex justify-between items-center">
               <div className="font-semibold">Holiday Name</div>
-              <div className="flex">
-                <div className="font-semibold px-4">From Date</div>
+              <div className="flex pr-5 mr-8">
+                <div className="pr-10 font-semibold">From Date</div>
                 <div className="font-semibold">To Date</div>
               </div>
             </div>
@@ -252,14 +252,14 @@ const Holiday: React.FC = () => {
                 <div 
                   key={index} 
                   className={`flex justify-between items-center py-3 px-6 border-b ${
-                    index % 2 === 0 ? 'bg-[#EEF5FF]' : 'bg-white'
+                    index % 2 === 0 ? 'bg-[#EEF5FF]' : 'bg-[#D9E4FF]'
                   } cursor-pointer hover:bg-gray-100 transition-colors`}
                   onClick={() => handleHolidayClick(holiday)}
                 >
                   <div className="text-sm font-medium text-gray-800">{holiday.holidayName}</div>
                   <div className="flex">
-                    <div className="text-sm text-gray-600 w-28 text-center">{holiday.fromDate}</div>
-                    <div className="text-sm text-gray-600 w-28 text-center">{holiday.toDate}</div>
+                    <div className="text-sm text-center text-gray-600 w-28">{holiday.fromDate}</div>
+                    <div className="text-sm text-center text-gray-600 w-28">{holiday.toDate}</div>
                   </div>
                 </div>
               ))}

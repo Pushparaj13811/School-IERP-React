@@ -22,7 +22,7 @@ const sampleAchievements: Achievement[] = Array.from({ length: 9 }, (_, index) =
   id: index + 1,
   title: "21 Day NextCode Challenge",
   description: "I solved HTML CSS Bootstratp problem for 21 days given by N........",
-  certificateUrl: "https://images.pexels.com/photos/5428833/pexels-photo-5428833.jpeg?auto=compress&cs=tinysrgb&w=800",
+  certificateUrl: "https://www.wordtemplates4u.org/wp-content/uploads/2018/12/Achievement-Certificate-Template-02.jpg",
 }));
 
 const Achievement: React.FC = () => {
@@ -67,8 +67,8 @@ const Achievement: React.FC = () => {
 
   return (
     <div className="p-4 bg-[#EEF5FF]">
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <div className="flex justify-between items-center mb-6">
+      <div className="p-6 bg-white rounded-lg shadow-sm">
+        <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-800">Achievements</h2>
           <button 
             onClick={handleAddAchievement}
@@ -78,7 +78,7 @@ const Achievement: React.FC = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {achievements.map((achievement) => (
             <AchievementCard 
               key={achievement.id}
