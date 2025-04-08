@@ -18,7 +18,7 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
             <div className="font-bold text-xl text-[#292648] mr-2">JST</div>
             <div className="text-[#292648] font-bold text-xl">ERP</div>
           </Link>
-          <div className="hidden md:block ml-6 font-semibold text-gray-700 text-lg">
+          <div className="hidden ml-6 text-lg font-semibold text-gray-700 md:block">
             Shree Janahit School Management System
           </div>
         </div>
@@ -28,19 +28,19 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
           {isAuthenticated && (
             <>
               {/* Search box - Only show when authenticated */}
-              <div className="hidden md:flex items-center relative">
+              <div className="relative items-center hidden md:flex">
                 <input
                   type="text"
                   placeholder="Search Here"
-                  className="bg-white border border-gray-300 rounded-md py-1 px-3 pl-9 text-sm focus:outline-none"
+                  className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md pl-9 focus:outline-none"
                 />
-                <i className="bi bi-search absolute left-3 text-gray-500"></i>
+                <i className="absolute text-gray-500 bi bi-search left-3"></i>
               </div>
 
               {/* Language selector - Only show when authenticated */}
-              <div className="hidden md:flex items-center text-gray-700 cursor-pointer">
+              <div className="items-center hidden text-gray-700 cursor-pointer md:flex">
                 <span>Language</span>
-                <i className="bi bi-chevron-down ml-1"></i>
+                <i className="ml-1 bi bi-chevron-down"></i>
               </div>
             </>
           )}
@@ -49,23 +49,24 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
           <div className="flex items-center text-gray-700 cursor-pointer">
             {isAuthenticated ? (
               <>
-                <div className="hidden md:block mr-2 text-right">
-                  <div className="font-semibold">{user?.name || 'User'}</div>
-                  <div className="text-xs text-gray-500">{user?.role || 'Student'}</div>
-                </div>
+                
                 <div className="h-9 w-9 rounded-full bg-[#292648] flex items-center justify-center text-white overflow-hidden">
                   <img 
                     src="https://cdn.pixabay.com/photo/2015/06/22/08/40/child-817373_640.jpg"
                     alt="Profile" 
-                    className="h-full w-full object-cover"
+                    className="object-cover w-full h-full"
                   />
                 </div>
-                <i className="bi bi-chevron-down ml-1"></i>
+                <div className="hidden ml-1 mr-1 md:block text-start">
+                  <div className="font-semibold ">{user?.name || 'User'}</div>
+                  <div className="text-xs text-gray-500 ">{user?.role || 'Student'}</div>
+                </div>
+                <i className="ml-1 bi bi-chevron-down"></i>
               </>
             ) : (
               <Link to="/login" className="flex items-center">
                 <span className="text-[#292648] font-semibold">Login</span>
-                <i className="bi bi-box-arrow-in-right ml-1 text-lg"></i>
+                <i className="ml-1 text-lg bi bi-box-arrow-in-right"></i>
               </Link>
             )}
           </div>
@@ -74,9 +75,9 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
           {isAuthenticated && (
             <button
               onClick={toggleSidebar}
-              className="md:hidden text-gray-700 focus:outline-none"
+              className="bg-[#D9E4FF] md:hidden focus:outline-none"
             >
-              <i className="bi bi-list text-2xl"></i>
+              <i className="text-2xl bi bi-list"></i>
             </button>
           )}
         </div>
