@@ -241,8 +241,8 @@ const Holiday: React.FC = () => {
           <div className="overflow-hidden md:col-span-7">
             <div className="bg-[#292648] text-white py-3 px-6 flex justify-between items-center">
               <div className="font-semibold">Holiday Name</div>
-              <div className="flex">
-                <div className="px-4 font-semibold">From Date</div>
+              <div className="flex pr-5 mr-8">
+                <div className="pr-10 font-semibold">From Date</div>
                 <div className="font-semibold">To Date</div>
               </div>
             </div>
@@ -252,7 +252,7 @@ const Holiday: React.FC = () => {
                 <div 
                   key={index} 
                   className={`flex justify-between items-center py-3 px-6 border-b ${
-                    index % 2 === 0 ? 'bg-[#EEF5FF]' : 'bg-white'
+                    index % 2 === 0 ? 'bg-[#EEF5FF]' : 'bg-[#D9E4FF]'
                   } cursor-pointer hover:bg-gray-100 transition-colors`}
                   onClick={() => handleHolidayClick(holiday)}
                 >

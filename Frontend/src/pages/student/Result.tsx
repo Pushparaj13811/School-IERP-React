@@ -107,36 +107,39 @@ const Result: React.FC = () => {
         </div>
           
         {/* Result summary */}
-        <div className="grid w-full grid-cols-1 gap-4 mt-6 md:grid-cols-12">
-          <div className="md:col-span-9 bg-[#292648] rounded-lg p-5 text-white">
-            <div className="grid grid-cols-2 gap-5 md:grid-cols-3">
-              <div>
-                <p className="mb-1 font-semibold">Status:</p>
-                <p className="text-green-400">{resultSummary.status}</p>
-              </div>
-              <div>
-                <p className="mb-1 font-semibold">Strongest Subject:</p>
-                <p>{resultSummary.strongestSubject}</p>
-              </div>
-              <div>
-                <p className="mb-1 font-semibold">Note:</p>
-                <p>{resultSummary.note}</p>
-              </div>
-              <div>
-                <p className="mb-1 font-semibold">Total Percentage:</p>
-                <p>{resultSummary.totalPercentage}</p>
-              </div>
-              <div>
-                <p className="mb-1 font-semibold">Subject to be Improved:</p>
-                <p>{resultSummary.subjectToImprove}</p>
-              </div>
-              <div>
-                <p className="mb-1 font-semibold">Rank:</p>
-                <p>{resultSummary.rank}</p>
-              </div>
+        <div className="grid w-full grid-cols-1 gap-4 mt-6 rounded md:grid-cols-12">
+          <div className="md:col-span-8 bg-[#292648] rounded-lg p-5 text-dark ">
+              <div className="bg-[#EEF5FF] p-3 rounded">
+                <div className="grid grid-cols-2 gap-5 md:grid-cols-3">
+                <div>
+                  <p className="mb-1 font-semibold">Status:</p>
+                  <p className="text-green-400">{resultSummary.status}</p>
+                </div>
+                <div>
+                  <p className="mb-1 font-semibold">Strongest Subject:</p>
+                  <p>{resultSummary.strongestSubject}</p>
+                </div>
+                <div>
+                  <p className="mb-1 font-semibold">Note:</p>
+                  <p>{resultSummary.note}</p>
+                </div>
+                <div>
+                  <p className="mb-1 font-semibold">Total Percentage:</p>
+                  <p>{resultSummary.totalPercentage}</p>
+                </div>
+                <div>
+                  <p className="mb-1 font-semibold">Subject to be Improved:</p>
+                  <p>{resultSummary.subjectToImprove}</p>
+                </div>
+                <div>
+                  <p className="mb-1 font-semibold">Rank:</p>
+                  <p>{resultSummary.rank}</p>
+                </div>
             </div>
+              </div>
           </div>
-          <div className="p-5 text-center bg-white border rounded-lg md:col-span-3">
+          <div className="p-5 rounded-lg bg-[#292648] text-centerborder md:col-span-4">
+            <div className="bg-[#EEF5FF] p-8  flex flex-row gap-3 rounded md:flex-col lg:flex-row">
             <div>
               <p className="mb-1 font-semibold">Class Teacher:</p>
               <p>{resultSummary.classTeacher}</p>
@@ -147,6 +150,7 @@ const Result: React.FC = () => {
                 alt="Teacher's Signature" 
                 className="inline-block h-16"
               />
+            </div>
             </div>
           </div>
         </div>
