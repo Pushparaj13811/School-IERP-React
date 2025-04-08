@@ -1,39 +1,40 @@
-import express from "express";
-import cors from "cors";
 import dotenv from "dotenv";
-import cookieParser from "cookie-parser";
+import app from './app.js';
+import { config } from './config/config.js';
+import { prisma } from './databases/prismaClient.js';
 
 dotenv.config();
 
-const app = express();
+const PORT = config.port || 3000;
 
-app.use(cors());
-app.use(express.json());
+// Start server
+const server = app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
 
-app.use(express.urlencoded({ extended: true, limit: "15kb" }));
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+    console.log('UNHANDLED REJECTION! 💥 Shutting down...');
+    console.log(err.name, err.message);
+    server.close(() => {
+        process.exit(1);
+    });
+});
 
-app.use(cookieParser());
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+    console.log('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+    console.log(err.name, err.message);
+    process.exit(1);
+});
 
-app.use(express.static("public"));
-
-app.use(helmet());
-
-app.use(xss());
-
-app.use(mongoSanitize());   
-
-app.use(hpp());
-
-app.use(limiter());
-
-app.use(compression()); 
-
-app.use(express.static("public"));
-
-app.use(express.static("public"));
-
-app.use(express.static("public"));
-
-
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('👋 SIGTERM RECEIVED. Shutting down gracefully');
+    server.close(() => {
+        console.log('💥 Process terminated!');
+        prisma.$disconnect();
+    });
+});
 
 export { app };
