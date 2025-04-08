@@ -45,9 +45,9 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-4xl p-6">
-        <div className="flex justify-between items-center mb-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className=" bg-[#EEF5FF] rounded-lg w-full max-w-4xl p-6">
+        <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-800">Achievement Details</h2>
           <button 
             onClick={onClose}
@@ -58,9 +58,9 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div>
-              <label className="block text-gray-600 mb-1">Activity Type</label>
+              <label className="block mb-1 text-gray-600">Activity Type</label>
               <input
                 type="text"
                 name="activityType"
@@ -70,7 +70,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
               />
             </div>
             <div>
-              <label className="block text-gray-600 mb-1">Title</label>
+              <label className="block mb-1 text-gray-600">Title</label>
               <input
                 type="text"
                 name="title"
@@ -80,7 +80,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
               />
             </div>
             <div>
-              <label className="block text-gray-600 mb-1">Organizations</label>
+              <label className="block mb-1 text-gray-600">Organizations</label>
               <input
                 type="text"
                 name="organizations"
@@ -90,7 +90,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
               />
             </div>
             <div>
-              <label className="block text-gray-600 mb-1">No of Days</label>
+              <label className="block mb-1 text-gray-600">No of Days</label>
               <input
                 type="text"
                 name="noOfDays"
@@ -100,7 +100,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
               />
             </div>
             <div>
-              <label className="block text-gray-600 mb-1">From</label>
+              <label className="block mb-1 text-gray-600">From</label>
               <input
                 type="date"
                 name="from"
@@ -110,7 +110,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
               />
             </div>
             <div>
-              <label className="block text-gray-600 mb-1">To</label>
+              <label className="block mb-1 text-gray-600">To</label>
               <input
                 type="date"
                 name="to"
@@ -121,9 +121,9 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <div className="grid grid-cols-1 gap-6 mt-6 md:grid-cols-2">
             <div>
-              <label className="block text-gray-600 mb-1">Description</label>
+              <label className="block mb-1 text-gray-600">Description</label>
               <textarea
                 name="description"
                 value={formData.description}
@@ -133,7 +133,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
               ></textarea>
             </div>
             <div>
-              <label className="block text-gray-600 mb-1">Testimonial</label>
+              <label className="block mb-1 text-gray-600">Testimonial</label>
               <textarea
                 name="testimonial"
                 value={formData.testimonial}

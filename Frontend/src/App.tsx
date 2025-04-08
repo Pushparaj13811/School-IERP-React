@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { routes } from './routes';
 import AuthLayout from "./components/layout/AuthLayout";
+import "@fortawesome/fontawesome-free/css/all.min.css";
 import PublicLayout from "./components/layout/PublicLayout";
 
 // Import bootstrap icons

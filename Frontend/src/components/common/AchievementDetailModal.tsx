@@ -24,9 +24,9 @@ const AchievementDetailModal: React.FC<AchievementDetailModalProps> = ({ isOpen,
   if (!isOpen || !achievement) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-4xl p-6">
-        <div className="flex justify-between items-center mb-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="w-full max-w-4xl p-6 bg-[#EEF5FF] rounded-lg">
+        <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-800">Achievement Details</h2>
           <button 
             onClick={onClose}
@@ -36,45 +36,45 @@ const AchievementDetailModal: React.FC<AchievementDetailModalProps> = ({ isOpen,
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
           <div>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <p className="text-gray-600 mb-1">Activity Type</p>
+                <p className="mb-1 text-gray-600">Activity Type</p>
                 <p className="font-medium">{achievement.activityType || "22SOECE11630"}</p>
               </div>
               <div>
-                <p className="text-gray-600 mb-1">Activity Name</p>
+                <p className="mb-1 text-gray-600">Activity Name</p>
                 <p className="font-medium">{achievement.activityName || achievement.title || "Ruchi Pathak"}</p>
               </div>
               <div>
-                <p className="text-gray-600 mb-1">Organization</p>
+                <p className="mb-1 text-gray-600">Organization</p>
                 <p className="font-medium">{achievement.organization || "Female"}</p>
               </div>
               <div>
-                <p className="text-gray-600 mb-1">No of Days</p>
+                <p className="mb-1 text-gray-600">No of Days</p>
                 <p className="font-medium">{achievement.noOfDays || "2002-04-01"}</p>
               </div>
               <div>
-                <p className="text-gray-600 mb-1">Held From</p>
+                <p className="mb-1 text-gray-600">Held From</p>
                 <p className="font-medium">{achievement.heldFrom || "Kiran Pathak"}</p>
               </div>
               <div>
-                <p className="text-gray-600 mb-1">Held To</p>
+                <p className="mb-1 text-gray-600">Held To</p>
                 <p className="font-medium">{achievement.heldTo || "Sarina Pathak"}</p>
               </div>
             </div>
             <div>
-              <p className="text-gray-600 mb-1">Description</p>
+              <p className="mb-1 text-gray-600">Description</p>
               <p className="font-medium">{achievement.description || "7"}</p>
             </div>
           </div>
-          <div className="flex justify-center items-center">
-            <div className="border border-orange-400 rounded-lg overflow-hidden">
+          <div className="flex items-center justify-center">
+            <div className="overflow-hidden border border-orange-400 rounded-lg">
               <img 
                 src={achievement.certificateUrl} 
                 alt={achievement.title} 
-                className="max-w-full h-auto"
+                className="h-auto max-w-full"
               />
             </div>
           </div>

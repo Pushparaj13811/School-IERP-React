@@ -52,16 +52,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     { icon: 'bi-house-door-fill', label: 'Home', isGroup: true },
     { icon: 'bi-speedometer2', label: 'Dashboard', path: '/' },
     { icon: 'bi-person', label: 'Profile', path: '/profile' },
-    
     { icon: 'bi-clipboard-data', label: 'Report', path: '/report' },
-    
-    { icon: 'bi-calendar-check', label: 'Attendance', path: '/attendance' },
-    
-    { icon: 'bi-file-earmark-text', label: 'Result', path: '/result' },
-    
     { icon: 'bi-three-dots', label: 'Others', isGroup: true },
     { icon: 'bi-calendar-event', label: 'Holidays', path: '/holiday' },
-    { icon: 'bi-trophy', label: 'Achievements', path: '/achievement' },
+    { icon: 'bi-bell', label: 'Announcements', path: '/announcements' },
     { icon: 'bi-chat-dots', label: 'Feedback', path: '/feedback' },
     { icon: 'bi-calendar-event', label: 'Contact Us', path: '/contact_us' },
     { icon: 'bi-box-arrow-right', label: 'Logout', path: '/logout' },

@@ -28,11 +28,11 @@ const Table: React.FC<TableProps> = ({
     <div className="shadow-sm rounded p-3 mb-4 bg-[#F1F4F9] w-full">
       {title && (
         <>
-          <h4 className="font-bold mb-3 text-start">{title}</h4>
+          <h4 className="mb-3 font-bold text-start">{title}</h4>
           <hr className="mb-3" />
         </>
       )}
-      <div className="overflow-x-auto w-full">
+      <div className="w-full overflow-x-auto">
         <table className="w-full border table-auto">
           <thead>
             <tr>
