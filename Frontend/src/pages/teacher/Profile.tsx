@@ -182,7 +182,33 @@ const TeacherProfile: React.FC = () => {
                     <div>
                       <p className="text-gray-600 mb-1">Classes</p>
                       <p className="font-medium">
-                        {teacherData.classes.map((cls) => cls.class?.name || 'Unnamed').join(', ')}
+                        {teacherData.classes.map((cls) => {
+                          // Handle both potential data structures
+                          if (cls && typeof cls === 'object' && 'class' in cls && cls.class) {
+                            return cls.class.name;
+                          } else if (cls && typeof cls === 'object' && 'name' in cls) {
+                            // If classes is an array of direct class objects
+                            return cls.name as string;
+                          }
+                          return '';
+                        }).filter(Boolean).join(', ') || 'N/A'}
+                      </p>
+                    </div>
+                  )}
+                  {teacherData.sections && teacherData.sections.length > 0 && (
+                    <div>
+                      <p className="text-gray-600 mb-1">Sections</p>
+                      <p className="font-medium">
+                        {teacherData.sections.map((sec) => {
+                          // Handle both potential data structures
+                          if (sec && typeof sec === 'object' && 'section' in sec && sec.section) {
+                            return sec.section.name;
+                          } else if (sec && typeof sec === 'object' && 'name' in sec) {
+                            // If sections is an array of direct section objects
+                            return sec.name as string;
+                          }
+                          return '';
+                        }).filter(Boolean).join(', ') || 'N/A'}
                       </p>
                     </div>
                   )}
