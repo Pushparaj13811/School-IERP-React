@@ -3,26 +3,12 @@ import { FaPaperPlane, FaUpload, FaPlus, FaTrash } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { userAPI } from '../../services/api';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ParentFormData, Parent } from '../../types/api';
-
-interface StudentOption {
-  id: number;
-  name: string;
-  grade: string;
-}
+import { ParentFormData, Parent, Student } from '../../types/api';
 
 interface LocationState {
   editMode?: boolean;
   parentData?: Parent;
 }
-
-// Mock data for existing students
-const mockStudents: StudentOption[] = [
-  { id: 1, name: 'John Doe', grade: 'Grade 1' },
-  { id: 2, name: 'Jane Smith', grade: 'Grade 2' },
-  { id: 3, name: 'Bob Johnson', grade: 'Grade 3' },
-  { id: 4, name: 'Alice Brown', grade: 'Grade 4' },
-];
 
 const AddParents: React.FC = () => {
   const navigate = useNavigate();
@@ -33,7 +19,7 @@ const AddParents: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(isEditMode);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Parent info
   const [name, setName] = useState('');
@@ -43,6 +29,10 @@ const AddParents: React.FC = () => {
   
   // Child information
   const [children, setChildren] = useState<number[]>([]);
+  
+  // Available students for selection
+  const [availableStudents, setAvailableStudents] = useState<Student[]>([]);
+  const [studentsLoading, setStudentsLoading] = useState(true);
   
   // Address info
   const [addressLine1, setAddressLine1] = useState('');
@@ -59,6 +49,32 @@ const AddParents: React.FC = () => {
   // File upload
   const [profilePicture, setProfilePicture] = useState<File | null>(null);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
+
+  // Fetch available students
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        setStudentsLoading(true);
+        const response = await userAPI.getStudents();
+        
+        if (response.data?.status === 'success' && response.data?.data?.students) {
+          console.log("Fetched students data:", response.data.data.students);
+          setAvailableStudents(response.data.data.students);
+        } else {
+          toast.error('Failed to load students data');
+          setAvailableStudents([]);
+        }
+      } catch (error) {
+        console.error('Error fetching students:', error);
+        toast.error('Failed to load students. Please try again.');
+        setAvailableStudents([]);
+      } finally {
+        setStudentsLoading(false);
+      }
+    };
+
+    fetchStudents();
+  }, []);
 
   // Fill form with parent data if in edit mode
   useEffect(() => {
@@ -81,6 +97,9 @@ const AddParents: React.FC = () => {
       
       // Fetch additional parent details if needed
       fetchParentDetails(parentToEdit.id);
+    } else {
+      // Only stop loading if not in edit mode
+      setIsLoading(false);
     }
   }, [isEditMode, parentToEdit]);
 
@@ -268,7 +287,7 @@ const AddParents: React.FC = () => {
   };
 
   if (isLoading) {
-    return <div className="flex justify-center items-center h-64">Loading...</div>;
+    return <div className="flex justify-center items-center h-64">Loading parent data...</div>;
   }
 
   return (
@@ -360,18 +379,24 @@ const AddParents: React.FC = () => {
               <div className="space-y-3 mb-4">
                 {children.map((childId, index) => (
                   <div key={index} className="flex items-center gap-2">
-            <select
+                    <select
                       value={childId}
                       onChange={(e) => handleChildChange(index, Number(e.target.value))}
                       className="flex-grow p-2 border rounded-md"
                     >
                       <option value={0}>Select a student</option>
-                      {mockStudents.map(student => (
-                        <option key={student.id} value={student.id}>
-                          {student.name} ({student.grade})
-                        </option>
-                      ))}
-            </select>
+                      {studentsLoading ? (
+                        <option disabled>Loading students...</option>
+                      ) : availableStudents.length > 0 ? (
+                        availableStudents.map(student => (
+                          <option key={student.id} value={student.id}>
+                            {student.name} {student.rollNo ? `(Roll: ${student.rollNo})` : ''} {student.class?.name ? `- ${student.class.name}` : ''}
+                          </option>
+                        ))
+                      ) : (
+                        <option disabled>No students available</option>
+                      )}
+                    </select>
                     <button
                       type="button"
                       onClick={() => handleRemoveChild(index)}
@@ -381,6 +406,11 @@ const AddParents: React.FC = () => {
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+            {availableStudents.length === 0 && !studentsLoading && (
+              <div className="text-yellow-600 text-sm mb-4">
+                No students available. Please add students first before assigning them to a parent.
               </div>
             )}
           </div>

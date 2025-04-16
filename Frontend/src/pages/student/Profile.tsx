@@ -131,7 +131,20 @@ const Profile: React.FC = () => {
     }
     
     try {
-      // If it's a string (should be the case always after our preprocessing)
+      // Check if profilePicture is an object with url property
+      if (profilePicture && typeof profilePicture === 'object' && profilePicture !== null) {
+        // Type assertion to access the url property safely
+        const pictureObj = profilePicture as unknown as { url?: string };
+        if (pictureObj.url) {
+          console.log("Profile picture is an object with url:", pictureObj.url);
+          const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+          const fullUrl = `${baseUrl}${pictureObj.url.startsWith('/') ? '' : '/'}${pictureObj.url}`;
+          console.log("Constructed full URL from object:", fullUrl);
+          return fullUrl;
+        }
+      }
+      
+      // If it's a string
       if (typeof profilePicture === 'string') {
         console.log("Profile picture is a string");
         
