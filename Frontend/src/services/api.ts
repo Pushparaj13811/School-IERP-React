@@ -13,7 +13,8 @@ import {
   Teacher,
   Parent,
   StudentFormData,
-  ParentFormData
+  ParentFormData,
+  Subject
 } from '../types/api';
 
 // Define missing interfaces
@@ -196,6 +197,7 @@ export const academicAPI = {
     }),
     getSectionsByClass: (classId: number) => api.get<ApiResponse<SectionsResponse>>(`/sections/class/${classId}`),
     getSubjects: () => api.get<ApiResponse<SubjectsResponse>>('/academic/subjects'),
+    getSubjectsByClass: (classId: number) => api.get<{success: boolean, data: Subject[]}>(`/academic/subjects/class/${classId}`),
     getDesignations: () => api.get<ApiResponse<DesignationsResponse>>('/academic/designations'),
 };
 

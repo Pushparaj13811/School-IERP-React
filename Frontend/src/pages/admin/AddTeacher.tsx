@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FaPaperPlane, FaUpload } from 'react-icons/fa';
+import { FaPaperPlane, FaUpload, } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { userAPI, academicAPI } from '../../services/api';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Designation, Teacher } from '../../types/api';
+import { Designation, Teacher, Class, Subject, Section } from '../../types/api';
 
 // Define the location state interface
 interface LocationState {
@@ -30,6 +30,21 @@ const AddTeacher: React.FC = () => {
   const [designationId, setDesignationId] = useState<number | string>('');
   const [bio, setBio] = useState('');
   
+  // Classes and subjects assignments
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
+  const [classSubjects, setClassSubjects] = useState<Record<number, Subject[]>>({});
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
+  const [selectedSubjects, setSelectedSubjects] = useState<number[]>([]);
+  const [loadingClasses, setLoadingClasses] = useState(true);
+  const [loadingSubjects, setLoadingSubjects] = useState(true);
+  
+  // Sections handling
+  const [classSections, setClassSections] = useState<Record<number, Section[]>>({});
+  const [selectedSections, setSelectedSections] = useState<number[]>([]);
+  const [loadingSections, setLoadingSections] = useState(false);
+  
   // Address info
   const [addressLine1, setAddressLine1] = useState('');
   const [addressLine2, setAddressLine2] = useState('');
@@ -50,6 +65,110 @@ const AddTeacher: React.FC = () => {
   const locationState = location.state as LocationState;
   const isEditMode = locationState?.editMode || false;
   const teacherToEdit = locationState?.teacherData;
+  
+  // Fetch classes and subjects from backend
+  useEffect(() => {
+    const fetchClassesAndSubjects = async () => {
+      try {
+        setLoadingClasses(true);
+        setLoadingSubjects(true);
+        
+        // Fetch classes
+        const classesResponse = await academicAPI.getClasses();
+        if (classesResponse.data.status === 'success' && classesResponse.data.data.classes) {
+          setClasses(classesResponse.data.data.classes);
+        } else {
+          toast.error('Failed to load classes data');
+          setClasses([]);
+        }
+        
+        // Fetch all subjects for reference
+        const subjectsResponse = await academicAPI.getSubjects();
+        if (subjectsResponse.data.status === 'success' && subjectsResponse.data.data.subjects) {
+          setAllSubjects(subjectsResponse.data.data.subjects);
+          setSubjects(subjectsResponse.data.data.subjects);
+        } else {
+          toast.error('Failed to load subjects data');
+          setAllSubjects([]);
+          setSubjects([]);
+        }
+      } catch (error) {
+        console.error('Error fetching classes and subjects:', error);
+        toast.error('Failed to load classes and subjects data');
+      } finally {
+        setLoadingClasses(false);
+        setLoadingSubjects(false);
+      }
+    };
+    
+    fetchClassesAndSubjects();
+  }, []);
+
+  // Update available subjects when selected classes change
+  useEffect(() => {
+    const fetchClassSpecificSubjects = async () => {
+      if (selectedClasses.length === 0) {
+        // If no classes selected, show all subjects
+        setSubjects(allSubjects);
+        return;
+      }
+
+      setLoadingSubjects(true);
+      try {
+        // Create a set to store unique subjects
+        const uniqueSubjectsMap = new Map<number, Subject>();
+        
+        // Fetch subjects for each selected class
+        for (const classId of selectedClasses) {
+          // Check if we already have subjects for this class
+          if (!classSubjects[classId]) {
+            try {
+              const response = await academicAPI.getSubjectsByClass(classId);
+              if (response.data?.success && response.data?.data) {
+                const fetchedSubjects = response.data.data;
+                // Store subjects for this class
+                setClassSubjects(prev => ({
+                  ...prev,
+                  [classId]: fetchedSubjects
+                }));
+                
+                // Add to unique subjects map
+                fetchedSubjects.forEach((subject: Subject) => {
+                  uniqueSubjectsMap.set(subject.id, subject);
+                });
+              }
+            } catch (error) {
+              console.error(`Error fetching subjects for class ${classId}:`, error);
+              toast.error(`Failed to load subjects for class ${classId}`);
+            }
+          } else {
+            // Use cached subjects for this class
+            classSubjects[classId].forEach(subject => {
+              uniqueSubjectsMap.set(subject.id, subject);
+            });
+          }
+        }
+        
+        // Convert map to array
+        const combinedSubjects = Array.from(uniqueSubjectsMap.values());
+        setSubjects(combinedSubjects);
+        
+        // Update selected subjects to only include those available for the selected classes
+        setSelectedSubjects(prev => 
+          prev.filter(subjectId => 
+            combinedSubjects.some(subject => subject.id === subjectId)
+          )
+        );
+      } catch (error) {
+        console.error('Error updating subjects based on classes:', error);
+        toast.error('Failed to update subjects for selected classes');
+      } finally {
+        setLoadingSubjects(false);
+      }
+    };
+
+    fetchClassSpecificSubjects();
+  }, [selectedClasses, allSubjects, classSubjects]);
   
   // Fetch designations from backend
   useEffect(() => {
@@ -100,12 +219,64 @@ const AddTeacher: React.FC = () => {
         setDesignationId(teacherToEdit.designation.id);
       }
       
+      // Set classes and subjects if available
+      if (teacherToEdit.classes) {
+        const classIds = teacherToEdit.classes.map(c => c.class.id);
+        setSelectedClasses(classIds);
+        
+        // Fetch sections for each class
+        classIds.forEach(classId => {
+          fetchSectionsForClass(classId);
+        });
+      }
+      
+      if (teacherToEdit.subjects) {
+        setSelectedSubjects(teacherToEdit.subjects.map(s => s.id));
+      }
+      
       // Set profile picture preview if available
       if (teacherToEdit.profilePicture) {
         setProfilePicturePreview(teacherToEdit.profilePicture);
       }
+      
+      // Fetch additional teacher details if needed
+      fetchTeacherDetails(teacherToEdit.id);
     }
   }, [isEditMode, teacherToEdit]);
+
+  // Function to fetch additional teacher details
+  const fetchTeacherDetails = async (teacherId: number) => {
+    try {
+      const response = await userAPI.getTeacherById(teacherId);
+      
+      if (response.data?.status === 'success' && response.data?.data?.teacher) {
+        const teacher = response.data.data.teacher;
+        
+        // Set additional teacher details
+        setEmergencyContact(teacher.emergencyContact || '');
+        setDateOfBirth(teacher.dateOfBirth || '');
+        setJoinDate(teacher.joinDate || '');
+        setBio(teacher.bio || '');
+        
+        // Set address information if available
+        if (teacher.address) {
+          setAddressLine1(teacher.address.addressLine1 || '');
+          setAddressLine2(teacher.address.addressLine2 || '');
+          setStreet(teacher.address.street || '');
+          setCity(teacher.address.city || '');
+          setWard(teacher.address.ward || '');
+          setMunicipality(teacher.address.municipality || '');
+          setDistrict(teacher.address.district || '');
+          setProvince(teacher.address.province || '');
+          setCountry(teacher.address.country || 'Nepal');
+          setPostalCode(teacher.address.postalCode || '');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching teacher details:', error);
+      toast.error('Failed to load complete teacher data');
+    }
+  };
 
   const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -116,6 +287,76 @@ const AddTeacher: React.FC = () => {
       const previewUrl = URL.createObjectURL(file);
       setProfilePicturePreview(previewUrl);
     }
+  };
+
+  // Handle class selection
+  const handleClassToggle = (classId: number) => {
+    setSelectedClasses(prev => {
+      const newSelectedClasses = prev.includes(classId)
+        ? prev.filter(id => id !== classId)
+        : [...prev, classId];
+      
+      // If we're removing a class, also remove its sections
+      if (prev.includes(classId)) {
+        setSelectedSections(sections => 
+          sections.filter(sectionId => 
+            !classSections[classId]?.some(section => section.id === sectionId)
+          )
+        );
+      }
+      
+      // Load sections for this class if we added it and don't already have its sections
+      if (!prev.includes(classId) && !classSections[classId]) {
+        fetchSectionsForClass(classId);
+      }
+      
+      return newSelectedClasses;
+    });
+  };
+  
+  // Fetch sections for a specific class
+  const fetchSectionsForClass = async (classId: number) => {
+    try {
+      setLoadingSections(true);
+      const response = await academicAPI.getSections(classId);
+      
+      if (response.data.status === 'success' && response.data.data.sections) {
+        const classSectionList = response.data.data.sections;
+        setClassSections(prev => ({
+          ...prev,
+          [classId]: classSectionList
+        }));
+      } else {
+        toast.error(`Failed to load sections for class ID ${classId}`);
+      }
+    } catch (error) {
+      console.error(`Error fetching sections for class ID ${classId}:`, error);
+      toast.error(`Failed to load sections for the selected class`);
+    } finally {
+      setLoadingSections(false);
+    }
+  };
+  
+  // Handle subject selection
+  const handleSubjectToggle = (subjectId: number) => {
+    setSelectedSubjects(prev => {
+      if (prev.includes(subjectId)) {
+        return prev.filter(id => id !== subjectId);
+      } else {
+        return [...prev, subjectId];
+      }
+    });
+  };
+  
+  // Handle section selection
+  const handleSectionToggle = (sectionId: number) => {
+    setSelectedSections(prev => {
+      if (prev.includes(sectionId)) {
+        return prev.filter(id => id !== sectionId);
+      } else {
+        return [...prev, sectionId];
+      }
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -147,6 +388,9 @@ const AddTeacher: React.FC = () => {
         joinDate,
         designationId: Number(designationId),
         bio: bio || undefined,
+        classes: selectedClasses.length > 0 ? selectedClasses : undefined,
+        sections: selectedSections.length > 0 ? selectedSections : undefined,
+        subjects: selectedSubjects.length > 0 ? selectedSubjects : undefined,
         address: addressData
       };
       
@@ -163,7 +407,7 @@ const AddTeacher: React.FC = () => {
           if (profilePicture) {
             try {
               console.log("Uploading profile picture for existing teacher");
-              await userAPI.uploadProfilePicture(profilePicture);
+              await userAPI.uploadTeacherProfilePicture(teacherToEdit.id, profilePicture);
               console.log("Profile picture updated successfully");
             } catch (pictureError) {
               console.error("Error uploading profile picture:", pictureError);
@@ -189,7 +433,8 @@ const AddTeacher: React.FC = () => {
           // Handle profile picture upload if present - in a separate try/catch
           if (profilePicture && response.data?.data?.teacher?.id) {
             try {
-              await userAPI.uploadProfilePicture(profilePicture);
+              const teacherId = response.data.data.teacher.id;
+              await userAPI.uploadTeacherProfilePicture(teacherId, profilePicture);
               console.log("Profile picture uploaded successfully");
             } catch (pictureError) {
               console.error("Error uploading profile picture:", pictureError);
@@ -346,6 +591,121 @@ const AddTeacher: React.FC = () => {
                   required
                 />
               </div>
+            </div>
+          </div>
+          
+          {/* Classes and Subjects Section */}
+          <div>
+            <h2 className="text-lg font-medium mb-4">Classes and Subjects</h2>
+            
+            {/* Classes Selection */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Assigned Classes
+              </label>
+              {loadingClasses ? (
+                <div className="text-gray-500">Loading classes...</div>
+              ) : classes.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {classes.map(cls => (
+                    <div key={cls.id} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`class-${cls.id}`}
+                        checked={selectedClasses.includes(cls.id)}
+                        onChange={() => handleClassToggle(cls.id)}
+                        className="mr-2"
+                      />
+                      <label htmlFor={`class-${cls.id}`} className="text-sm">
+                        {cls.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-yellow-600 text-sm">
+                  No classes available. Please add classes first.
+                </div>
+              )}
+            </div>
+            
+            {/* Sections Selection */}
+            {selectedClasses.length > 0 && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Assigned Sections
+                </label>
+                <div className="space-y-3">
+                  {selectedClasses.map(classId => {
+                    const classData = classes.find(c => c.id === classId);
+                    const availableSections = classSections[classId] || [];
+                    
+                    return (
+                      <div key={`sections-${classId}`} className="border p-3 rounded-md">
+                        <h3 className="font-medium text-sm mb-2">{classData?.name} Sections:</h3>
+                        {loadingSections && !classSections[classId] ? (
+                          <div className="text-gray-500 text-sm">Loading sections...</div>
+                        ) : availableSections.length > 0 ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                            {availableSections.map(section => (
+                              <div key={section.id} className="flex items-center">
+                                <input
+                                  type="checkbox"
+                                  id={`section-${section.id}`}
+                                  checked={selectedSections.includes(section.id)}
+                                  onChange={() => handleSectionToggle(section.id)}
+                                  className="mr-2"
+                                />
+                                <label htmlFor={`section-${section.id}`} className="text-sm">
+                                  {section.name}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-yellow-600 text-sm">
+                            No sections available for this class.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {/* Subjects Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Assigned Subjects
+                {selectedClasses.length > 0 ? ' (Filtered by selected classes)' : ' (All available subjects)'}
+              </label>
+              {loadingSubjects ? (
+                <div className="text-gray-500">Loading subjects...</div>
+              ) : subjects.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {subjects.map(subject => (
+                    <div key={subject.id} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`subject-${subject.id}`}
+                        checked={selectedSubjects.includes(subject.id)}
+                        onChange={() => handleSubjectToggle(subject.id)}
+                        className="mr-2"
+                      />
+                      <label htmlFor={`subject-${subject.id}`} className="text-sm">
+                        {subject.name} ({subject.code})
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-yellow-600 text-sm">
+                  {selectedClasses.length > 0 
+                    ? 'No subjects available for the selected classes. Please assign subjects to these classes first.'
+                    : 'No subjects available. Please add subjects first.'}
+                </div>
+              )}
             </div>
           </div>
           

@@ -149,6 +149,7 @@ model Class {
   periods        Period[]
   SubjectResult  SubjectResult[]
   announcements  AnnouncementClass[]
+  subjects       ClassSubject[]
 
   @@map("classes")
 }
@@ -166,6 +167,7 @@ model Subject {
   subjectAttendance SubjectAttendance[]
   periods           Period[]
   subjectResults    SubjectResult[]
+  classes           ClassSubject[]
 
   @@map("subjects")
 }
@@ -723,4 +725,20 @@ enum Priority {
   NORMAL
   HIGH
   URGENT
+}
+
+// Junction table for Class-Subject many-to-many relationship
+model ClassSubject {
+  id        Int      @id @default(autoincrement())
+  classId   Int
+  subjectId Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  class   Class   @relation(fields: [classId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([classId, subjectId])
+  @@map("class_subjects")
 }
