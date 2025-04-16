@@ -1,40 +1,68 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { userService, UserProfile } from '../../services/userService';
+import { Parent } from '../../types/api';
+
+// Create a simple spinner component since we couldn't find the import
+const Spinner: React.FC = () => (
+  <div className="flex justify-center items-center h-full">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#292648]"></div>
+  </div>
+);
 
 const ParentProfile: React.FC = () => {
-  // Mock data - replace with actual API data
-  const parentData = {
-    personalDetails: {
-      fullName: 'KIRAN PATHAK',
-      spouseName: 'Sarina Pathak',
-      gender: 'Male',
-      dateOfBirth: '2002-04-01',
-      bloodGroup: 'B+',
-      nationality: 'Nepali',
-      religion: 'Hindu',
-      childName: 'Ruchi Pathak',
-      dobNo: '772227272'
-    },
-    address: {
-      addressLine1: 'Thasang-3, Lete, Nepal',
-      addressLine2: 'Gharapjhong-3, Mustang, Nepal',
-      state: 'Gandaki',
-      municipality: 'Gharapjhong',
-      wardNo: '3',
-      city: 'Shyang',
-      country: 'Nepal',
-      pincode: '36200',
-      permanentAddress: 'Thasang-3, Lete, Nepal',
-      currentAddress: 'Gharapjhong-3, Mustang, Nepal'
-    },
-    professionDetails: {
-      profession: 'Business',
-      spouseProfession: 'Business',
-      annualIncome: '1200000',
-      officeAddress: 'Thasang-3, Lete, Nepal',
-      officeContact: '97747367940'
-    }
-  };
+  const [parent, setParent] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const fetchParentData = async () => {
+      try {
+        setLoading(true);
+        const profile = await userService.getUserProfile();
+        
+        if (!profile || profile.role !== 'PARENT') {
+          throw new Error('Parent profile not found or user is not a parent');
+        }
+        
+        setParent(profile);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching parent data:', err);
+        setError('Failed to load parent profile. Please try again later.');
+        setLoading(false);
+      }
+    };
+
+    fetchParentData();
+  }, []);
+
+  if (loading) {
+    return <Spinner />;
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 text-center">
+        <div className="p-4 bg-red-100 text-red-700 rounded-md">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
+  if (!parent || !parent.roleSpecificData) {
+    return (
+      <div className="p-6 text-center">
+        <div className="p-4 bg-yellow-100 text-yellow-700 rounded-md">
+          No parent profile data available.
+        </div>
+      </div>
+    );
+  }
+
+  // Type assertion to access parent properties safely
+  const parentData = parent.roleSpecificData as Parent;
+  
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -43,13 +71,18 @@ const ParentProfile: React.FC = () => {
             <div className="flex flex-col items-center w-48">
               <div className="w-32 h-32 mb-4 overflow-hidden bg-blue-100 rounded-full">
                 <img
-                  src="/default-parent-avatar.png"
+                  src={userService.getProfileImageUrl(parent.profilePicture)}
                   alt="Parent"
                   className="object-cover w-100 h-100"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/default-parent-avatar.png";
+                    console.error("Error loading profile image, using default");
+                  }}
                 />
               </div>
-              <h2 className="text-xl font-semibold">{parentData.personalDetails.fullName}</h2>
-              <p className="text-gray-600">Parent</p>
+              <h2 className="text-xl font-semibold">{parent.name}</h2>
+              <p className="text-gray-600">{userService.getRoleDisplayName(parent.role)}</p>
               <div className="mt-4 space-y-2">
                 <button className="w-full px-4 py-2 bg-[#292648] text-white rounded-md ">
                   Download Pdf
@@ -66,114 +99,78 @@ const ParentProfile: React.FC = () => {
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="mb-1 text-gray-600">Full Name</p>
-                    <p className="font-medium">{parentData.personalDetails.fullName}</p>
+                    <p className="font-medium">{parentData.name || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="mb-1 text-gray-600">Spouse Name</p>
-                    <p className="font-medium">{parentData.personalDetails.spouseName}</p>
+                    <p className="mb-1 text-gray-600">Email</p>
+                    <p className="font-medium">{parentData.email || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="mb-1 text-gray-600">Gender</p>
-                    <p className="font-medium">{parentData.personalDetails.gender}</p>
+                    <p className="font-medium">{parentData.gender || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="mb-1 text-gray-600">Date of Birth</p>
-                    <p className="font-medium">{parentData.personalDetails.dateOfBirth}</p>
+                    <p className="mb-1 text-gray-600">Contact Number</p>
+                    <p className="font-medium">{parentData.contactNo || 'N/A'}</p>
                   </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Blood Group</p>
-                    <p className="font-medium">{parentData.personalDetails.bloodGroup}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Nationality</p>
-                    <p className="font-medium">{parentData.personalDetails.nationality}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Religion</p>
-                    <p className="font-medium">{parentData.personalDetails.religion}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Child's Name</p>
-                    <p className="font-medium">{parentData.personalDetails.childName}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">DOB No.</p>
-                    <p className="font-medium">{parentData.personalDetails.dobNo}</p>
-                  </div>
+                  {parentData.children && parentData.children.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-gray-600">Children</p>
+                      <p className="font-medium">
+                        {parentData.children.map((child: {name?: string}) => child.name || 'Unnamed').join(', ')}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="mb-6">
-                <h3 className="pb-2 mb-4 text-lg font-semibold border-b">Address</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="mb-1 text-gray-600">Address Line 1</p>
-                    <p className="font-medium">{parentData.address.addressLine1}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Address Line 2</p>
-                    <p className="font-medium">{parentData.address.addressLine2}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">State/Province</p>
-                    <p className="font-medium">{parentData.address.state}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Municipality</p>
-                    <p className="font-medium">{parentData.address.municipality}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Ward No.</p>
-                    <p className="font-medium">{parentData.address.wardNo}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Town/City</p>
-                    <p className="font-medium">{parentData.address.city}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Country</p>
-                    <p className="font-medium">{parentData.address.country}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Pincode</p>
-                    <p className="font-medium">{parentData.address.pincode}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Permanent Address</p>
-                    <p className="font-medium">{parentData.address.permanentAddress}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Current Address</p>
-                    <p className="font-medium">{parentData.address.currentAddress}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="pb-2 mb-4 text-lg font-semibold border-b">Profession Details</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="mb-1 text-gray-600">Profession</p>
-                    <p className="font-medium">{parentData.professionDetails.profession}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Spouse's Profession</p>
-                    <p className="font-medium">{parentData.professionDetails.spouseProfession}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Annual Income</p>
-                    <p className="font-medium">{parentData.professionDetails.annualIncome}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Office Address</p>
-                    <p className="font-medium">{parentData.professionDetails.officeAddress}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Office Contact</p>
-                    <p className="font-medium">{parentData.professionDetails.officeContact}</p>
+              {parentData.address && (
+                <div className="mb-6">
+                  <h3 className="pb-2 mb-4 text-lg font-semibold border-b">Address</h3>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <p className="mb-1 text-gray-600">Address Line 1</p>
+                      <p className="font-medium">{parentData.address.addressLine1 || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-gray-600">Address Line 2</p>
+                      <p className="font-medium">{parentData.address.addressLine2 || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-gray-600">Street</p>
+                      <p className="font-medium">{parentData.address.street || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-gray-600">City</p>
+                      <p className="font-medium">{parentData.address.city || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-gray-600">Ward</p>
+                      <p className="font-medium">{parentData.address.ward || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-gray-600">Municipality</p>
+                      <p className="font-medium">{parentData.address.municipality || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-gray-600">District</p>
+                      <p className="font-medium">{parentData.address.district || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-gray-600">Province</p>
+                      <p className="font-medium">{parentData.address.province || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-gray-600">Country</p>
+                      <p className="font-medium">{parentData.address.country || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-gray-600">Postal Code</p>
+                      <p className="font-medium">{parentData.address.postalCode || 'N/A'}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
