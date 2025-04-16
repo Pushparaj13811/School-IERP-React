@@ -203,6 +203,39 @@ const AddTeacher: React.FC = () => {
       setGender(teacherToEdit.gender || 'MALE');
       setContactNo(teacherToEdit.contactNo || '');
       
+      // Set initial values for date fields and emergency contact if available
+      setEmergencyContact(teacherToEdit.emergencyContact || '');
+      setBio(teacherToEdit.bio || '');
+      
+      // Format dates if they exist
+      if (teacherToEdit.dateOfBirth) {
+        // Ensure it's properly formatted for input[type=date] (YYYY-MM-DD)
+        try {
+          let dateStr = teacherToEdit.dateOfBirth;
+          if (typeof dateStr === 'string') {
+            dateStr = dateStr.substring(0, 10); // Extract YYYY-MM-DD part
+          }
+          setDateOfBirth(dateStr);
+          console.log("Setting DOB:", dateStr);
+        } catch (err) {
+          console.error("Error formatting DOB:", err);
+        }
+      }
+      
+      if (teacherToEdit.joinDate) {
+        // Ensure it's properly formatted for input[type=date] (YYYY-MM-DD)
+        try {
+          let dateStr = teacherToEdit.joinDate;
+          if (typeof dateStr === 'string') {
+            dateStr = dateStr.substring(0, 10); // Extract YYYY-MM-DD part
+          }
+          setJoinDate(dateStr);
+          console.log("Setting join date:", dateStr);
+        } catch (err) {
+          console.error("Error formatting join date:", err);
+        }
+      }
+      
       // Set professional info if available
       if (teacherToEdit.designation?.id) {
         setDesignationId(teacherToEdit.designation.id);
@@ -238,6 +271,27 @@ const AddTeacher: React.FC = () => {
         // useEffect that watches selectedClasses
       }
       
+      // Set sections if available
+      if (teacherToEdit.sections && Array.isArray(teacherToEdit.sections)) {
+        // Handle different potential section data structures with proper null checks
+        const sectionIds = teacherToEdit.sections.map(s => {
+          // Handle potential structure: { section: { id: number } }
+          if (s && typeof s === 'object' && 'section' in s && s.section && typeof s.section === 'object' && 'id' in s.section) {
+            return s.section.id;
+          }
+          // Handle potential structure: { id: number }
+          else if (s && typeof s === 'object' && 'id' in s) {
+            return s.id;
+          }
+          return null;
+        }).filter(Boolean) as number[]; // Filter out null/undefined values and assert type
+        
+        if (sectionIds.length > 0) {
+          setSelectedSections(sectionIds);
+          console.log("Setting selected sections:", sectionIds);
+        }
+      }
+      
       if (teacherToEdit.subjects && Array.isArray(teacherToEdit.subjects)) {
         // Handle different potential subject data structures with proper null checks
         const subjectIds = teacherToEdit.subjects.map(s => {
@@ -269,28 +323,65 @@ const AddTeacher: React.FC = () => {
   // Function to fetch additional teacher details
   const fetchTeacherDetails = async (teacherId: number) => {
     try {
+      console.log(`Fetching detailed information for teacher ID: ${teacherId}`);
       const response = await userAPI.getTeacherById(teacherId);
       
       if (response.data?.status === 'success' && response.data?.data?.teacher) {
         const teacher = response.data.data.teacher;
+        console.log("Complete teacher details from API:", JSON.stringify(teacher, null, 2));
         
         // Utility function to format ISO date string to YYYY-MM-DD for form inputs
-        const formatDateForForm = (isoDateString: string) => {
+        const formatDateForForm = (isoDateString: string | null | undefined) => {
           if (!isoDateString) return '';
           try {
             // Extract just the YYYY-MM-DD part for date inputs
-            return isoDateString.substring(0, 10);
+            if (typeof isoDateString === 'string') {
+              return isoDateString.substring(0, 10);
+            }
+            return '';
           } catch (error) {
             console.error('Error formatting date:', error);
             return '';
           }
         };
         
-        // Set additional teacher details
-        setEmergencyContact(teacher.emergencyContact || '');
-        setDateOfBirth(teacher.dateOfBirth ? formatDateForForm(teacher.dateOfBirth) : '');
-        setJoinDate(teacher.joinDate ? formatDateForForm(teacher.joinDate) : '');
+        // Set additional teacher details with robust null checking
+        if (teacher.emergencyContact) {
+          setEmergencyContact(teacher.emergencyContact);
+          console.log("Setting emergency contact from API:", teacher.emergencyContact);
+        }
+        
+        if (teacher.dateOfBirth) {
+          const formattedDOB = formatDateForForm(teacher.dateOfBirth);
+          setDateOfBirth(formattedDOB);
+          console.log("Setting DOB from API:", formattedDOB);
+        }
+        
+        if (teacher.joinDate) {
+          const formattedJoinDate = formatDateForForm(teacher.joinDate);
+          setJoinDate(formattedJoinDate);
+          console.log("Setting join date from API:", formattedJoinDate);
+        }
+        
         setBio(teacher.bio || '');
+        
+        // If sections weren't set from the teacher data passed in location.state,
+        // try to get them from the detailed teacher data
+        if (selectedSections.length === 0 && teacher.sections && Array.isArray(teacher.sections)) {
+          const sectionIds = teacher.sections.map(s => {
+            if (s && typeof s === 'object' && 'section' in s && s.section) {
+              return s.section.id;
+            } else if (s && typeof s === 'object' && 'id' in s) {
+              return s.id;
+            }
+            return null;
+          }).filter(Boolean) as number[];
+          
+          if (sectionIds.length > 0) {
+            setSelectedSections(sectionIds);
+            console.log("Setting selected sections from teacher details:", sectionIds);
+          }
+        }
         
         // Set address information if available
         if (teacher.address) {
@@ -305,6 +396,8 @@ const AddTeacher: React.FC = () => {
           setCountry(teacher.address.country || 'Nepal');
           setPostalCode(teacher.address.postalCode || '');
         }
+      } else {
+        console.error('Invalid response format from teacher API:', response.data);
       }
     } catch (error) {
       console.error('Error fetching teacher details:', error);
@@ -352,15 +445,19 @@ const AddTeacher: React.FC = () => {
   const fetchSectionsForClass = async (classId: number) => {
     try {
       setLoadingSections(true);
+      console.log(`Fetching sections for class ID: ${classId}`);
       const response = await academicAPI.getSections(classId);
       
       if (response.data.status === 'success' && response.data.data.sections) {
         const classSectionList = response.data.data.sections;
+        console.log(`Found ${classSectionList.length} sections for class ${classId}:`, classSectionList);
+        
         setClassSections(prev => ({
           ...prev,
           [classId]: classSectionList
         }));
       } else {
+        console.error('Failed response from sections API:', response.data);
         toast.error(`Failed to load sections for class ID ${classId}`);
       }
     } catch (error) {
@@ -550,6 +647,51 @@ const AddTeacher: React.FC = () => {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    // Debug sections and classes data
+    if (selectedSections.length > 0) {
+      console.log("Currently selected sections:", selectedSections);
+    }
+    
+    if (Object.keys(classSections).length > 0) {
+      console.log("Available sections by class:", classSections);
+    }
+  }, [selectedSections, classSections]);
+
+  // Track loaded sections and apply teacher section selections after sections are loaded
+  useEffect(() => {
+    // Only run in edit mode when we have the teacher data and classes have been selected
+    if (isEditMode && teacherToEdit && selectedClasses.length > 0) {
+      // Check if all selected classes have their sections loaded
+      const allSectionsLoaded = selectedClasses.every(classId => 
+        classSections[classId] !== undefined
+      );
+      
+      // If we have all sections loaded and the teacher has sections, select them
+      if (allSectionsLoaded && teacherToEdit.sections && Array.isArray(teacherToEdit.sections)) {
+        const sectionIds = teacherToEdit.sections.map(s => {
+          if (s && typeof s === 'object' && 'section' in s && s.section && typeof s.section === 'object' && 'id' in s.section) {
+            return s.section.id;
+          } else if (s && typeof s === 'object' && 'id' in s) {
+            return s.id;
+          }
+          return null;
+        }).filter(Boolean) as number[];
+        
+        if (sectionIds.length > 0) {
+          // Instead of directly setting, check if the sections exist in our available sections
+          const availableSectionIds = Object.values(classSections).flat().map(s => s.id);
+          const validSectionIds = sectionIds.filter(id => availableSectionIds.includes(id));
+          
+          if (validSectionIds.length > 0 && validSectionIds.length !== selectedSections.length) {
+            setSelectedSections(validSectionIds);
+            console.log("Setting validated sections after loading:", validSectionIds);
+          }
+        }
+      }
+    }
+  }, [isEditMode, teacherToEdit, selectedClasses, classSections]);
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;

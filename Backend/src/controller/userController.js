@@ -294,6 +294,10 @@ export const getTeachers = async (req, res, next) => {
             email: teacher.user.email,
             gender: teacher.gender,
             contactNo: teacher.contactNo,
+            emergencyContact: teacher.emergencyContact,
+            dateOfBirth: teacher.dateOfBirth,
+            joinDate: teacher.joinDate,
+            bio: teacher.bio,
             designation: teacher.designation,
             subjects: teacher.subjects.map(s => s.subject),
             classes: teacher.classes.map(c => c.class),
@@ -499,6 +503,10 @@ export const getTeacherById = async (req, res, next) => {
             email: teacher.user.email,
             gender: teacher.gender,
             contactNo: teacher.contactNo,
+            emergencyContact: teacher.emergencyContact,
+            dateOfBirth: teacher.dateOfBirth,
+            joinDate: teacher.joinDate,
+            bio: teacher.bio,
             designation: teacher.designation,
             subjects: teacher.subjects.map(s => s.subject),
             classes: teacher.classes.map(c => c.class),
@@ -917,6 +925,11 @@ export const updateTeacher = async (req, res, next) => {
                         class: true
                     }
                 },
+                sections: {
+                    include: {
+                        section: true
+                    }
+                },
                 profilePicture: true,
                 address: true
             }
@@ -929,9 +942,14 @@ export const updateTeacher = async (req, res, next) => {
             email: updatedTeacher.user.email,
             gender: updatedTeacher.gender,
             contactNo: updatedTeacher.contactNo,
+            emergencyContact: updatedTeacher.emergencyContact,
+            dateOfBirth: updatedTeacher.dateOfBirth,
+            joinDate: updatedTeacher.joinDate,
+            bio: updatedTeacher.bio,
             designation: updatedTeacher.designation,
             subjects: updatedTeacher.subjects.map(s => s.subject),
             classes: updatedTeacher.classes.map(c => c.class),
+            sections: updatedTeacher.sections?.map(s => s.section) || [],
             address: updatedTeacher.address,
             profilePicture: updatedTeacher.profilePicture?.url
         };
