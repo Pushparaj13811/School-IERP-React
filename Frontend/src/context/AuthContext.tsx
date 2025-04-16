@@ -72,6 +72,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuth();
   }, []);
 
+  // Helper function to normalize the role to match UserRole enum
+  const normalizeRole = (role: string): UserRole => {
+    return role.toLowerCase() as UserRole;
+  };
+
   const checkAuth = async (): Promise<boolean> => {
     try {
       setLoading(true);
@@ -86,6 +91,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const responseData = response.data as ApiResponseData;
           const actualToken = responseData.data.token;
           const actualUser = responseData.data.data.user;
+          
+          // Normalize the role
+          actualUser.role = normalizeRole(actualUser.role);
           
           localStorage.setItem('token', actualToken);
           localStorage.setItem('user', JSON.stringify(actualUser));
@@ -127,8 +135,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const actualToken = responseData.data.token;
       const actualUser = responseData.data.data.user;
       
+      // Normalize the role
+      actualUser.role = normalizeRole(actualUser.role);
+      
       console.log('Setting token:', actualToken);
-      console.log('Setting user:', actualUser);
+      console.log('Setting user with normalized role:', actualUser);
       
       localStorage.setItem('token', actualToken);
       localStorage.setItem('user', JSON.stringify(actualUser));
