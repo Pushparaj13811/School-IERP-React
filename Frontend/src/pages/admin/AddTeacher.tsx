@@ -438,11 +438,12 @@ const AddTeacher: React.FC = () => {
         bio: bio || undefined,
         classes: selectedClasses.length > 0 ? selectedClasses : undefined,
         subjects: selectedSubjects.length > 0 ? selectedSubjects : undefined,
+        sections: selectedSections.length > 0 ? selectedSections : undefined,
         address: addressData
       };
       
-      // We'll still track selected sections in the UI but won't send them to the API
-      console.log("Selected section IDs (tracked in UI but not sent to API):", selectedSections);
+      // Remove the comment about not sending sections to API
+      console.log("Selected section IDs:", selectedSections);
       
       let response;
       
@@ -466,7 +467,7 @@ const AddTeacher: React.FC = () => {
           });
           console.log("Selected class IDs:", selectedClasses);
           console.log("Selected subject IDs:", selectedSubjects);
-          console.log("Selected section IDs (tracked in UI but not sent to API):", selectedSections);
+          console.log("Selected section IDs:", selectedSections);
           
           response = await userAPI.updateTeacher(teacherToEdit.id, teacherData);
           console.log("Teacher data updated successfully");
@@ -509,7 +510,7 @@ const AddTeacher: React.FC = () => {
           });
           console.log("Selected class IDs:", selectedClasses);
           console.log("Selected subject IDs:", selectedSubjects);
-          console.log("Selected section IDs (tracked in UI but not sent to API):", selectedSections);
+          console.log("Selected section IDs:", selectedSections);
           
           response = await userAPI.createTeacher({
             email,

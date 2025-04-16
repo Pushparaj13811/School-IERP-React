@@ -102,6 +102,7 @@ const TeachersList: React.FC = () => {
                 <th className="px-6 py-3 text-left text-sm font-medium">Contact No.</th>
                 <th className="px-6 py-3 text-left text-sm font-medium">Subjects</th>
                 <th className="px-6 py-3 text-left text-sm font-medium">Classes</th>
+                <th className="px-6 py-3 text-left text-sm font-medium">Sections</th>
                 <th className="px-6 py-3 text-left text-sm font-medium">Action</th>
               </tr>
             </thead>
@@ -138,6 +139,17 @@ const TeachersList: React.FC = () => {
                         } else if (c && typeof c === 'object' && 'name' in c) {
                           // If classes is an array of direct class objects
                           return c.name as string;
+                        }
+                        return '';
+                      }).filter(Boolean).join(', ') 
+                      : '-'
+                    }
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    {teacher.sections ? 
+                      teacher.sections.map(s => {
+                        if (s && typeof s === 'object' && 'name' in s) {
+                          return s.name as string;
                         }
                         return '';
                       }).filter(Boolean).join(', ') 
