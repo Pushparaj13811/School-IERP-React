@@ -158,9 +158,9 @@ const CreateAnnouncement: React.FC = () => {
                 return;
             }
             
-            // For now, we're not handling file uploads in this example
-            // In a real implementation, you would upload files to a server/cloud storage
-            // and then include the URLs in the announcement data
+            // Prepare the targetRoles to match the backend's expected Role enum
+            // Convert from lowercase (e.g., 'student') to uppercase (e.g., 'STUDENT')
+            const formattedRoles = selectedRoles.map(role => role.toUpperCase());
             
             const announcementData = {
                 title,
@@ -169,7 +169,7 @@ const CreateAnnouncement: React.FC = () => {
                 expiresAt: expiresAt || undefined,
                 targetClassIds: selectedClasses,
                 targetSectionIds: selectedSections,
-                targetRoles: selectedRoles,
+                targetRoles: formattedRoles,
                 attachments: attachments.map(attachment => ({
                     name: attachment.name,
                     url: URL.createObjectURL(attachment.file), // For demo purposes
