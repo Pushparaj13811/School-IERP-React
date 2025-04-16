@@ -834,10 +834,15 @@ export const updateTeacher = async (req, res, next) => {
         // Extract subjects and classes data if provided
         const subjectIds = data.subjects;
         const classIds = data.classes;
+        const sectionIds = data.sections;
         delete data.subjects;
         delete data.classes;
+        delete data.sections;
 
         console.log('Updating teacher with data:', JSON.stringify(data, null, 2));
+        console.log('Selected class IDs:', classIds);
+        console.log('Selected section IDs:', sectionIds);
+        console.log('Selected subject IDs:', subjectIds);
 
         // Update teacher data
         const updatedTeacher = await prisma.teacher.update({
@@ -871,6 +876,17 @@ export const updateTeacher = async (req, res, next) => {
                         create: classIds.map(classId => ({
                             class: {
                                 connect: { id: Number(classId) }
+                            }
+                        }))
+                    }
+                }),
+                // Add sections relationship if provided
+                ...(sectionIds && {
+                    sections: {
+                        deleteMany: {},
+                        create: sectionIds.map(sectionId => ({
+                            section: {
+                                connect: { id: Number(sectionId) }
                             }
                         }))
                     }

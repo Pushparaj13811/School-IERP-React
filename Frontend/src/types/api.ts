@@ -90,6 +90,22 @@ export interface Teacher {
   subjects?: Subject[];
   classes?: { class: Class }[];
   profilePicture?: string;
+  emergencyContact?: string;
+  dateOfBirth?: string;
+  joinDate?: string;
+  bio?: string;
+  address?: {
+    addressLine1: string;
+    addressLine2?: string;
+    street: string;
+    city: string;
+    ward: string;
+    municipality: string;
+    district: string;
+    province: string;
+    country: string;
+    postalCode?: string;
+  };
 }
 
 export interface Parent {
@@ -212,6 +228,33 @@ export interface ParentFormData {
   gender: string;
   contactNo: string;
   children?: number[];
+  address: {
+    addressLine1: string;
+    addressLine2?: string;
+    street: string;
+    city: string;
+    ward: string;
+    municipality: string;
+    district: string;
+    province: string;
+    country: string;
+    postalCode?: string;
+  };
+}
+
+export interface TeacherFormData {
+  name: string;
+  email: string;
+  gender: string;
+  contactNo: string;
+  emergencyContact: string;
+  dateOfBirth: string;
+  joinDate: string;
+  designationId: number;
+  bio?: string;
+  subjects?: number[];
+  classes?: number[];
+  sections?: number[];
   address: {
     addressLine1: string;
     addressLine2?: string;
