@@ -119,10 +119,30 @@ const TeachersList: React.FC = () => {
                   <td className="px-6 py-4 text-sm text-gray-900">{teacher.email}</td>
                   <td className="px-6 py-4 text-sm text-gray-900">{teacher.contactNo}</td>
                   <td className="px-6 py-4 text-sm text-gray-900">
-                    {teacher.subjects?.map(s => s.name).join(', ') || '-'}
+                    {teacher.subjects ? 
+                      teacher.subjects.map(s => {
+                        if (s && typeof s === 'object' && 'name' in s) {
+                          return s.name as string;
+                        }
+                        return '';
+                      }).filter(Boolean).join(', ') 
+                      : '-'
+                    }
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900">
-                    {teacher.classes?.map(c => c.class.name).join(', ') || '-'}
+                    {teacher.classes ? 
+                      teacher.classes.map(c => {
+                        // Handle both potential data structures
+                        if (c && typeof c === 'object' && 'class' in c && c.class) {
+                          return c.class.name;
+                        } else if (c && typeof c === 'object' && 'name' in c) {
+                          // If classes is an array of direct class objects
+                          return c.name as string;
+                        }
+                        return '';
+                      }).filter(Boolean).join(', ') 
+                      : '-'
+                    }
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900">
                     <div className="flex space-x-3" onClick={(e) => e.stopPropagation()}>

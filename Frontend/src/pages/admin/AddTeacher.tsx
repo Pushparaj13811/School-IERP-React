@@ -32,7 +32,6 @@ const AddTeacher: React.FC = () => {
   
   // Classes and subjects assignments
   const [classes, setClasses] = useState<Class[]>([]);
-  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
   const [classSubjects, setClassSubjects] = useState<Record<number, Subject[]>>({});
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
@@ -68,10 +67,9 @@ const AddTeacher: React.FC = () => {
   
   // Fetch classes and subjects from backend
   useEffect(() => {
-    const fetchClassesAndSubjects = async () => {
+    const fetchClasses = async () => {
       try {
         setLoadingClasses(true);
-        setLoadingSubjects(true);
         
         // Fetch classes
         const classesResponse = await academicAPI.getClasses();
@@ -82,34 +80,25 @@ const AddTeacher: React.FC = () => {
           setClasses([]);
         }
         
-        // Fetch all subjects for reference
-        const subjectsResponse = await academicAPI.getSubjects();
-        if (subjectsResponse.data.status === 'success' && subjectsResponse.data.data.subjects) {
-          setAllSubjects(subjectsResponse.data.data.subjects);
-          setSubjects(subjectsResponse.data.data.subjects);
-        } else {
-          toast.error('Failed to load subjects data');
-          setAllSubjects([]);
-          setSubjects([]);
-        }
+        // We'll no longer fetch all subjects here; they'll be fetched after class selection
       } catch (error) {
-        console.error('Error fetching classes and subjects:', error);
-        toast.error('Failed to load classes and subjects data');
+        console.error('Error fetching classes:', error);
+        toast.error('Failed to load classes data');
       } finally {
         setLoadingClasses(false);
-        setLoadingSubjects(false);
       }
     };
     
-    fetchClassesAndSubjects();
+    fetchClasses();
   }, []);
 
   // Update available subjects when selected classes change
   useEffect(() => {
     const fetchClassSpecificSubjects = async () => {
       if (selectedClasses.length === 0) {
-        // If no classes selected, show all subjects
-        setSubjects(allSubjects);
+        // If no classes selected, show empty subjects list
+        setSubjects([]);
+        setSelectedSubjects([]);
         return;
       }
 
@@ -168,7 +157,7 @@ const AddTeacher: React.FC = () => {
     };
 
     fetchClassSpecificSubjects();
-  }, [selectedClasses, allSubjects, classSubjects]);
+  }, [selectedClasses, classSubjects]);
   
   // Fetch designations from backend
   useEffect(() => {
@@ -220,18 +209,47 @@ const AddTeacher: React.FC = () => {
       }
       
       // Set classes and subjects if available
-      if (teacherToEdit.classes) {
-        const classIds = teacherToEdit.classes.map(c => c.class.id);
-        setSelectedClasses(classIds);
+      if (teacherToEdit.classes && Array.isArray(teacherToEdit.classes)) {
+        // Handle different potential class data structures with proper null checks
+        const classIds = teacherToEdit.classes.map(c => {
+          // Handle potential structure: { class: { id: number } }
+          if (c && typeof c === 'object' && 'class' in c && c.class && typeof c.class === 'object' && 'id' in c.class) {
+            return c.class.id;
+          }
+          // Handle potential structure: { id: number }
+          else if (c && typeof c === 'object' && 'id' in c) {
+            return c.id;
+          }
+          return null;
+        }).filter(Boolean) as number[]; // Filter out null/undefined values and assert type
         
-        // Fetch sections for each class
-        classIds.forEach(classId => {
-          fetchSectionsForClass(classId);
-        });
+        if (classIds.length > 0) {
+          setSelectedClasses(classIds);
+          
+          // Fetch sections for each class
+          classIds.forEach(classId => {
+            if (classId) {
+              fetchSectionsForClass(classId);
+            }
+          });
+        }
+        
+        // Note: We don't need to fetch subjects here as it will be triggered by the
+        // useEffect that watches selectedClasses
       }
       
-      if (teacherToEdit.subjects) {
-        setSelectedSubjects(teacherToEdit.subjects.map(s => s.id));
+      if (teacherToEdit.subjects && Array.isArray(teacherToEdit.subjects)) {
+        // Handle different potential subject data structures with proper null checks
+        const subjectIds = teacherToEdit.subjects.map(s => {
+          if (s && typeof s === 'object' && 'id' in s) {
+            return s.id;
+          }
+          return null;
+        }).filter(Boolean) as number[]; // Filter out null/undefined values and assert type
+        
+        if (subjectIds.length > 0) {
+          setSelectedSubjects(subjectIds);
+        }
       }
       
       // Set profile picture preview if available
@@ -240,7 +258,11 @@ const AddTeacher: React.FC = () => {
       }
       
       // Fetch additional teacher details if needed
-      fetchTeacherDetails(teacherToEdit.id);
+      if (teacherToEdit.id) {
+        fetchTeacherDetails(teacherToEdit.id);
+      } else {
+        console.warn('Teacher ID is undefined, cannot fetch additional details');
+      }
     }
   }, [isEditMode, teacherToEdit]);
 
@@ -252,10 +274,22 @@ const AddTeacher: React.FC = () => {
       if (response.data?.status === 'success' && response.data?.data?.teacher) {
         const teacher = response.data.data.teacher;
         
+        // Utility function to format ISO date string to YYYY-MM-DD for form inputs
+        const formatDateForForm = (isoDateString: string) => {
+          if (!isoDateString) return '';
+          try {
+            // Extract just the YYYY-MM-DD part for date inputs
+            return isoDateString.substring(0, 10);
+          } catch (error) {
+            console.error('Error formatting date:', error);
+            return '';
+          }
+        };
+        
         // Set additional teacher details
         setEmergencyContact(teacher.emergencyContact || '');
-        setDateOfBirth(teacher.dateOfBirth || '');
-        setJoinDate(teacher.joinDate || '');
+        setDateOfBirth(teacher.dateOfBirth ? formatDateForForm(teacher.dateOfBirth) : '');
+        setJoinDate(teacher.joinDate ? formatDateForForm(teacher.joinDate) : '');
         setBio(teacher.bio || '');
         
         // Set address information if available
@@ -303,11 +337,11 @@ const AddTeacher: React.FC = () => {
             !classSections[classId]?.some(section => section.id === sectionId)
           )
         );
-      }
-      
-      // Load sections for this class if we added it and don't already have its sections
-      if (!prev.includes(classId) && !classSections[classId]) {
-        fetchSectionsForClass(classId);
+      } else {
+        // If we're adding a class, fetch sections and subjects for this class
+        if (!classSections[classId]) {
+          fetchSectionsForClass(classId);
+        }
       }
       
       return newSelectedClasses;
@@ -378,21 +412,37 @@ const AddTeacher: React.FC = () => {
         postalCode: postalCode || undefined
       };
       
-      // Prepare teacher data
+      // Format dates properly for ISO-8601 DateTime format
+      // If the date is just YYYY-MM-DD, we need to add time component
+      const formatDateForAPI = (dateString: string) => {
+        if (!dateString) return dateString;
+        // Check if it's already a complete ISO string
+        if (dateString.includes('T')) return dateString;
+        // Add the time component to make it a valid ISO-8601 DateTime
+        return `${dateString}T00:00:00.000Z`;
+      };
+      
+      // Prepare teacher data with properly formatted dates
       const teacherData = {
         name,
         gender,
         contactNo,
         emergencyContact,
-        dateOfBirth,
-        joinDate,
-        designationId: Number(designationId),
+        dateOfBirth: formatDateForAPI(dateOfBirth),
+        joinDate: formatDateForAPI(joinDate),
+        designation: {
+          connect: {
+            id: Number(designationId)
+          }
+        },
         bio: bio || undefined,
         classes: selectedClasses.length > 0 ? selectedClasses : undefined,
-        sections: selectedSections.length > 0 ? selectedSections : undefined,
         subjects: selectedSubjects.length > 0 ? selectedSubjects : undefined,
         address: addressData
       };
+      
+      // We'll still track selected sections in the UI but won't send them to the API
+      console.log("Selected section IDs (tracked in UI but not sent to API):", selectedSections);
       
       let response;
       
@@ -400,6 +450,24 @@ const AddTeacher: React.FC = () => {
         try {
           // Update existing teacher - core teacher data only
           console.log("Updating teacher data:", teacherToEdit.id);
+          console.log("Updating teacher with data:", {
+            name,
+            gender,
+            contactNo,
+            emergencyContact,
+            dateOfBirth: formatDateForAPI(dateOfBirth),
+            joinDate: formatDateForAPI(joinDate),
+            designation: {
+              connect: {
+                id: Number(designationId)
+              }
+            },
+            bio: bio || undefined
+          });
+          console.log("Selected class IDs:", selectedClasses);
+          console.log("Selected subject IDs:", selectedSubjects);
+          console.log("Selected section IDs (tracked in UI but not sent to API):", selectedSections);
+          
           response = await userAPI.updateTeacher(teacherToEdit.id, teacherData);
           console.log("Teacher data updated successfully");
           
@@ -424,6 +492,25 @@ const AddTeacher: React.FC = () => {
       } else {
         try {
           // Create new teacher
+          console.log("Creating teacher with data:", {
+            name,
+            email,
+            gender,
+            contactNo,
+            emergencyContact,
+            dateOfBirth: formatDateForAPI(dateOfBirth),
+            joinDate: formatDateForAPI(joinDate),
+            designation: {
+              connect: {
+                id: Number(designationId)
+              }
+            },
+            bio: bio || undefined
+          });
+          console.log("Selected class IDs:", selectedClasses);
+          console.log("Selected subject IDs:", selectedSubjects);
+          console.log("Selected section IDs (tracked in UI but not sent to API):", selectedSections);
+          
           response = await userAPI.createTeacher({
             email,
             ...teacherData
@@ -678,7 +765,7 @@ const AddTeacher: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Assigned Subjects
-                {selectedClasses.length > 0 ? ' (Filtered by selected classes)' : ' (All available subjects)'}
+                {selectedClasses.length > 0 ? ' (Filtered by selected classes)' : ' (Please select a class first)'}
               </label>
               {loadingSubjects ? (
                 <div className="text-gray-500">Loading subjects...</div>
@@ -703,7 +790,7 @@ const AddTeacher: React.FC = () => {
                 <div className="text-yellow-600 text-sm">
                   {selectedClasses.length > 0 
                     ? 'No subjects available for the selected classes. Please assign subjects to these classes first.'
-                    : 'No subjects available. Please add subjects first.'}
+                    : 'Please select a class to view available subjects.'}
                 </div>
               )}
             </div>

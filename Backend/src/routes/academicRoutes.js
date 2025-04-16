@@ -5,11 +5,11 @@ import {
     getClassById,
     updateClass,
     deleteClass,
-    getClasses,
     getSubjects,
     getDesignations
 } from '../controller/classController.js';
 import { getSectionsByClass } from '../controller/sectionController.js';
+import { getSubjectsByClassId } from '../controller/subjectController.js';
 import { protect, restrictTo } from '../middlewares/authMiddleware.js';
 import { PrismaClient } from '@prisma/client';
 
@@ -63,6 +63,7 @@ router.get('/sections', async (req, res, next) => {
     }
 });
 router.get('/subjects', getSubjects);
+router.get('/subjects/class/:classId', getSubjectsByClassId);
 router.get('/designations', getDesignations);
 
 export default router; 

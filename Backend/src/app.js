@@ -16,6 +16,7 @@ import resultRoutes from './routes/resultRoutes.js';
 import holidayRoutes from './routes/holidayRoutes.js';
 import achievementRoutes from './routes/achievementRoutes.js';
 import sectionRoutes from './routes/sectionRoutes.js';
+import subjectRoutes from './routes/subjectRoutes.js';
 import { fileURLToPath } from 'url';
 
 // Get directory name in ESM
@@ -59,6 +60,7 @@ app.use('/api/v1/results', resultRoutes);
 app.use('/api/v1/holidays', holidayRoutes);
 app.use('/api/v1/achievements', achievementRoutes);
 app.use('/api/v1/sections', sectionRoutes);
+app.use('/api/v1/subjects', subjectRoutes);
 
 // Error handling
 app.use(notFoundHandler);

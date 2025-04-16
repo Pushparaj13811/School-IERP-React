@@ -90,22 +90,103 @@ async function main() {
   ];
 
   // Create each subject, skipping if it already exists
+  let createdSubjects = [];
   for (const subject of subjects) {
     const existingSubject = await prisma.subject.findUnique({
       where: { code: subject.code }
     });
 
     if (!existingSubject) {
-      await prisma.subject.create({
+      const newSubject = await prisma.subject.create({
         data: subject
       });
       console.log(`Created subject: ${subject.name} (${subject.code})`);
+      createdSubjects.push(newSubject);
     } else {
       console.log(`Subject '${subject.name}' already exists, skipping...`);
+      createdSubjects.push(existingSubject);
     }
   }
 
-  console.log('Subject seeding completed successfully!');
+  // Fetch all classes
+  console.log('Fetching classes...');
+  const classes = await prisma.class.findMany();
+  
+  if (classes.length === 0) {
+    console.log('No classes found. Please seed classes first.');
+    return;
+  }
+  
+  console.log(`Found ${classes.length} classes. Now assigning subjects to classes...`);
+
+  // Assign subjects to classes based on their level
+  // Define subject distributions by class level
+  const classSubjectMappings = {
+    // Elementary classes (1-5)
+    elementary: ['MATH', 'ENG', 'SCI', 'SOC', 'PE', 'ART', 'MUS'],
+    
+    // Middle school classes (6-8)
+    middleSchool: ['MATH', 'ENG', 'SCI', 'SOC', 'PE', 'ART', 'MUS', 'HIST', 'GEO', 'CS'],
+    
+    // High school classes (9-12)
+    highSchool: ['MATH', 'ENG', 'BIO', 'CHEM', 'PHYS', 'HIST', 'GEO', 'CS', 'ECON', 'PE', 'ENV', 'LANG']
+  };
+
+  // Function to determine class level
+  const getClassLevel = (className) => {
+    const classNumber = parseInt(className.replace(/\D/g, ''));
+    
+    if (classNumber >= 1 && classNumber <= 5) {
+      return 'elementary';
+    } else if (classNumber >= 6 && classNumber <= 8) {
+      return 'middleSchool';
+    } else {
+      return 'highSchool';
+    }
+  };
+
+  // Create ClassSubject associations
+  const classSubjectAssociations = [];
+  
+  for (const cls of classes) {
+    const level = getClassLevel(cls.name);
+    const subjectCodes = classSubjectMappings[level];
+    
+    for (const code of subjectCodes) {
+      const subject = createdSubjects.find(s => s.code === code);
+      
+      if (subject) {
+        // Check if association already exists
+        const existingAssociation = await prisma.classSubject.findFirst({
+          where: {
+            classId: cls.id,
+            subjectId: subject.id
+          }
+        });
+        
+        if (!existingAssociation) {
+          classSubjectAssociations.push({
+            classId: cls.id,
+            subjectId: subject.id
+          });
+        }
+      }
+    }
+  }
+  
+  // Batch create class-subject associations
+  if (classSubjectAssociations.length > 0) {
+    await prisma.classSubject.createMany({
+      data: classSubjectAssociations,
+      skipDuplicates: true
+    });
+    
+    console.log(`Created ${classSubjectAssociations.length} class-subject associations`);
+  } else {
+    console.log('No new class-subject associations to create');
+  }
+
+  console.log('Subject seeding and class assignments completed successfully!');
 }
 
 main()
