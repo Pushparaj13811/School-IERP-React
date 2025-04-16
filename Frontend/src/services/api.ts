@@ -143,6 +143,33 @@ export const userAPI = {
             },
         });
     },
+    uploadParentProfilePicture: (parentId: number, file: File) => {
+        const formData = new FormData();
+        formData.append('profilePicture', file);
+        return api.patch<ApiResponse<{ profilePicture: string }>>(`/users/parents/${parentId}/profile-picture`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+    },
+    uploadStudentProfilePicture: (studentId: number, file: File) => {
+        const formData = new FormData();
+        formData.append('profilePicture', file);
+        return api.patch<ApiResponse<{ profilePicture: string }>>(`/users/students/${studentId}/profile-picture`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+    },
+    uploadTeacherProfilePicture: (teacherId: number, file: File) => {
+        const formData = new FormData();
+        formData.append('profilePicture', file);
+        return api.patch<ApiResponse<{ profilePicture: string }>>(`/users/teachers/${teacherId}/profile-picture`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+    },
     createUser: (data: Record<string, unknown>) => api.post<ApiResponse<UserResponse>>('/users/create', data),
     createStudent: (data: StudentFormData) => api.post<ApiResponse<{ user: UserResponse; student: Student }>>('/users/create-student', data),
     createParent: (data: ParentFormData) => api.post<ApiResponse<{ user: UserResponse; parent: Parent }>>('/users/create-parent', data),

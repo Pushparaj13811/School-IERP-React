@@ -572,7 +572,7 @@ export const getParentById = async (req, res, next) => {
 export const updateStudent = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const data = req.body;
+        const data = { ...req.body };
         
         // Check if user is authorized to update students
         if (req.user.role !== 'ADMIN') {
@@ -599,6 +599,42 @@ export const updateStudent = async (req, res, next) => {
         // Extract address data if provided
         const addressData = data.address ? { ...data.address } : undefined;
         delete data.address;
+        
+        // Extract class and section IDs and convert to nested connect operations
+        const classId = data.classId ? Number(data.classId) : undefined;
+        const sectionId = data.sectionId ? Number(data.sectionId) : undefined;
+        const parentId = data.parentId ? Number(data.parentId) : undefined;
+        
+        // Remove direct ID properties
+        delete data.classId;
+        delete data.sectionId;
+        delete data.parentId;
+
+        // Add nested relation updates
+        if (classId) {
+            data.class = {
+                connect: { id: classId }
+            };
+        }
+        
+        if (sectionId) {
+            data.section = {
+                connect: { id: sectionId }
+            };
+        }
+        
+        if (parentId) {
+            data.parent = {
+                connect: { id: parentId }
+            };
+        } else if (data.parentId === null) {
+            // If parentId is explicitly set to null, disconnect the parent
+            data.parent = {
+                disconnect: true
+            };
+        }
+        
+        console.log('Updating student with data:', JSON.stringify(data, null, 2));
         
         // Update student data
         const updatedStudent = await prisma.student.update({
@@ -641,9 +677,6 @@ export const updateStudent = async (req, res, next) => {
             religion: updatedStudent.religion,
             fatherName: updatedStudent.fatherName,
             motherName: updatedStudent.motherName,
-            classId: updatedStudent.classId,
-            sectionId: updatedStudent.sectionId,
-            parentId: updatedStudent.parentId,
             class: updatedStudent.class,
             section: updatedStudent.section,
             parent: updatedStudent.parent,
@@ -659,6 +692,7 @@ export const updateStudent = async (req, res, next) => {
             }
         });
     } catch (error) {
+        console.error('Error updating student:', error);
         next(error);
     }
 };
@@ -667,7 +701,7 @@ export const updateStudent = async (req, res, next) => {
 export const updateParent = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const data = req.body;
+        const data = { ...req.body };
         
         // Check if user is authorized to update parents
         if (req.user.role !== 'ADMIN') {
@@ -698,6 +732,8 @@ export const updateParent = async (req, res, next) => {
         // Extract children data if provided
         const childrenIds = data.children;
         delete data.children;
+
+        console.log('Updating parent with data:', JSON.stringify(data, null, 2));
 
         // Update parent data
         const updatedParent = await prisma.parent.update({
@@ -758,6 +794,7 @@ export const updateParent = async (req, res, next) => {
             }
         });
     } catch (error) {
+        console.error('Error updating parent:', error);
         next(error);
     }
 };
@@ -766,7 +803,7 @@ export const updateParent = async (req, res, next) => {
 export const updateTeacher = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const data = req.body;
+        const data = { ...req.body };
         
         // Check if user is authorized to update teachers
         if (req.user.role !== 'ADMIN') {
@@ -799,6 +836,8 @@ export const updateTeacher = async (req, res, next) => {
         const classIds = data.classes;
         delete data.subjects;
         delete data.classes;
+
+        console.log('Updating teacher with data:', JSON.stringify(data, null, 2));
 
         // Update teacher data
         const updatedTeacher = await prisma.teacher.update({
@@ -877,6 +916,90 @@ export const updateTeacher = async (req, res, next) => {
             }
         });
     } catch (error) {
+        console.error('Error updating teacher:', error);
+        next(error);
+    }
+};
+
+export const updateProfilePictureById = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const userRole = req.params.userRole; // STUDENT, PARENT, or TEACHER
+        
+        if (!req.file) {
+            return next(new AppError(400, 'Please upload a file'));
+        }
+
+        if (!id || !userRole) {
+            return next(new AppError(400, 'Missing required parameters'));
+        }
+
+        console.log(`Updating profile picture for ${userRole} with ID: ${id}`, req.file);
+
+        // Validate file type
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+        if (!allowedTypes.includes(req.file.mimetype)) {
+            return next(new AppError(400, 'Please upload an image file (jpeg, jpg, or png)'));
+        }
+
+        // Generate a proper URL for the uploaded file
+        const host = req.headers.host;
+        const protocol = req.secure ? 'https' : 'http';
+        const fileUrl = `${protocol}://${host}/uploads/profiles/${req.file.filename}`;
+        
+        console.log('File URL:', fileUrl);
+
+        try {
+            let userId;
+            
+            // Find the user ID based on the role and entity ID
+            switch (userRole) {
+                case 'STUDENT':
+                    const student = await prisma.student.findUnique({
+                        where: { id: parseInt(id) },
+                        select: { userId: true }
+                    });
+                    if (!student) return next(new AppError(404, 'Student not found'));
+                    userId = student.userId;
+                    break;
+                
+                case 'PARENT':
+                    const parent = await prisma.parent.findUnique({
+                        where: { id: parseInt(id) },
+                        select: { userId: true }
+                    });
+                    if (!parent) return next(new AppError(404, 'Parent not found'));
+                    userId = parent.userId;
+                    break;
+                
+                case 'TEACHER':
+                    const teacher = await prisma.teacher.findUnique({
+                        where: { id: parseInt(id) },
+                        select: { userId: true }
+                    });
+                    if (!teacher) return next(new AppError(404, 'Teacher not found'));
+                    userId = teacher.userId;
+                    break;
+                
+                default:
+                    return next(new AppError(400, 'Invalid user role'));
+            }
+            
+            console.log(`Found user ID ${userId} for ${userRole} with ID ${id}`);
+            
+            // Create profile picture and update user
+            const profilePicture = await userService.updateProfilePicture(userId, fileUrl);
+            
+            res.status(200).json({
+                status: 'success',
+                data: { profilePicture }
+            });
+        } catch (profileError) {
+            console.error(`Error updating profile picture for ${userRole} with ID ${id}:`, profileError);
+            return next(new AppError(500, 'Error saving profile picture to database'));
+        }
+    } catch (error) {
+        console.error('Error in file upload:', error);
         next(error);
     }
 }; 

@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import fs from 'fs';
-import { getProfile, updateProfile, updatePassword, updateProfilePicture, createUser, createStudent, createParent, createTeacher, getStudents, getParents, getTeachers, getUsers, getStudentById, getTeacherById, getParentById, updateStudent, updateParent, updateTeacher } from '../controller/userController.js';
+import { getProfile, updateProfile, updatePassword, updateProfilePicture, createUser, createStudent, createParent, createTeacher, getStudents, getParents, getTeachers, getUsers, getStudentById, getTeacherById, getParentById, updateStudent, updateParent, updateTeacher, updateProfilePictureById } from '../controller/userController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 import { AppError } from '../middlewares/errorHandler.js';
 
@@ -103,5 +103,19 @@ router.get('/parents/:id', getParentById);
 router.patch('/students/:id', updateStudent);
 router.patch('/parents/:id', updateParent);
 router.patch('/teachers/:id', updateTeacher);
+
+// Profile picture upload routes for specific user roles
+router.patch('/students/:id/profile-picture', handleMulterUpload, (req, res, next) => {
+    req.params.userRole = 'STUDENT';
+    next();
+}, updateProfilePictureById);
+router.patch('/parents/:id/profile-picture', handleMulterUpload, (req, res, next) => {
+    req.params.userRole = 'PARENT';
+    next();
+}, updateProfilePictureById);
+router.patch('/teachers/:id/profile-picture', handleMulterUpload, (req, res, next) => {
+    req.params.userRole = 'TEACHER';
+    next();
+}, updateProfilePictureById);
 
 export default router; 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { userService, UserProfile } from '../../services/userService';
-import { Parent } from '../../types/api';
+import { userAPI } from '../../services/api';
+import { Parent, Student } from '../../types/api';
 
 // Create a simple spinner component since we couldn't find the import
 const Spinner: React.FC = () => (
@@ -10,21 +12,44 @@ const Spinner: React.FC = () => (
 );
 
 const ParentProfile: React.FC = () => {
-  const [parent, setParent] = useState<UserProfile | null>(null);
+  const { id } = useParams<{ id?: string }>();
+  const [parent, setParent] = useState<UserProfile | Parent | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [isOwnProfile, setIsOwnProfile] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchParentData = async () => {
       try {
         setLoading(true);
-        const profile = await userService.getUserProfile();
         
-        if (!profile || profile.role !== 'PARENT') {
-          throw new Error('Parent profile not found or user is not a parent');
+        // If id parameter exists, fetch specific parent (admin view)
+        if (id) {
+          console.log(`Fetching parent profile with ID: ${id}`);
+          const response = await userAPI.getParentById(parseInt(id));
+          
+          if (response.data?.status === 'success' && response.data?.data?.parent) {
+            console.log('Parent data from API:', response.data.data.parent);
+            setParent(response.data.data.parent);
+            setIsOwnProfile(false);
+          } else {
+            throw new Error('Failed to load parent profile data');
+          }
+        } 
+        // Otherwise, try to get logged-in user's profile (parent view)
+        else {
+          console.log('Fetching own parent profile');
+          const profile = await userService.getUserProfile();
+          
+          if (profile && profile.role === 'PARENT') {
+            console.log('Own parent profile found:', profile);
+            setParent(profile);
+            setIsOwnProfile(true);
+          } else {
+            throw new Error('Parent profile not found or user is not a parent');
+          }
         }
         
-        setParent(profile);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching parent data:', err);
@@ -34,7 +59,7 @@ const ParentProfile: React.FC = () => {
     };
 
     fetchParentData();
-  }, []);
+  }, [id]);
 
   if (loading) {
     return <Spinner />;
@@ -50,7 +75,7 @@ const ParentProfile: React.FC = () => {
     );
   }
 
-  if (!parent || !parent.roleSpecificData) {
+  if (!parent) {
     return (
       <div className="p-6 text-center">
         <div className="p-4 bg-yellow-100 text-yellow-700 rounded-md">
@@ -60,9 +85,29 @@ const ParentProfile: React.FC = () => {
     );
   }
 
-  // Type assertion to access parent properties safely
-  const parentData = parent.roleSpecificData as Parent;
+  // Extract parent data based on whether we're viewing own profile or specific parent
+  const parentData = isOwnProfile 
+    ? (parent as UserProfile).roleSpecificData as Parent 
+    : parent as Parent;
   
+  const displayName = isOwnProfile 
+    ? (parent as UserProfile).name 
+    : parentData.name;
+  
+  const profilePicture = isOwnProfile 
+    ? (parent as UserProfile).profilePicture 
+    : parentData.profilePicture;
+  
+  const getProfileImageUrl = () => {
+    console.log("Parent component - profile picture:", profilePicture);
+    if (!profilePicture) {
+      console.log("No profile picture available for parent");
+      return "/default-parent-avatar.png";
+    }
+    
+    return userService.getProfileImageUrl(profilePicture);
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -71,7 +116,7 @@ const ParentProfile: React.FC = () => {
             <div className="flex flex-col items-center w-48">
               <div className="w-32 h-32 mb-4 overflow-hidden bg-blue-100 rounded-full">
                 <img
-                  src={userService.getProfileImageUrl(parent.profilePicture)}
+                  src={getProfileImageUrl()}
                   alt="Parent"
                   className="object-cover w-100 h-100"
                   onError={(e) => {
@@ -81,15 +126,17 @@ const ParentProfile: React.FC = () => {
                   }}
                 />
               </div>
-              <h2 className="text-xl font-semibold">{parent.name}</h2>
-              <p className="text-gray-600">{userService.getRoleDisplayName(parent.role)}</p>
+              <h2 className="text-xl font-semibold">{displayName}</h2>
+              <p className="text-gray-600">{isOwnProfile ? userService.getRoleDisplayName((parent as UserProfile).role) : 'Parent'}</p>
               <div className="mt-4 space-y-2">
                 <button className="w-full px-4 py-2 bg-[#292648] text-white rounded-md ">
                   Download Pdf
                 </button>
-                <button className="w-full px-4 py-2 border bg-[#292648] text-white rounded-md">
-                  Edit Profile
-                </button>
+                {isOwnProfile && (
+                  <button className="w-full px-4 py-2 border bg-[#292648] text-white rounded-md">
+                    Edit Profile
+                  </button>
+                )}
               </div>
             </div>
 
@@ -114,11 +161,18 @@ const ParentProfile: React.FC = () => {
                     <p className="font-medium">{parentData.contactNo || 'N/A'}</p>
                   </div>
                   {parentData.children && parentData.children.length > 0 && (
-                    <div>
+                    <div className="col-span-2">
                       <p className="mb-1 text-gray-600">Children</p>
-                      <p className="font-medium">
-                        {parentData.children.map((child: {name?: string}) => child.name || 'Unnamed').join(', ')}
-                      </p>
+                      <ul className="pl-5 list-disc">
+                        {parentData.children.map((child: Student) => (
+                          <li key={child.id} className="font-medium">
+                            {child.name} 
+                            {child.class && ` (${child.class.name}`}
+                            {child.section && child.class && ` - ${child.section.name}`}
+                            {child.class && ')'}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                 </div>

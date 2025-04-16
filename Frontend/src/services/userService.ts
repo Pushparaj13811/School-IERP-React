@@ -149,7 +149,7 @@ class UserService {
     
     if (!profilePicture) {
       console.log('No profile picture provided, returning default');
-      return "https://via.placeholder.com/150?text=User";
+      return "/default-avatar.png";
     }
     
     try {
@@ -160,12 +160,18 @@ class UserService {
         // If it's an admin profile picture with defined structure
         if ('url' in profilePicture && profilePicture.url) {
           console.log('Found url property:', profilePicture.url);
+          
+          // Check if the URL is already absolute
+          if (profilePicture.url.startsWith('http://') || profilePicture.url.startsWith('https://')) {
+            return profilePicture.url;
+          }
+          
           const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
           return `${baseUrl}${profilePicture.url.startsWith('/') ? '' : '/'}${profilePicture.url}`;
         }
         
         console.log('No url property found in object');
-        return "https://via.placeholder.com/150?text=User";
+        return "/default-avatar.png";
       }
       
       // If it's a string
@@ -186,10 +192,10 @@ class UserService {
       }
       
       console.warn('Unable to process profile picture format:', profilePicture);
-      return "https://via.placeholder.com/150?text=User";
+      return "/default-avatar.png";
     } catch (error) {
       console.error("Error processing profile picture:", error);
-      return "https://via.placeholder.com/150?text=User";
+      return "/default-avatar.png";
     }
   }
   

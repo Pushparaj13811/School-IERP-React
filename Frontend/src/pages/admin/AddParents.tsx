@@ -10,6 +10,18 @@ interface LocationState {
   parentData?: Parent;
 }
 
+// Define a more generic Error type interface
+interface ApiErrorResponse {
+  response?: {
+    data?: {
+      message?: string;
+    };
+    status?: number;
+  };
+  request?: unknown;
+  message?: string;
+}
+
 const AddParents: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -216,56 +228,122 @@ const AddParents: React.FC = () => {
       
       if (isEditMode && parentToEdit) {
         try {
-          // Update existing parent - core parent data only
-          console.log("Updating parent data:", parentToEdit.id);
-          response = await userAPI.updateParent(parentToEdit.id, parentData);
-          console.log("Parent data updated successfully");
+          // Log the parent data for debugging
+          console.log("Updating parent data:", {
+            id: parentToEdit.id,
+            data: parentData
+          });
           
-          // Handle profile picture separately
+          // First, let's handle the profile picture if it exists
+          let profilePictureResponse;
           if (profilePicture) {
             try {
               console.log("Uploading profile picture for existing parent");
-              await userAPI.uploadProfilePicture(profilePicture);
-              console.log("Profile picture updated successfully");
+              // Use the new endpoint for parent profile pictures
+              profilePictureResponse = await userAPI.uploadParentProfilePicture(parentToEdit.id, profilePicture);
+              console.log("Profile picture upload response:", profilePictureResponse);
+              
+              // If upload was successful, we should update the parent with the picture ID
+              if (profilePictureResponse?.data?.status === 'success' && 
+                  profilePictureResponse?.data?.data?.profilePicture) {
+                console.log("Profile picture uploaded successfully, proceeding with parent update");
+              }
             } catch (pictureError) {
               console.error("Error uploading profile picture:", pictureError);
-              toast.error("Parent data updated but failed to update profile picture.");
+              toast.error("Failed to upload profile picture. Continuing with parent update.");
             }
           }
           
+          // Now update the parent data
+          console.log("Updating parent data:", parentToEdit.id);
+          response = await userAPI.updateParent(parentToEdit.id, parentData);
+          console.log("Parent update response:", response);
+          
           toast.success('Parent updated successfully');
+          navigate('/parents');
         } catch (updateError) {
-          console.error('Error updating parent:', updateError);
-          toast.error('Failed to update parent. Please try again.');
+          const err = updateError as ApiErrorResponse;
+          console.error('Error updating parent:', err);
+          
+          // Log more details about the error
+          if (err.response) {
+            console.error('Error response:', err.response.data);
+            console.error('Status code:', err.response.status);
+            
+            // Display more specific error message
+            if (err.response.data?.message) {
+              toast.error(`Update failed: ${err.response.data.message}`);
+            } else {
+              toast.error(`Update failed: Server returned ${err.response.status}`);
+            }
+          } else if (err.request) {
+            console.error('Error request:', err.request);
+            toast.error('No response received from server. Please check your connection.');
+          } else {
+            toast.error('Failed to update parent. Please try again.');
+          }
+          setIsSubmitting(false);
           return;
         }
       } else {
+        // Update the profile picture upload flow for new parent creation
         try {
-          // Create new parent
+          // For new parents, we need to create the parent first, then upload the profile picture
+          console.log("Creating new parent with data:", parentData);
           response = await userAPI.createParent(parentData);
-          console.log("Parent created successfully");
+          console.log("Parent creation response:", response);
           
-          // Handle profile picture upload if present - in a separate try/catch
-          if (profilePicture && response.data?.data?.parent?.id) {
+          // If parent creation successful, upload profile picture
+          if (response?.data?.status === 'success' && profilePicture) {
             try {
-              await userAPI.uploadProfilePicture(profilePicture);
-              console.log("Profile picture uploaded successfully");
+              // Make sure we have the parent ID before uploading profile picture
+              const parentId = response.data.data.parent.id;
+              console.log("Parent created with ID:", parentId);
+              
+              console.log("Uploading profile picture for new parent");
+              // Use the new endpoint for parent profile pictures
+              const profilePictureResponse = await userAPI.uploadParentProfilePicture(parentId, profilePicture);
+              console.log("Profile picture upload response:", profilePictureResponse);
+              
+              if (profilePictureResponse?.data?.status === 'success') {
+                console.log("Profile picture uploaded successfully for new parent");
+              } else {
+                console.error("Profile picture upload returned unexpected response:", profilePictureResponse);
+                toast.warning("Parent created but profile picture may not have been properly linked.");
+              }
             } catch (pictureError) {
               console.error("Error uploading profile picture:", pictureError);
               toast.error("Parent created but failed to upload profile picture.");
             }
           }
           
-          toast.success('Parent created successfully');
+          toast.success('Parent added successfully');
+          navigate('/parents');
         } catch (createError) {
-          console.error('Error creating parent:', createError);
-          toast.error('Failed to create parent. Please try again.');
+          const err = createError as ApiErrorResponse;
+          console.error('Error creating parent:', err);
+          
+          // Log more details about the error
+          if (err.response) {
+            console.error('Error response:', err.response.data);
+            console.error('Status code:', err.response.status);
+            
+            // Display more specific error message
+            if (err.response.data?.message) {
+              toast.error(`Creation failed: ${err.response.data.message}`);
+            } else {
+              toast.error(`Creation failed: Server returned ${err.response.status}`);
+            }
+          } else if (err.request) {
+            console.error('Error request:', err.request);
+            toast.error('No response received from server. Please check your connection.');
+          } else {
+            toast.error('Failed to create parent. Please try again.');
+          }
+          setIsSubmitting(false);
           return;
         }
       }
-      
-      // Navigate only if everything succeeded
-      navigate('/parents');
     } catch (error: unknown) {
       interface ErrorWithResponse {
         response?: {
@@ -281,8 +359,6 @@ const AddParents: React.FC = () => {
           : 'Failed to process parent data';
       toast.error(errorMessage);
       console.error('Error processing parent:', error);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 

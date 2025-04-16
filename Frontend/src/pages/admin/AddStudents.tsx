@@ -16,6 +16,18 @@ interface LocationState {
   studentData?: Student;
 }
 
+// Define a more generic Error type interface
+interface ApiErrorResponse {
+  response?: {
+    data?: {
+      message?: string;
+    };
+    status?: number;
+  };
+  request?: unknown;
+  message?: string;
+}
+
 const AddStudents: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -302,7 +314,8 @@ const AddStudents: React.FC = () => {
         gender,
         contactNo,
         emergencyContact,
-        dateOfBirth,
+        // Format date in ISO-8601 with time information
+        dateOfBirth: dateOfBirth ? new Date(`${dateOfBirth}T00:00:00Z`).toISOString() : '',
         dobNo: dobNo || undefined,
         bloodGroup: bloodGroup || undefined,
         nationality,
@@ -320,17 +333,30 @@ const AddStudents: React.FC = () => {
       
       if (isEditMode && studentToEdit) {
         try {
+          // Log the data being sent to API for debugging
+          console.log("Student update data:", {
+            id: studentToEdit.id,
+            data: studentData
+          });
+          
+          // Add validation for required fields
+          if (!name || !email || !rollNo || !classId || !sectionId) {
+            toast.error("Please fill in all required fields");
+            setIsSubmitting(false);
+            return;
+          }
+          
           // Update existing student - core student data only
           console.log("Updating student data:", studentToEdit.id);
           response = await userAPI.updateStudent(studentToEdit.id, studentData);
-          console.log("Student data updated successfully");
+          console.log("Student data updated successfully:", response);
           
           // Handle profile picture separately if it exists
           if (profilePicture) {
             try {
               console.log("Uploading profile picture for existing student");
-              // Use a separate API call for profile picture
-              await userAPI.uploadProfilePicture(profilePicture);
+              // Use the specific endpoint for student profile pictures
+              await userAPI.uploadStudentProfilePicture(studentToEdit.id, profilePicture);
               console.log("Profile picture updated successfully");
             } catch (pictureError) {
               console.error("Error uploading profile picture:", pictureError);
@@ -339,23 +365,57 @@ const AddStudents: React.FC = () => {
           }
           
           toast.success('Student updated successfully');
+          navigate('/students');
         } catch (updateError) {
-          console.error('Error updating student:', updateError);
-          toast.error('Failed to update student. Please try again.');
+          const err = updateError as ApiErrorResponse;
+          console.error('Error updating student:', err);
+          // Log more details about the error
+          if (err.response) {
+            console.error('Error response:', err.response.data);
+            console.error('Status code:', err.response.status);
+            
+            // Display more specific error message
+            if (err.response.data?.message) {
+              toast.error(`Update failed: ${err.response.data.message}`);
+            } else {
+              toast.error(`Update failed: Server returned ${err.response.status}`);
+            }
+          } else if (err.request) {
+            console.error('Error request:', err.request);
+            toast.error('No response received from server. Please check your connection.');
+          } else {
+            toast.error('Failed to update student. Please try again.');
+          }
+          
+          setIsSubmitting(false);
           return;
         }
       } else {
         // For new students, create first then upload profile picture
         try {
           // Create new student
+          console.log("Creating new student with data:", studentData);
           response = await userAPI.createStudent(studentData);
-          console.log("Student created successfully");
+          console.log("Student created successfully:", response);
           
           // Handle profile picture upload if present
           if (profilePicture && response.data?.data?.student?.id) {
             try {
-              await userAPI.uploadProfilePicture(profilePicture);
-              console.log("Profile picture uploaded successfully");
+              // Make sure we have the student ID before uploading
+              const studentId = response.data.data.student.id;
+              console.log("Student created with ID:", studentId);
+              
+              console.log("Uploading profile picture for new student");
+              // Use the specific endpoint for student profile pictures
+              const profilePictureResponse = await userAPI.uploadStudentProfilePicture(studentId, profilePicture);
+              console.log("Profile picture upload response:", profilePictureResponse);
+              
+              if (profilePictureResponse?.data?.status === 'success') {
+                console.log("Profile picture uploaded successfully for new student");
+              } else {
+                console.error("Profile picture upload returned unexpected response:", profilePictureResponse);
+                toast.warning("Student created but profile picture may not have been properly linked.");
+              }
             } catch (pictureError) {
               console.error("Error uploading profile picture:", pictureError);
               toast.error("Student created but failed to upload profile picture.");
@@ -363,9 +423,29 @@ const AddStudents: React.FC = () => {
           }
           
           toast.success('Student created successfully');
+          navigate('/students');
         } catch (createError) {
-          console.error('Error creating student:', createError);
-          toast.error('Failed to create student. Please try again.');
+          const err = createError as ApiErrorResponse;
+          console.error('Error creating student:', err);
+          
+          // Log more details about the error
+          if (err.response) {
+            console.error('Error response:', err.response.data);
+            console.error('Status code:', err.response.status);
+            
+            // Display more specific error message
+            if (err.response.data?.message) {
+              toast.error(`Creation failed: ${err.response.data.message}`);
+            } else {
+              toast.error(`Creation failed: Server returned ${err.response.status}`);
+            }
+          } else if (err.request) {
+            console.error('Error request:', err.request);
+            toast.error('No response received from server. Please check your connection.');
+          } else {
+            toast.error('Failed to create student. Please try again.');
+          }
+          setIsSubmitting(false);
           return;
         }
       }
