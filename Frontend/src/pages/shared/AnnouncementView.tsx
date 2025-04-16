@@ -7,6 +7,29 @@ import { UserRole } from '../../utils/roles';
 import { announcementAPI } from '../../services/api';
 import { toast } from 'react-toastify';
 
+// Interface for API response data structure
+interface AnnouncementData {
+  id: number;
+  title: string;
+  content: string;
+  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string | null;
+  isActive: boolean;
+  createdBy: {
+    name: string;
+    role: string;
+  };
+  targetClasses?: string[];
+  targetSections?: string[];
+  attachments?: Array<{
+    name: string;
+    url: string;
+    type: string;
+  }>;
+}
+
 // Interface for the component's state
 interface Announcement {
   id: number;
@@ -47,8 +70,8 @@ const AnnouncementView: React.FC = () => {
                 const response = await announcementAPI.getAll();
                 
                 if (response.data?.status === 'success' && response.data?.data?.announcements) {
-                    // Type as any first, then process into our known Announcement type
-                    const apiAnnouncements = response.data.data.announcements as any[];
+                    // Type as API response type first, then process into our known Announcement type
+                    const apiAnnouncements = response.data.data.announcements as unknown as AnnouncementData[];
                     
                     const formattedAnnouncements: Announcement[] = apiAnnouncements.map(announcement => ({
                         id: announcement.id,

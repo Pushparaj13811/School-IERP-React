@@ -10,6 +10,24 @@ interface AnnouncementAttachment {
   type: string;
 }
 
+// Interface for API response data structure
+interface AnnouncementData {
+  id: number;
+  title: string;
+  content: string;
+  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+  createdAt: string;
+  expiresAt: string | null;
+  isActive: boolean;
+  createdBy: {
+    name: string;
+    role: string;
+  };
+  targetClasses?: string[];
+  targetSections?: string[];
+  attachments?: AnnouncementAttachment[];
+}
+
 // Interface for the component's state
 interface Announcement {
   id: number;
@@ -43,14 +61,13 @@ const Announcements: React.FC = () => {
         const response = await announcementAPI.getAll();
         
         if (response.data?.status === 'success' && response.data?.data?.announcements) {
-          // Type as unknown first, then process into our known Announcement type
-          const apiAnnouncements = response.data.data.announcements as unknown[];
+          // Type as API response type first, then process into our component's Announcement type
+          const apiAnnouncements = response.data.data.announcements as unknown as AnnouncementData[];
           
           const formattedAnnouncements: Announcement[] = [];
           
           // Map the API data to our component's Announcement type
-          for (const item of apiAnnouncements) {
-            const announcement = item as any;
+          for (const announcement of apiAnnouncements) {
             formattedAnnouncements.push({
               id: announcement.id,
               title: announcement.title,
