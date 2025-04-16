@@ -10,6 +10,10 @@ import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import academicRoutes from './routes/academicRoutes.js';
+import attendanceRoutes from './routes/attendanceRoutes.js';
+import resultRoutes from './routes/resultRoutes.js';
+import holidayRoutes from './routes/holidayRoutes.js';
+import achievementRoutes from './routes/achievementRoutes.js';
 
 const app = express();
 
@@ -32,8 +36,10 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/academic', academicRoutes);
-
-
+app.use('/api/v1/attendance', attendanceRoutes);
+app.use('/api/v1/results', resultRoutes);
+app.use('/api/v1/holidays', holidayRoutes);
+app.use('/api/v1/achievements', achievementRoutes);
 
 // Error handling
 app.use(notFoundHandler);
