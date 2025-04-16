@@ -149,6 +149,28 @@ export interface UserResponse {
   email: string;
   role: 'ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT';
   isActive?: boolean;
+  student?: Student;
+  teacher?: Teacher;
+  parent?: Parent;
+  admin?: {
+    id: number;
+    fullName: string;
+    phone?: string;
+    dateOfBirth?: string;
+    joinDate?: string;
+    emergencyContact?: string;
+    bio?: string | null;
+    profilePicture?: {
+      id: number;
+      url: string;
+    } | null;
+    address?: {
+      addressLine1: string;
+      city: string;
+      district: string;
+      province: string;
+    };
+  };
 }
 
 // Form data interfaces for creating users

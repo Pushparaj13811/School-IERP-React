@@ -1,69 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaCamera } from 'react-icons/fa';
-import { userAPI } from '../../services/api';
 import { toast } from 'react-toastify';
-import { format } from 'date-fns';
-
-interface ProfileData {
-  fullName: string;
-  email: string;
-  phone: string;
-  address: {
-    addressLine1: string;
-    city: string;
-    district: string;
-    province: string;
-  };
-  dateOfBirth: string;
-  joinDate: string;
-  emergencyContact: string;
-  bio: string | null;
-  profilePicture?: {
-    id: number;
-    url: string;
-  } | null;
-}
-
-interface ProfileApiResponse {
-  status: string;
-  data: {
-    user: {
-      email: string;
-      admin: {
-        fullName: string;
-        phone: string;
-        dateOfBirth: string;
-        joinDate: string;
-        emergencyContact: string;
-        bio: string | null;
-        address: {
-          addressLine1: string;
-          city: string;
-          district: string;
-          province: string;
-        };
-        profilePicture?: {
-          id: number;
-          url: string;
-        } | null;
-      };
-    };
-  };
-  message?: string;
-}
-
-interface ProfilePictureResponse {
-  status: string;
-  data: {
-    profilePicture: {
-      id: number;
-      url: string;
-    }
-  };
-  message?: string;
-}
+import { useAuth } from '../../context/AuthContext';
+import profileService, { AdminProfileData } from '../../services/profileService';
 
 const Profile: React.FC = () => {
+  const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +13,7 @@ const Profile: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Initialize with empty profile data
-  const [profileData, setProfileData] = useState<ProfileData>({
+  const [profileData, setProfileData] = useState<AdminProfileData>({
     fullName: '',
     email: '',
     phone: '',
@@ -88,43 +30,23 @@ const Profile: React.FC = () => {
     profilePicture: null
   });
 
-  // Function to format date from ISO to YYYY-MM-DD for input fields
-  const formatDateForInput = (dateString: string) => {
-    if (!dateString) return '';
-    try {
-      return format(new Date(dateString), 'yyyy-MM-dd');
-    } catch {
-      return '';
-    }
-  };
-
   // Function to fetch profile data
   const fetchProfileData = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await userAPI.getProfile();
-      // Use Type assertion to unknown first, then to our specific interface
-      const responseData = response.data as unknown as ProfileApiResponse;
-      const userData = responseData?.data?.user;
+      console.log("Fetching profile data, user role:", user?.role);
+      const data = await profileService.getProfileData();
       
-      if (userData?.admin) {
-        setProfileData({
-          fullName: userData.admin.fullName || '',
-          email: userData.email || '',
-          phone: userData.admin.phone || '',
-          address: {
-            addressLine1: userData.admin.address?.addressLine1 || '',
-            city: userData.admin.address?.city || '',
-            district: userData.admin.address?.district || '',
-            province: userData.admin.address?.province || '',
-          },
-          dateOfBirth: userData.admin.dateOfBirth || '',
-          joinDate: userData.admin.joinDate || '',
-          emergencyContact: userData.admin.emergencyContact || '',
-          bio: userData.admin.bio || '',
-          profilePicture: userData.admin.profilePicture || null
-        });
+      if (data) {
+        // Check if data is admin profile data
+        if ('fullName' in data) {
+          setProfileData(data as AdminProfileData);
+        } else {
+          setError('Not an administrator account. This page is for admin profiles only.');
+        }
+      } else {
+        setError('Failed to load profile data. Please try again.');
       }
     } catch (err) {
       setError('Failed to load profile data. Please try again.');
@@ -163,13 +85,18 @@ const Profile: React.FC = () => {
         }
       };
 
-      // Call API to update profile
-      await userAPI.updateProfile(updateData);
-      toast.success('Profile updated successfully!');
-      setIsEditing(false);
+      // Call service to update profile
+      const success = await profileService.updateProfile(updateData);
       
-      // Refresh profile data
-      fetchProfileData();
+      if (success) {
+        toast.success('Profile updated successfully!');
+        setIsEditing(false);
+        
+        // Refresh profile data
+        fetchProfileData();
+      } else {
+        toast.error('Failed to update profile. Please try again.');
+      }
     } catch (err) {
       toast.error('Failed to update profile. Please try again.');
       console.error('Error updating profile:', err);
@@ -185,7 +112,7 @@ const Profile: React.FC = () => {
       setProfileData({
         ...profileData,
         [parent]: {
-          ...profileData[parent as keyof ProfileData] as Record<string, unknown>,
+          ...profileData[parent as keyof AdminProfileData] as Record<string, unknown>,
           [child]: value
         }
       });
@@ -209,36 +136,19 @@ const Profile: React.FC = () => {
 
     const file = files[0];
     
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Please upload a valid image file (JPEG, JPG, or PNG)');
-      return;
-    }
-
-    // Validate file size (limit to 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-      toast.error('File size must be less than 5MB');
-      return;
-    }
-
     try {
       setIsUploading(true);
-      const response = await userAPI.uploadProfilePicture(file);
+      const result = await profileService.uploadProfilePicture(file);
       
-      // Safe type conversion - first to unknown, then to our specific type
-      const responseData = response.data as unknown as ProfilePictureResponse;
-      
-      if (responseData?.data?.profilePicture) {
-        const newProfilePicture = responseData.data.profilePicture;
-        
+      if (result.success && result.data) {
         setProfileData({
           ...profileData,
-          profilePicture: newProfilePicture
+          profilePicture: result.data
         });
         
         toast.success('Profile picture updated successfully!');
+      } else {
+        toast.error('Failed to upload profile picture. Please try again.');
       }
     } catch (error) {
       toast.error('Failed to upload profile picture. Please try again.');
@@ -283,17 +193,26 @@ const Profile: React.FC = () => {
                 className="w-48 h-48 rounded-full bg-gray-200 overflow-hidden cursor-pointer"
                 onClick={handleProfilePictureClick}
               >
-                <img 
-                  src={profileData.profilePicture?.url || 'https://via.placeholder.com/300?text=No+Image'} 
-                  alt="Profile" 
-                  className="w-full h-full object-cover"
-                  crossOrigin="anonymous"
-                  onError={(e) => {
-                    // Handle image loading errors
-                    console.error('Error loading image:', e);
-                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300?text=Error+Loading';
-                  }}
-                />
+                {profileData.profilePicture ? (
+                  <img 
+                    src={profileService.getProfileImageUrl(profileData.profilePicture)} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover"
+                    crossOrigin="anonymous"
+                    onError={(e) => {
+                      // Handle image loading errors
+                      console.error('Error loading image:', e);
+                      console.log('Profile picture data:', profileData.profilePicture);
+                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300?text=Error+Loading';
+                    }}
+                  />
+                ) : (
+                  <img 
+                    src="https://via.placeholder.com/300?text=No+Image" 
+                    alt="No Profile"
+                    className="w-full h-full object-cover"
+                  />
+                )}
                 {isUploading && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
                     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
@@ -364,7 +283,7 @@ const Profile: React.FC = () => {
               
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Date of Birth</label>
-                <p className="text-gray-800">{formatDateForInput(profileData.dateOfBirth)}</p>
+                <p className="text-gray-800">{profileService.formatDateForInput(profileData.dateOfBirth)}</p>
               </div>
               
               <div>
@@ -384,7 +303,7 @@ const Profile: React.FC = () => {
               
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Join Date</label>
-                <p className="text-gray-800">{formatDateForInput(profileData.joinDate)}</p>
+                <p className="text-gray-800">{profileService.formatDateForInput(profileData.joinDate)}</p>
               </div>
             </div>
             

@@ -201,4 +201,21 @@ export const leaveAPI = {
     updateLeave: (id: string, data: Record<string, unknown>) => api.put<ApiResponse<{ leave: Leave }>>(`/leaves/${id}`, data),
 };
 
+// Dashboard API
+export interface StudentDashboardData {
+    student: Student;
+    attendancePercentage: number;
+    examResults: number;
+    holidaysCount: number;
+    achievementsCount: number;
+    recentAnnouncements: Announcement[];
+}
+
+export const dashboardAPI = {
+    getStudentDashboard: () => api.get<ApiResponse<StudentDashboardData>>('/dashboard/student'),
+    getTeacherDashboard: () => api.get<ApiResponse<Record<string, unknown>>>('/dashboard/teacher'),
+    getParentDashboard: () => api.get<ApiResponse<Record<string, unknown>>>('/dashboard/parent'),
+    getAdminDashboard: () => api.get<ApiResponse<Record<string, unknown>>>('/dashboard/admin'),
+};
+
 export default api; 
