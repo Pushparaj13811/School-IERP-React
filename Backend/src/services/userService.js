@@ -2,6 +2,7 @@ import { prisma } from '../databases/prismaClient.js';
 import { AppError } from '../middlewares/errorHandler.js';
 import bcrypt from 'bcryptjs';
 import { config } from '../config/config.js';
+import { generateRandomPassword } from '../utils/passwordGenerator.js';
 
 export class UserService {
     async getUserProfile(userId) {
@@ -330,5 +331,88 @@ export class UserService {
                 }
             }
         });
+    }
+
+    async createUserWithAutoPassword(email, role, userData) {
+        // Check if user already exists
+        const existingUser = await prisma.user.findUnique({
+            where: { email }
+        });
+
+        if (existingUser) {
+            throw new AppError(400, 'User with this email already exists');
+        }
+
+        // Generate random password
+        const password = generateRandomPassword();
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create user
+        const user = await prisma.user.create({
+            data: {
+                email,
+                password: hashedPassword,
+                role,
+                ...userData
+            }
+        });
+
+        return { user, password };
+    }
+
+    async createStudentWithAutoPassword(email, studentData) {
+        const { user, password } = await this.createUserWithAutoPassword(email, 'STUDENT', studentData);
+        
+        // Create student profile
+        await prisma.student.create({
+            data: {
+                userId: user.id,
+                ...studentData
+            }
+        });
+
+        return { user, password };
+    }
+
+    async createParentWithAutoPassword(email, parentData) {
+        const { user, password } = await this.createUserWithAutoPassword(email, 'PARENT', parentData);
+        
+        // Create parent profile
+        await prisma.parent.create({
+            data: {
+                userId: user.id,
+                ...parentData
+            }
+        });
+
+        return { user, password };
+    }
+
+    async createTeacherWithAutoPassword(email, teacherData) {
+        const { user, password } = await this.createUserWithAutoPassword(email, 'TEACHER', teacherData);
+        
+        // Create teacher profile
+        await prisma.teacher.create({
+            data: {
+                userId: user.id,
+                ...teacherData
+            }
+        });
+
+        return { user, password };
+    }
+
+    async getUserByEmail(email) {
+        const user = await prisma.user.findUnique({
+            where: { email },
+            include: {
+                student: true,
+                teacher: true,
+                admin: true,
+                parent: true
+            }
+        });
+
+        return user;
     }
 }

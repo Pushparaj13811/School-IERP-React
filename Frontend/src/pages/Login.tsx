@@ -8,6 +8,14 @@ interface LocationState {
   };
 }
 
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
+
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,14 +38,9 @@ const Login: React.FC = () => {
       await login(email, password);
       // Use optional chaining and provide a default path
       navigate(from?.pathname || '/', { replace: true });
-    } catch (err: unknown) {
-      console.error('Login error:', err);
-      // Type guard for error handling
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Invalid email or password');
-      }
+    } catch (err) {
+      const apiError = err as ApiError;
+      setError(apiError.response?.data?.message || 'Invalid email or password');
       setIsLoading(false);
     }
   };
@@ -116,15 +119,6 @@ const Login: React.FC = () => {
         </div>
       </form>
       
-      <div className="mt-4 text-xs text-center text-gray-500">
-        <p>Use these test accounts:</p>
-        <p className="text-[10px] mt-1">
-          student@example.com / password<br />
-          teacher@example.com / password<br />
-          admin@example.com / password<br />
-          parent@example.com / password
-        </p>
-      </div>
     </div>
   );
 };

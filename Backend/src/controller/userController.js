@@ -1,5 +1,6 @@
 import { UserService } from '../services/userService.js';
 import { AppError } from '../middlewares/errorHandler.js';
+import { emailService } from '../services/emailService.js';
 
 const userService = new UserService();
 
@@ -74,6 +75,94 @@ export const updateProfilePicture = async (req, res, next) => {
         res.status(200).json({
             status: 'success',
             data: { profilePicture }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const createUser = async (req, res, next) => {
+    try {
+        // Check if the requesting user is an admin
+        if (req.user.role !== 'ADMIN') {
+            return next(new AppError(403, 'Only admins can create users'));
+        }
+
+        const { email, role, ...userData } = req.body;
+
+        // Create user with auto-generated password
+        const { user, password } = await userService.createUserWithAutoPassword(email, role, userData);
+
+        // Send email with credentials
+        await emailService.sendUserCredentials(email, password);
+
+        res.status(201).json({
+            status: 'success',
+            message: 'User created successfully',
+            data: { user }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const createStudent = async (req, res, next) => {
+    try {
+        if (req.user.role !== 'ADMIN') {
+            return next(new AppError(403, 'Only admins can create students'));
+        }
+
+        const { email, ...studentData } = req.body;
+        const { user, password } = await userService.createStudentWithAutoPassword(email, studentData);
+        
+        await emailService.sendUserCredentials(email, password);
+
+        res.status(201).json({
+            status: 'success',
+            message: 'Student created successfully',
+            data: { user }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const createParent = async (req, res, next) => {
+    try {
+        if (req.user.role !== 'ADMIN') {
+            return next(new AppError(403, 'Only admins can create parents'));
+        }
+
+        const { email, ...parentData } = req.body;
+        const { user, password } = await userService.createParentWithAutoPassword(email, parentData);
+        
+        await emailService.sendUserCredentials(email, password);
+
+        res.status(201).json({
+            status: 'success',
+            message: 'Parent created successfully',
+            data: { user }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const createTeacher = async (req, res, next) => {
+    try {
+        if (req.user.role !== 'ADMIN') {
+            return next(new AppError(403, 'Only admins can create teachers'));
+        }
+
+        const { email, ...teacherData } = req.body;
+        const { user, password } = await userService.createTeacherWithAutoPassword(email, teacherData);
+        
+        await emailService.sendUserCredentials(email, password);
+
+        res.status(201).json({
+            status: 'success',
+            message: 'Teacher created successfully',
+            data: { user }
         });
     } catch (error) {
         next(error);

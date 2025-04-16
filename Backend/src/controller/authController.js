@@ -80,4 +80,13 @@ export const logout = (req, res) => {
         httpOnly: true
     });
     res.status(200).json({ status: 'success' });
+};
+
+export const refreshToken = async (req, res, next) => {
+    try {
+        // req.user is already set from the protect middleware
+        createSendToken(req.user, 200, res);
+    } catch (error) {
+        next(error);
+    }
 }; 

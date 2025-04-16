@@ -1,11 +1,52 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { UserRole } from '../utils/roles';
+import { authAPI } from '../services/api';
+
+interface Student {
+  id: number;
+  name: string;
+  // Add other student properties as needed
+}
+
+interface Teacher {
+  id: number;
+  name: string;
+  // Add other teacher properties as needed
+}
+
+interface Admin {
+  id: number;
+  fullName: string;
+  // Add other admin properties as needed
+}
+
+interface Parent {
+  id: number;
+  name: string;
+  // Add other parent properties as needed
+}
 
 interface User {
-  id: string;
-  name: string;
+  id: number;
   email: string;
   role: UserRole;
+  student?: Student;
+  teacher?: Teacher;
+  admin?: Admin;
+  parent?: Parent;
+}
+
+interface ApiResponseData {
+  statusCode: number;
+  data: {
+    status: string;
+    token: string;
+    data: {
+      user: User;
+    }
+  };
+  message: string;
+  success: boolean;
 }
 
 interface AuthContextType {
@@ -28,23 +69,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is authenticated on app load
     checkAuth();
   }, []);
 
   const checkAuth = async (): Promise<boolean> => {
     try {
       setLoading(true);
-      // For demo purposes - replace with actual API call
-      const storedUser = localStorage.getItem('user');
+      const token = localStorage.getItem('token');
       
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-        setLoading(false);
-        return true;
+      if (token) {
+        console.log('Token found in localStorage, attempting to refresh');
+        try {
+          const response = await authAPI.refreshToken();
+          console.log('Refresh token response:', response.data);
+          
+          const responseData = response.data as ApiResponseData;
+          const actualToken = responseData.data.token;
+          const actualUser = responseData.data.data.user;
+          
+          localStorage.setItem('token', actualToken);
+          localStorage.setItem('user', JSON.stringify(actualUser));
+          setUser(actualUser);
+          console.log('User authenticated:', actualUser);
+          setLoading(false);
+          return true;
+        } catch (refreshError) {
+          console.error('Failed to refresh token:', refreshError);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+          setLoading(false);
+          return false;
+        }
       }
 
-      // No default user - require explicit login
+      console.log('No token found, user is not authenticated');
       setUser(null);
       setLoading(false);
       return false;
@@ -60,33 +119,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
       
-      // Validate credentials
-      if (!email || !password) {
-        throw new Error('Email and password are required');
-      }
+      console.log('Attempting login with:', email);
+      const response = await authAPI.login(email, password);
+      console.log('Login response:', response.data);
       
-      if (password !== 'password') {
-        throw new Error('Invalid password');
-      }
+      const responseData = response.data as ApiResponseData;
+      const actualToken = responseData.data.token;
+      const actualUser = responseData.data.data.user;
       
-      // Mock login - replace with actual API call
-      console.log(`Login attempt with password length: ${password.length}`);
+      console.log('Setting token:', actualToken);
+      console.log('Setting user:', actualUser);
       
-      const mockUser = {
-        id: '1',
-        name: email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1),
-        email,
-        role: email.includes('admin') 
-          ? UserRole.ADMIN 
-          : email.includes('teacher') 
-            ? UserRole.TEACHER 
-            : email.includes('parent') 
-              ? UserRole.PARENT 
-              : UserRole.STUDENT
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
+      localStorage.setItem('token', actualToken);
+      localStorage.setItem('user', JSON.stringify(actualUser));
+      setUser(actualUser);
       setLoading(false);
     } catch (error) {
       console.error('Login failed:', error);
@@ -95,9 +141,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = (): void => {
-    setUser(null);
-    localStorage.removeItem('user');
+  const logout = async (): Promise<void> => {
+    try {
+      await authAPI.logout();
+    } catch (error) {
+      console.error('Logout failed:', error);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+    }
   };
 
   return (
