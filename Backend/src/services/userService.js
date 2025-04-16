@@ -537,6 +537,7 @@ export class UserService {
                 address,
                 subjects,
                 classes,
+                sections,
                 ...otherTeacherData 
             } = teacherData;
             
@@ -590,6 +591,18 @@ export class UserService {
                         data: {
                             teacherId: teacher.id,
                             classId: parseInt(classId)
+                        }
+                    });
+                }
+            }
+            
+            // Connect sections if provided
+            if (sections && Array.isArray(sections) && sections.length > 0) {
+                for (const sectionId of sections) {
+                    await prisma.teacherSection.create({
+                        data: {
+                            teacherId: teacher.id,
+                            sectionId: parseInt(sectionId)
                         }
                     });
                 }

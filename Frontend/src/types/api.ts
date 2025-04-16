@@ -89,6 +89,7 @@ export interface Teacher {
   designation?: Designation;
   subjects?: Subject[];
   classes?: { class: Class }[];
+  sections?: { section: Section }[];
   profilePicture?: string;
   emergencyContact?: string;
   dateOfBirth?: string;

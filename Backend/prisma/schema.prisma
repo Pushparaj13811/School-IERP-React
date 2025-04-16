@@ -101,6 +101,7 @@ model Teacher {
   profilePicture    ProfilePicture?    @relation(fields: [profilePictureId], references: [id])
   subjects          TeacherSubject[]
   classes           TeacherClass[]
+  sections          TeacherSection[]
   periods           Period[]
   classResults      OverallResult[] // For class teacher role
   leaveApplications LeaveApplication[] @relation("TeacherLeaveApplications")
@@ -270,6 +271,23 @@ model TeacherClass {
   @@map("teacher_classes")
 }
 
+// After the TeacherClass model, add the new TeacherSection model
+// Junction table for Teacher-Section many-to-many relationship
+model TeacherSection {
+  id        Int      @id @default(autoincrement())
+  teacherId Int
+  sectionId Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+  section Section @relation(fields: [sectionId], references: [id])
+
+  @@unique([teacherId, sectionId])
+  @@map("teacher_sections")
+}
+
 model Section {
   id        Int      @id @default(autoincrement())
   name      String // e.g., "A", "B", "C"
@@ -280,11 +298,12 @@ model Section {
   classId Int
 
   // Relations
-  class         Class                 @relation(fields: [classId], references: [id])
-  students      Student[]
-  timetables    Timetable[]
-  periods       Period[]
-  announcements AnnouncementSection[]
+  class           Class                 @relation(fields: [classId], references: [id])
+  students        Student[]
+  timetables      Timetable[]
+  periods         Period[]
+  teacherSections TeacherSection[]
+  announcements   AnnouncementSection[]
 
   @@unique([classId, name])
   @@map("sections")

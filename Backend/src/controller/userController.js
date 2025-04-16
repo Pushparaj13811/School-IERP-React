@@ -278,6 +278,11 @@ export const getTeachers = async (req, res, next) => {
                         class: true
                     }
                 },
+                sections: {
+                    include: {
+                        section: true
+                    }
+                },
                 profilePicture: true
             }
         });
@@ -292,6 +297,7 @@ export const getTeachers = async (req, res, next) => {
             designation: teacher.designation,
             subjects: teacher.subjects.map(s => s.subject),
             classes: teacher.classes.map(c => c.class),
+            sections: teacher.sections.map(s => s.section),
             profilePicture: teacher.profilePicture?.url
         }));
         
@@ -471,6 +477,11 @@ export const getTeacherById = async (req, res, next) => {
                         class: true
                     }
                 },
+                sections: {
+                    include: {
+                        section: true
+                    }
+                },
                 profilePicture: true,
                 address: true
             }
@@ -491,6 +502,7 @@ export const getTeacherById = async (req, res, next) => {
             designation: teacher.designation,
             subjects: teacher.subjects.map(s => s.subject),
             classes: teacher.classes.map(c => c.class),
+            sections: teacher.sections.map(s => s.section),
             address: teacher.address,
             profilePicture: teacher.profilePicture?.url
         };
