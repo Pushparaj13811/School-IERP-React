@@ -1,41 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaPaperPlane, FaTimes, FaUpload } from 'react-icons/fa';
 import Button from '../../components/ui/Button';
+import { toast } from 'react-toastify';
+import { academicAPI, announcementAPI } from '../../services/api';
+import { Class, Section } from '../../types/api';
 import { UserRole } from '../../utils/roles';
 
-interface Class {
-    id: number;
-    name: string;
-    sections: Section[];
+interface Attachment {
+  name: string;
+  file: File;
+  type: string;
+  size: number;
+  url?: string;
 }
-
-interface Section {
-    id: number;
-    name: string;
-}
-
-// Dummy data for classes and sections
-const dummyClasses: Class[] = [
-    {
-        id: 1,
-        name: 'Class 9',
-        sections: [
-            { id: 1, name: 'A' },
-            { id: 2, name: 'B' },
-            { id: 3, name: 'C' },
-        ],
-    },
-    {
-        id: 2,
-        name: 'Class 10',
-        sections: [
-            { id: 4, name: 'A' },
-            { id: 5, name: 'B' },
-            { id: 6, name: 'C' },
-        ],
-    },
-];
 
 const CreateAnnouncement: React.FC = () => {
     const navigate = useNavigate();
@@ -43,39 +21,101 @@ const CreateAnnouncement: React.FC = () => {
     const [content, setContent] = useState('');
     const [priority, setPriority] = useState<'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'>('NORMAL');
     const [expiresAt, setExpiresAt] = useState('');
-    const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
-    const [selectedSections, setSelectedSections] = useState<number[]>([]);
-    const [selectedRoles, setSelectedRoles] = useState<UserRole[]>([]);
-    const [attachments, setAttachments] = useState<File[]>([]);
+    const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submitStatus, setSubmitStatus] = useState<'success' | 'error' | null>(null);
-
+    
+    // Target audience state
+    const [classes, setClasses] = useState<Class[]>([]);
+    const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
+    const [classesLoading, setClassesLoading] = useState(true);
+    
+    const [classSections, setClassSections] = useState<Record<number, Section[]>>({});
+    const [selectedSections, setSelectedSections] = useState<number[]>([]);
+    const [sectionsLoading, setSectionsLoading] = useState(false);
+    
+    const [selectedRoles, setSelectedRoles] = useState<UserRole[]>([]);
+    
+    // Fetch classes when component mounts
+    useEffect(() => {
+        const fetchClasses = async () => {
+            try {
+                setClassesLoading(true);
+                const response = await academicAPI.getClasses();
+                
+                if (response.data?.status === 'success' && response.data?.data?.classes) {
+                    setClasses(response.data.data.classes);
+                } else {
+                    toast.error('Failed to load classes');
+                }
+            } catch (error) {
+                console.error('Error fetching classes:', error);
+                toast.error('Failed to load classes');
+            } finally {
+                setClassesLoading(false);
+            }
+        };
+        
+        fetchClasses();
+    }, []);
+    
+    // Fetch sections when a class is selected
+    const fetchSectionsForClass = async (classId: number) => {
+        try {
+            setSectionsLoading(true);
+            const response = await academicAPI.getSections(classId);
+            
+            if (response.data?.status === 'success' && response.data?.data?.sections) {
+                setClassSections(prev => ({
+                    ...prev,
+                    [classId]: response.data.data.sections
+                }));
+            } else {
+                toast.error(`Failed to load sections for class ID ${classId}`);
+            }
+        } catch (error) {
+            console.error(`Error fetching sections for class ID ${classId}:`, error);
+            toast.error('Failed to load sections');
+        } finally {
+            setSectionsLoading(false);
+        }
+    };
+    
+    // Handle class toggle
     const handleClassChange = (classId: number) => {
         setSelectedClasses(prev => {
-            if (prev.includes(classId)) {
-                return prev.filter(id => id !== classId);
+            const isSelected = prev.includes(classId);
+            const newSelectedClasses = isSelected 
+                ? prev.filter(id => id !== classId)
+                : [...prev, classId];
+            
+            // If we're adding a class, fetch its sections
+            if (!isSelected && !classSections[classId]) {
+                fetchSectionsForClass(classId);
             }
-            return [...prev, classId];
+            
+            // If we're removing a class, also remove its sections
+            if (isSelected) {
+                setSelectedSections(prev => 
+                    prev.filter(sectionId => 
+                        !classSections[classId]?.some(section => section.id === sectionId)
+                    )
+                );
+            }
+            
+            return newSelectedClasses;
         });
-        // Clear sections when class is deselected
-        setSelectedSections(prev =>
-            prev.filter(sectionId =>
-                dummyClasses.find(cls =>
-                    cls.sections.some(section => section.id === sectionId)
-                )?.id === classId
-            )
+    };
+    
+    // Handle section toggle
+    const handleSectionChange = (sectionId: number) => {
+        setSelectedSections(prev => 
+            prev.includes(sectionId)
+                ? prev.filter(id => id !== sectionId)
+                : [...prev, sectionId]
         );
     };
-
-    const handleSectionChange = (sectionId: number) => {
-        setSelectedSections(prev => {
-            if (prev.includes(sectionId)) {
-                return prev.filter(id => id !== sectionId);
-            }
-            return [...prev, sectionId];
-        });
-    };
-
+    
+    // Handle role toggle
     const handleRoleChange = (role: UserRole) => {
         setSelectedRoles(prev => {
             if (prev.includes(role)) {
@@ -84,10 +124,21 @@ const CreateAnnouncement: React.FC = () => {
             return [...prev, role];
         });
     };
-
+    
+    // Handle file upload
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            setAttachments(prev => [...prev, ...Array.from(e.target.files!)]);
+        if (e.target.files && e.target.files.length > 0) {
+            const newAttachments = Array.from(e.target.files).map(file => ({
+                name: file.name,
+                file,
+                type: file.type,
+                size: file.size
+            }));
+            
+            setAttachments(prev => [...prev, ...newAttachments]);
+            
+            // Clear the input value so the same file can be selected again
+            e.target.value = '';
         }
     };
 
@@ -98,23 +149,60 @@ const CreateAnnouncement: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
+        
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            setSubmitStatus('success');
-            // Reset form
-            setTitle('');
-            setContent('');
-            setPriority('NORMAL');
-            setExpiresAt('');
-            setSelectedClasses([]);
-            setSelectedSections([]);
-            setSelectedRoles([]);
-            setAttachments([]);
-            // Navigate back to announcements page
-            navigate('/announcements');
-        } catch {
-            setSubmitStatus('error');
+            // Validate form
+            if (selectedRoles.length === 0 && selectedClasses.length === 0) {
+                toast.error('Please select at least one target audience (roles or classes)');
+                setIsSubmitting(false);
+                return;
+            }
+            
+            // For now, we're not handling file uploads in this example
+            // In a real implementation, you would upload files to a server/cloud storage
+            // and then include the URLs in the announcement data
+            
+            const announcementData = {
+                title,
+                content,
+                priority,
+                expiresAt: expiresAt || undefined,
+                targetClassIds: selectedClasses,
+                targetSectionIds: selectedSections,
+                targetRoles: selectedRoles,
+                attachments: attachments.map(attachment => ({
+                    name: attachment.name,
+                    url: URL.createObjectURL(attachment.file), // For demo purposes
+                    type: attachment.type,
+                    size: attachment.size
+                }))
+            };
+            
+            const response = await announcementAPI.create(announcementData);
+            
+            if (response.data?.status === 'success') {
+                toast.success('Announcement published successfully!');
+                
+                // Reset form
+                setTitle('');
+                setContent('');
+                setPriority('NORMAL');
+                setExpiresAt('');
+                setSelectedClasses([]);
+                setSelectedSections([]);
+                setSelectedRoles([]);
+                setAttachments([]);
+                
+                // Navigate back to announcements page
+                setTimeout(() => {
+                    navigate('/admin/announcements');
+                }, 2000);
+            } else {
+                throw new Error('Failed to publish announcement');
+            }
+        } catch (error) {
+            console.error('Error publishing announcement:', error);
+            toast.error('Failed to publish announcement. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -157,7 +245,7 @@ const CreateAnnouncement: React.FC = () => {
                         </label>
                         <select
                             value={priority}
-                            onChange={(e) => setPriority(e.target.value as typeof priority)}
+                            onChange={(e) => setPriority(e.target.value as 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT')}
                             className="w-full p-2 border rounded-md"
                         >
                             <option value="LOW">Low</option>
@@ -189,7 +277,7 @@ const CreateAnnouncement: React.FC = () => {
                         <div className="border rounded-md p-4">
                             <h3 className="font-medium mb-2">Select Roles</h3>
                             <div className="space-y-2">
-                                {Object.values(UserRole).map(role => (
+                                {Object.values(UserRole).map((role) => (
                                     <label key={role} className="flex items-center gap-2">
                                         <input
                                             type="checkbox"
@@ -197,7 +285,7 @@ const CreateAnnouncement: React.FC = () => {
                                             onChange={() => handleRoleChange(role)}
                                             className="rounded"
                                         />
-                                        <span>{role.charAt(0) + role.slice(1).toLowerCase()}</span>
+                                        <span>{role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()}</span>
                                     </label>
                                 ))}
                             </div>
@@ -206,36 +294,44 @@ const CreateAnnouncement: React.FC = () => {
                         {/* Class and Section targeting */}
                         <div className="border rounded-md p-4">
                             <h3 className="font-medium mb-2">Select Classes and Sections</h3>
-                            <div className="space-y-4">
-                                {dummyClasses.map(cls => (
-                                    <div key={cls.id} className="border rounded-md p-4">
-                                        <label className="flex items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedClasses.includes(cls.id)}
-                                                onChange={() => handleClassChange(cls.id)}
-                                                className="rounded"
-                                            />
-                                            <span className="font-medium">{cls.name}</span>
-                                        </label>
-                                        {selectedClasses.includes(cls.id) && (
-                                            <div className="ml-6 mt-2 space-y-2">
-                                                {cls.sections.map(section => (
-                                                    <label key={section.id} className="flex items-center gap-2">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedSections.includes(section.id)}
-                                                            onChange={() => handleSectionChange(section.id)}
-                                                            className="rounded"
-                                                        />
-                                                        <span>Section {section.name}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+                            {classesLoading ? (
+                                <p className="text-gray-500">Loading classes...</p>
+                            ) : (
+                                <div className="space-y-4">
+                                    {classes.map(cls => (
+                                        <div key={cls.id} className="border rounded-md p-4">
+                                            <label className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedClasses.includes(cls.id)}
+                                                    onChange={() => handleClassChange(cls.id)}
+                                                    className="rounded"
+                                                />
+                                                <span className="font-medium">{cls.name}</span>
+                                            </label>
+                                            {selectedClasses.includes(cls.id) && (
+                                                <div className="ml-6 mt-2 space-y-2">
+                                                    {sectionsLoading && !classSections[cls.id] ? (
+                                                        <p className="text-gray-500">Loading sections...</p>
+                                                    ) : (
+                                                        classSections[cls.id]?.map(section => (
+                                                            <label key={section.id} className="flex items-center gap-2">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedSections.includes(section.id)}
+                                                                    onChange={() => handleSectionChange(section.id)}
+                                                                    className="rounded"
+                                                                />
+                                                                <span>Section {section.name}</span>
+                                                            </label>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -257,17 +353,17 @@ const CreateAnnouncement: React.FC = () => {
                         </label>
                     </div>
                     {attachments.length > 0 && (
-                        <div className="mt-2 space-y-2">
+                        <div className="mt-4 space-y-2">
                             {attachments.map((file, index) => (
-                                <div key={index} className="flex items-center gap-2 text-sm">
-                                    <span>{file.name}</span>
-                                    <Button
-                                        variant="secondary"
+                                <div key={index} className="flex items-center justify-between border rounded-md p-2 pr-4">
+                                    <span className="truncate">{file.name}</span>
+                                    <button
+                                        type="button"
                                         onClick={() => removeFile(index)}
-                                        className="text-red-600 hover:text-red-800"
+                                        className="text-red-500 hover:text-red-700"
                                     >
                                         <FaTimes />
-                                    </Button>
+                                    </button>
                                 </div>
                             ))}
                         </div>
@@ -276,26 +372,15 @@ const CreateAnnouncement: React.FC = () => {
 
                 <div className="flex justify-end">
                     <Button
-                        variant="primary"
                         type="submit"
                         disabled={isSubmitting}
+                        className="flex items-center gap-2"
                     >
                         <FaPaperPlane />
                         {isSubmitting ? 'Publishing...' : 'Publish Announcement'}
                     </Button>
                 </div>
             </form>
-
-            {submitStatus === 'success' && (
-                <div className="mt-4 p-4 bg-green-100 text-green-700 rounded-md">
-                    Announcement published successfully!
-                </div>
-            )}
-            {submitStatus === 'error' && (
-                <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-md">
-                    Error publishing announcement. Please try again.
-                </div>
-            )}
         </div>
     );
 };
