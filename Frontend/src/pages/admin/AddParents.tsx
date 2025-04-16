@@ -455,7 +455,7 @@ const AddParents: React.FC = () => {
               <div className="space-y-3 mb-4">
                 {children.map((childId, index) => (
                   <div key={index} className="flex items-center gap-2">
-                    <select
+            <select
                       value={childId}
                       onChange={(e) => handleChildChange(index, Number(e.target.value))}
                       className="flex-grow p-2 border rounded-md"
@@ -472,7 +472,7 @@ const AddParents: React.FC = () => {
                       ) : (
                         <option disabled>No students available</option>
                       )}
-                    </select>
+            </select>
                     <button
                       type="button"
                       onClick={() => handleRemoveChild(index)}

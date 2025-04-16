@@ -9,7 +9,8 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "seed": "node src/scripts/seedClassesAndSections.js",
-    "seed:admin": "node src/seeds/adminSeeder.js"
+    "seed:admin": "node src/seeds/adminSeeder.js",
+    "seed:designations": "node src/scripts/seed-designations.js"
   },
   "repository": {
     "type": "git",
