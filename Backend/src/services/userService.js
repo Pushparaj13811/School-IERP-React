@@ -167,74 +167,94 @@ export class UserService {
     }
 
     async updateProfilePicture(userId, fileUrl) {
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            include: {
-                student: true,
-                teacher: true,
-                admin: true,
-                parent: true
+        console.log('Updating profile picture for user:', userId);
+        console.log('With URL:', fileUrl);
+        
+        try {
+            const user = await prisma.user.findUnique({
+                where: { id: userId },
+                include: {
+                    student: true,
+                    teacher: true,
+                    admin: true,
+                    parent: true
+                }
+            });
+
+            if (!user) {
+                throw new AppError(404, 'User not found');
             }
-        });
 
-        if (!user) {
-            throw new AppError(404, 'User not found');
-        }
+            console.log('User found with role:', user.role);
 
-        // Create new profile picture
-        const profilePicture = await prisma.profilePicture.create({
-            data: { url: fileUrl }
-        });
+            // Create new profile picture
+            const profilePicture = await prisma.profilePicture.create({
+                data: { url: fileUrl }
+            });
 
-        // Update based on role
-        switch (user.role) {
-            case 'STUDENT':
-                return await prisma.student.update({
-                    where: { id: user.student.id },
-                    data: { profilePictureId: profilePicture.id },
-                    include: {
-                        profilePicture: true,
-                        class: true,
-                        section: true,
-                        address: true
-                    }
-                });
-            case 'TEACHER':
-                return await prisma.teacher.update({
-                    where: { id: user.teacher.id },
-                    data: { profilePictureId: profilePicture.id },
-                    include: {
-                        profilePicture: true,
-                        designation: true,
-                        address: true
-                    }
-                });
-            case 'ADMIN':
-                return await prisma.admin.update({
-                    where: { id: user.admin.id },
-                    data: { profilePictureId: profilePicture.id },
-                    include: {
-                        profilePicture: true,
-                        address: true
-                    }
-                });
-            case 'PARENT':
-                return await prisma.parent.update({
-                    where: { id: user.parent.id },
-                    data: { profilePictureId: profilePicture.id },
-                    include: {
-                        profilePicture: true,
-                        address: true,
-                        children: {
-                            include: {
-                                class: true,
-                                section: true
+            console.log('Profile picture created:', profilePicture.id);
+
+            // Update based on role
+            let result;
+            switch (user.role) {
+                case 'STUDENT':
+                    result = await prisma.student.update({
+                        where: { id: user.student.id },
+                        data: { profilePictureId: profilePicture.id },
+                        include: {
+                            profilePicture: true,
+                            class: true,
+                            section: true,
+                            address: true
+                        }
+                    });
+                    break;
+                case 'TEACHER':
+                    result = await prisma.teacher.update({
+                        where: { id: user.teacher.id },
+                        data: { profilePictureId: profilePicture.id },
+                        include: {
+                            profilePicture: true,
+                            designation: true,
+                            address: true
+                        }
+                    });
+                    break;
+                case 'ADMIN':
+                    result = await prisma.admin.update({
+                        where: { id: user.admin.id },
+                        data: { profilePictureId: profilePicture.id },
+                        include: {
+                            profilePicture: true,
+                            address: true
+                        }
+                    });
+                    break;
+                case 'PARENT':
+                    result = await prisma.parent.update({
+                        where: { id: user.parent.id },
+                        data: { profilePictureId: profilePicture.id },
+                        include: {
+                            profilePicture: true,
+                            address: true,
+                            children: {
+                                include: {
+                                    class: true,
+                                    section: true
+                                }
                             }
                         }
-                    }
-                });
-            default:
-                throw new AppError(400, 'Invalid user role');
+                    });
+                    break;
+                default:
+                    throw new AppError(400, 'Invalid user role');
+            }
+            
+            console.log('Profile updated successfully');
+            return result;
+        } catch (error) {
+            console.error('Error in updateProfilePicture service:', error);
+            throw error;
         }
     }
 
@@ -333,7 +353,7 @@ export class UserService {
         });
     }
 
-    async createUserWithAutoPassword(email, role, userData) {
+    async createUserWithAutoPassword(email, role, userData = {}) {
         // Check if user already exists
         const existingUser = await prisma.user.findUnique({
             where: { email }
@@ -347,13 +367,12 @@ export class UserService {
         const password = generateRandomPassword();
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Create user
+        // Create user with only user-specific fields
         const user = await prisma.user.create({
             data: {
                 email,
                 password: hashedPassword,
-                role,
-                ...userData
+                role
             }
         });
 
@@ -361,45 +380,232 @@ export class UserService {
     }
 
     async createStudentWithAutoPassword(email, studentData) {
-        const { user, password } = await this.createUserWithAutoPassword(email, 'STUDENT', studentData);
-        
-        // Create student profile
-        await prisma.student.create({
-            data: {
-                userId: user.id,
-                ...studentData
+        try {
+            // First, verify required fields are present
+            if (!email || !studentData.name || !studentData.gender || !studentData.rollNo) {
+                throw new AppError(400, 'Missing required fields for student creation');
             }
-        });
 
-        return { user, password };
+            // Verify class and section exist
+            if (!studentData.classId || !studentData.sectionId) {
+                throw new AppError(400, 'Class and section are required');
+            }
+
+            // Make sure address data is complete
+            if (!studentData.address || !studentData.address.addressLine1) {
+                throw new AppError(400, 'Address information is required');
+            }
+
+            // First create the user
+            const { user, password } = await this.createUserWithAutoPassword(email, 'STUDENT');
+            
+            // Extract fields that are only for the address
+            const { 
+                address,
+                parentId,
+                ...otherStudentData 
+            } = studentData;
+            
+            // Create the address first
+            console.log('Creating address:', address);
+            const createdAddress = await prisma.address.create({
+                data: address
+            });
+            
+            if (!createdAddress || !createdAddress.id) {
+                throw new AppError(500, 'Failed to create address record');
+            }
+            
+            console.log('Address created with ID:', createdAddress.id);
+            
+            // Format dateOfBirth properly to ISO format
+            let formattedData = { ...otherStudentData };
+            if (formattedData.dateOfBirth) {
+                // If it's just a date (YYYY-MM-DD), convert it to full ISO DateTime format
+                if (formattedData.dateOfBirth.length === 10) { // Simple check for YYYY-MM-DD format
+                    formattedData.dateOfBirth = new Date(`${formattedData.dateOfBirth}T00:00:00Z`).toISOString();
+                }
+                console.log('Formatted date of birth:', formattedData.dateOfBirth);
+            }
+            
+            // Create student with correct relationships
+            const studentCreateData = {
+                userId: user.id,
+                email,
+                ...formattedData,
+                addressId: createdAddress.id
+            };
+            
+            // Add parent relation only if parentId is provided
+            if (parentId) {
+                studentCreateData.parentId = parseInt(parentId);
+            }
+            
+            console.log('Creating student with data:', studentCreateData);
+            
+            // Create the student record
+            const student = await prisma.student.create({
+                data: studentCreateData
+            });
+            
+            console.log('Student created successfully with ID:', student.id);
+
+            return { user, password };
+        } catch (error) {
+            console.error('Error in createStudentWithAutoPassword:', error);
+            
+            // Clean up if user was created but student creation failed
+            if (error.code === 'P2002') {
+                throw new AppError(400, `Duplicate entry: ${error.meta?.target?.[0] || 'A record with this information'} already exists`);
+            }
+            
+            throw error;
+        }
     }
 
     async createParentWithAutoPassword(email, parentData) {
-        const { user, password } = await this.createUserWithAutoPassword(email, 'PARENT', parentData);
-        
-        // Create parent profile
-        await prisma.parent.create({
-            data: {
-                userId: user.id,
-                ...parentData
+        try {
+            // First create the user
+            const { user, password } = await this.createUserWithAutoPassword(email, 'PARENT');
+            
+            // Extract fields that are only for the address and children
+            const { 
+                address,
+                children,
+                ...otherParentData 
+            } = parentData;
+            
+            // Create the address first if provided
+            let addressId;
+            if (address) {
+                const createdAddress = await prisma.address.create({
+                    data: address
+                });
+                addressId = createdAddress.id;
             }
-        });
+            
+            // Format date fields if needed
+            let formattedData = { ...otherParentData };
+            if (formattedData.dateOfBirth && formattedData.dateOfBirth.length === 10) {
+                formattedData.dateOfBirth = new Date(`${formattedData.dateOfBirth}T00:00:00Z`).toISOString();
+            }
+            
+            // Create parent with correct relationships
+            const parentCreateData = {
+                userId: user.id,
+                email,
+                ...formattedData,
+                ...(addressId ? { addressId } : {})
+            };
+            
+            // Create the parent record
+            const parent = await prisma.parent.create({
+                data: parentCreateData
+            });
+            
+            // Connect children to parent if provided
+            if (children && Array.isArray(children) && children.length > 0) {
+                // Update each child to connect to this parent
+                for (const childId of children) {
+                    await prisma.student.update({
+                        where: { id: parseInt(childId) },
+                        data: { parentId: parent.id }
+                    });
+                }
+            }
 
-        return { user, password };
+            return { user, password };
+        } catch (error) {
+            console.error('Error in createParentWithAutoPassword:', error);
+            
+            // Clean up if user was created but parent creation failed
+            if (error.code === 'P2002') {
+                throw new AppError(400, `Duplicate entry: ${error.meta?.target?.[0] || 'A record with this information'} already exists`);
+            }
+            
+            throw error;
+        }
     }
 
     async createTeacherWithAutoPassword(email, teacherData) {
-        const { user, password } = await this.createUserWithAutoPassword(email, 'TEACHER', teacherData);
-        
-        // Create teacher profile
-        await prisma.teacher.create({
-            data: {
-                userId: user.id,
-                ...teacherData
+        try {
+            // First create the user
+            const { user, password } = await this.createUserWithAutoPassword(email, 'TEACHER');
+            
+            // Extract fields that are only for the address
+            const { 
+                address,
+                subjects,
+                classes,
+                ...otherTeacherData 
+            } = teacherData;
+            
+            // Create the address first if provided
+            let addressId;
+            if (address) {
+                const createdAddress = await prisma.address.create({
+                    data: address
+                });
+                addressId = createdAddress.id;
             }
-        });
+            
+            // Format date fields properly
+            let formattedData = { ...otherTeacherData };
+            if (formattedData.dateOfBirth && formattedData.dateOfBirth.length === 10) {
+                formattedData.dateOfBirth = new Date(`${formattedData.dateOfBirth}T00:00:00Z`).toISOString();
+            }
+            if (formattedData.joinDate && formattedData.joinDate.length === 10) {
+                formattedData.joinDate = new Date(`${formattedData.joinDate}T00:00:00Z`).toISOString();
+            }
+            
+            // Create teacher with correct relationships
+            const teacherCreateData = {
+                userId: user.id,
+                email,
+                ...formattedData,
+                ...(addressId ? { addressId } : {})
+            };
+            
+            // Create the teacher record
+            const teacher = await prisma.teacher.create({
+                data: teacherCreateData
+            });
+            
+            // Connect subjects if provided
+            if (subjects && Array.isArray(subjects) && subjects.length > 0) {
+                for (const subjectId of subjects) {
+                    await prisma.teacherSubject.create({
+                        data: {
+                            teacherId: teacher.id,
+                            subjectId: parseInt(subjectId)
+                        }
+                    });
+                }
+            }
+            
+            // Connect classes if provided
+            if (classes && Array.isArray(classes) && classes.length > 0) {
+                for (const classId of classes) {
+                    await prisma.teacherClass.create({
+                        data: {
+                            teacherId: teacher.id,
+                            classId: parseInt(classId)
+                        }
+                    });
+                }
+            }
 
-        return { user, password };
+            return { user, password };
+        } catch (error) {
+            console.error('Error in createTeacherWithAutoPassword:', error);
+            
+            // Clean up if user was created but teacher creation failed
+            if (error.code === 'P2002') {
+                throw new AppError(400, `Duplicate entry: ${error.meta?.target?.[0] || 'A record with this information'} already exists`);
+            }
+            
+            throw error;
+        }
     }
 
     async getUserByEmail(email) {

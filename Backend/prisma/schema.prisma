@@ -53,7 +53,7 @@ model Student {
   userId           Int  @unique
   classId          Int
   sectionId        Int
-  parentId         Int
+  parentId         Int?  // Make parent optional
   addressId        Int  @unique
   profilePictureId Int? @unique
 
@@ -61,7 +61,7 @@ model Student {
   user              User                @relation(fields: [userId], references: [id])
   class             Class               @relation(fields: [classId], references: [id])
   section           Section             @relation(fields: [sectionId], references: [id])
-  parent            Parent              @relation(fields: [parentId], references: [id])
+  parent            Parent?             @relation(fields: [parentId], references: [id]) // Make relation optional
   address           Address             @relation(fields: [addressId], references: [id])
   profilePicture    ProfilePicture?     @relation(fields: [profilePictureId], references: [id])
   subjectAttendance SubjectAttendance[]

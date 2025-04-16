@@ -1,38 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaEdit, FaTrash } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
-
-interface Student {
-    id: number;
-    name: string;
-    grade: string;
-    rollNo: string;
-    gender: string;
-    email: string;
-    address: string;
-    contactNo: string;
-}
+import { userAPI } from '../../services/api';
+import { toast } from 'react-toastify';
+import { Student } from '../../types/api';
 
 const StudentsList: React.FC = () => {
     const navigate = useNavigate();
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+    const [students, setStudents] = useState<Student[]>([]);
+    const [loading, setLoading] = useState<boolean>(true);
 
-    // Mock data - in a real application, this would come from an API
-    const students = [
-        {
-            id: 1,
-            name: 'Rohan Sharma',
-            grade: 'Grade 10',
-            rollNo: '2023001',
-            gender: 'Male',
-            email: 'rohan.s@gmail.com',
-            address: 'Thasang-3, Lete, Nepal',
-            contactNo: '9774736794'
-        },
-        // Add more mock data as needed
-    ];
+    useEffect(() => {
+        fetchStudents();
+    }, []);
+
+    const fetchStudents = async () => {
+        try {
+            setLoading(true);
+            const response = await userAPI.getStudents();
+            
+            if (response.data?.status === 'success' && Array.isArray(response.data?.data?.students)) {
+                setStudents(response.data.data.students);
+            } else {
+                toast.error('Failed to load students data');
+                setStudents([]);
+            }
+        } catch (error) {
+            console.error('Error fetching students:', error);
+            toast.error('Failed to load students. Please try again.');
+            setStudents([]);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleRowClick = (studentId: number) => {
         navigate(`/student-profile/${studentId}`);
@@ -45,7 +48,12 @@ const StudentsList: React.FC = () => {
     const handleEditClick = (e: React.MouseEvent, student: Student) => {
         e.stopPropagation();
         // Navigate to add student form with student data
-        navigate('add-students', { state: { editData: student } });
+        navigate('add-students', { 
+            state: { 
+                editMode: true,
+                studentData: student 
+            } 
+        });
     };
 
     const handleDeleteClick = (e: React.MouseEvent, student: Student) => {
@@ -61,6 +69,10 @@ const StudentsList: React.FC = () => {
         setSelectedStudent(null);
     };
 
+    if (loading) {
+        return <div className="flex justify-center items-center h-64">Loading students...</div>;
+    }
+
     return (
         <div className="p-6">
             <div className="flex justify-between items-center mb-6">
@@ -73,57 +85,63 @@ const StudentsList: React.FC = () => {
                 </button>
             </div>
 
-            <div className="bg-white rounded-lg shadow overflow-x-auto">
-                <table className="min-w-full">
-                    <thead className="bg-indigo-900 text-white">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-sm font-medium">S. Id</th>
-                            <th className="px-6 py-3 text-left text-sm font-medium">Name</th>
-                            <th className="px-6 py-3 text-left text-sm font-medium">Grade</th>
-                            <th className="px-6 py-3 text-left text-sm font-medium">Roll No.</th>
-                            <th className="px-6 py-3 text-left text-sm font-medium">Gender</th>
-                            <th className="px-6 py-3 text-left text-sm font-medium">Email</th>
-                            <th className="px-6 py-3 text-left text-sm font-medium">Address</th>
-                            <th className="px-6 py-3 text-left text-sm font-medium">Contact No.</th>
-                            <th className="px-6 py-3 text-left text-sm font-medium">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                        {students.map((student, index) => (
-                            <tr 
-                                key={student.id} 
-                                className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} cursor-pointer hover:bg-gray-100`}
-                                onClick={() => handleRowClick(student.id)}
-                            >
-                                <td className="px-6 py-4 text-sm text-gray-900">{student.id}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{student.name}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{student.grade}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{student.rollNo}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{student.gender}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{student.email}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{student.address}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">{student.contactNo}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                    <div className="flex space-x-3" onClick={(e) => e.stopPropagation()}>
-                                        <button 
-                                            className="text-green-600 hover:text-green-800"
-                                            onClick={(e) => handleEditClick(e, student)}
-                                        >
-                                            <FaEdit />
-                                        </button>
-                                        <button 
-                                            className="text-red-600 hover:text-red-800"
-                                            onClick={(e) => handleDeleteClick(e, student)}
-                                        >
-                                            <FaTrash />
-                                        </button>
-                                    </div>
-                                </td>
+            {students.length === 0 ? (
+                <div className="bg-white rounded-lg shadow p-6 text-center">
+                    <p className="text-gray-500">No students found. Add your first student to get started.</p>
+                </div>
+            ) : (
+                <div className="bg-white rounded-lg shadow overflow-x-auto">
+                    <table className="min-w-full">
+                        <thead className="bg-indigo-900 text-white">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-sm font-medium">ID</th>
+                                <th className="px-6 py-3 text-left text-sm font-medium">Name</th>
+                                <th className="px-6 py-3 text-left text-sm font-medium">Class</th>
+                                <th className="px-6 py-3 text-left text-sm font-medium">Section</th>
+                                <th className="px-6 py-3 text-left text-sm font-medium">Roll No.</th>
+                                <th className="px-6 py-3 text-left text-sm font-medium">Gender</th>
+                                <th className="px-6 py-3 text-left text-sm font-medium">Email</th>
+                                <th className="px-6 py-3 text-left text-sm font-medium">Contact No.</th>
+                                <th className="px-6 py-3 text-left text-sm font-medium">Action</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                            {students.map((student, index) => (
+                                <tr 
+                                    key={student.id} 
+                                    className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} cursor-pointer hover:bg-gray-100`}
+                                    onClick={() => handleRowClick(student.id)}
+                                >
+                                    <td className="px-6 py-4 text-sm text-gray-900">{student.id}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-900">{student.name}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-900">{student.class?.name || '-'}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-900">{student.section?.name || '-'}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-900">{student.rollNo}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-900">{student.gender}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-900">{student.email}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-900">{student.contactNo}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-900">
+                                        <div className="flex space-x-3" onClick={(e) => e.stopPropagation()}>
+                                            <button 
+                                                className="text-green-600 hover:text-green-800"
+                                                onClick={(e) => handleEditClick(e, student)}
+                                            >
+                                                <FaEdit />
+                                            </button>
+                                            <button 
+                                                className="text-red-600 hover:text-red-800"
+                                                onClick={(e) => handleDeleteClick(e, student)}
+                                            >
+                                                <FaTrash />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             <ConfirmationModal
                 isOpen={deleteModalOpen}

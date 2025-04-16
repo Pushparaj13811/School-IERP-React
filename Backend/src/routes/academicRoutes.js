@@ -4,46 +4,36 @@ import {
     getAllClasses,
     getClassById,
     updateClass,
-    deleteClass
+    deleteClass,
+    getClasses,
+    getSubjects,
+    getDesignations
 } from '../controller/classController.js';
-import {
-    createSection,
-    getAllSections,
-    getSectionById,
-    updateSection,
-    deleteSection,
-    getSectionsByClass
-} from '../controller/sectionController.js';
+import { getSectionsByClass } from '../controller/sectionController.js';
 import { protect, restrictTo } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
+// Protect all routes
+router.use(protect);
+
 // Class Routes
 router
     .route('/classes')
-    .post(protect, restrictTo('ADMIN'), createClass)
-    .get(protect, getAllClasses);
+    .post(restrictTo('ADMIN'), createClass)
+    .get(getAllClasses);
 
 router
     .route('/classes/:id')
-    .get(protect, getClassById)
-    .patch(protect, restrictTo('ADMIN'), updateClass)
-    .delete(protect, restrictTo('ADMIN'), deleteClass);
+    .get(getClassById)
+    .patch(restrictTo('ADMIN'), updateClass)
+    .delete(restrictTo('ADMIN'), deleteClass);
 
-// Section Routes
-router
-    .route('/sections')
-    .post(protect, restrictTo('ADMIN'), createSection)
-    .get(protect, getAllSections);
+// Legacy routes for backward compatibility
+router.get('/classes/:classId/sections', getSectionsByClass);
 
-router
-    .route('/sections/:id')
-    .get(protect, getSectionById)
-    .patch(protect, restrictTo('ADMIN'), updateSection)
-    .delete(protect, restrictTo('ADMIN'), deleteSection);
-
-router
-    .route('/classes/:classId/sections')
-    .get(protect, getSectionsByClass);
+// Additional routes
+router.get('/subjects', getSubjects);
+router.get('/designations', getDesignations);
 
 export default router; 

@@ -1,8 +1,85 @@
 import axios from 'axios';
+import { 
+  ApiResponse, 
+  ClassesResponse, 
+  SectionsResponse, 
+  SubjectsResponse, 
+  DesignationsResponse,
+  StudentsResponse,
+  TeachersResponse,
+  ParentsResponse,
+  UserResponse,
+  Student,
+  Teacher,
+  Parent,
+  StudentFormData,
+  ParentFormData
+} from '../types/api';
+
+// Define missing interfaces
+interface TeacherFormData {
+  name: string;
+  email: string;
+  gender: string;
+  contactNo: string;
+  designationId?: number;
+  subjects?: number[];
+  classes?: number[];
+  address: {
+    addressLine1: string;
+    addressLine2?: string;
+    street: string;
+    city: string;
+    ward: string;
+    municipality: string;
+    district: string;
+    province: string;
+    country: string;
+    postalCode?: string;
+  };
+}
+
+// Interfaces for other API responses
+interface Announcement {
+  id: number;
+  title: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: number;
+}
+
+interface Attendance {
+  id: number;
+  date: string;
+  status: string;
+  studentId: number;
+  student?: Student;
+}
+
+interface Result {
+  id: number;
+  marks: number;
+  grade: string;
+  studentId: number;
+  subjectId: number;
+  student?: Student;
+  subject?: { name: string };
+}
+
+interface Leave {
+  id: number;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: string;
+  userId: number;
+  user?: { name: string };
+}
 
 // Create axios instance with default config
 const api = axios.create({
-    baseURL: 'http://localhost:3000/api/v1', // Update this with your backend URL
+    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1', // Update this with your backend URL
     headers: {
         'Content-Type': 'application/json',
     },
@@ -47,49 +124,81 @@ api.interceptors.response.use(
 // Auth API
 export const authAPI = {
     login: (email: string, password: string) => 
-        api.post('/auth/login', { email, password }),
-    logout: () => api.post('/auth/logout'),
-    refreshToken: () => api.post('/auth/refresh-token'),
+        api.post<ApiResponse<{ token: string; user: UserResponse }>>('/auth/login', { email, password }),
+    logout: () => api.post<ApiResponse<object>>('/auth/logout'),
+    refreshToken: () => api.post<ApiResponse<{ token: string }>>('/auth/refresh-token'),
 };
 
 // User API
 export const userAPI = {
-    getProfile: () => api.get('/users/profile'),
-    updateProfile: (data: Record<string, unknown>) => api.put('/users/profile', data),
-    updatePassword: (data: Record<string, unknown>) => api.put('/users/password', data),
-    createUser: (data: Record<string, unknown>) => api.post('/users', data),
-    createStudent: (data: Record<string, unknown>) => api.post('/users/students', data),
-    createParent: (data: Record<string, unknown>) => api.post('/users/parents', data),
-    createTeacher: (data: Record<string, unknown>) => api.post('/users/teachers', data),
+    getProfile: () => api.get<ApiResponse<UserResponse>>('/users/profile'),
+    updateProfile: (data: Record<string, unknown>) => api.patch<ApiResponse<UserResponse>>('/users/profile', data),
+    updatePassword: (data: Record<string, unknown>) => api.patch<ApiResponse<{ message: string }>>('/users/password', data),
+    uploadProfilePicture: (file: File) => {
+        const formData = new FormData();
+        formData.append('profilePicture', file);
+        return api.patch<ApiResponse<{ profilePicture: string }>>('/users/profile-picture', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+    },
+    createUser: (data: Record<string, unknown>) => api.post<ApiResponse<UserResponse>>('/users/create', data),
+    createStudent: (data: StudentFormData) => api.post<ApiResponse<{ user: UserResponse; student: Student }>>('/users/create-student', data),
+    createParent: (data: ParentFormData) => api.post<ApiResponse<{ user: UserResponse; parent: Parent }>>('/users/create-parent', data),
+    createTeacher: (data: TeacherFormData) => api.post<ApiResponse<{ user: UserResponse; teacher: Teacher }>>('/users/create-teacher', data),
+    getStudents: (params?: Record<string, unknown>) => api.get<ApiResponse<StudentsResponse>>('/users/students', { params }),
+    getParents: (params?: Record<string, unknown>) => api.get<ApiResponse<ParentsResponse>>('/users/parents', { params }),
+    getTeachers: (params?: Record<string, unknown>) => api.get<ApiResponse<TeachersResponse>>('/users/teachers', { params }),
+    getStudentById: (id: number) => api.get<ApiResponse<{ student: Student }>>(`/users/students/${id}`),
+    getParentById: (id: number) => api.get<ApiResponse<{ parent: Parent }>>(`/users/parents/${id}`),
+    getTeacherById: (id: number) => api.get<ApiResponse<{ teacher: Teacher }>>(`/users/teachers/${id}`),
+    updateStudent: (id: number, data: Partial<StudentFormData>) => api.patch<ApiResponse<{ student: Student }>>(`/users/students/${id}`, data),
+    updateParent: (id: number, data: Partial<ParentFormData>) => api.patch<ApiResponse<{ parent: Parent }>>(`/users/parents/${id}`, data),
+    updateTeacher: (id: number, data: Partial<TeacherFormData>) => api.patch<ApiResponse<{ teacher: Teacher }>>(`/users/teachers/${id}`, data),
+};
+
+// Academic API
+export const academicAPI = {
+    getClasses: () => api.get<ApiResponse<ClassesResponse>>('/academic/classes'),
+    getSections: (classId?: number) => api.get<ApiResponse<SectionsResponse>>('/academic/sections', { 
+        params: { 
+            classId,
+            _cache: new Date().getTime() // Add cache busting parameter 
+        } 
+    }),
+    getSectionsByClass: (classId: number) => api.get<ApiResponse<SectionsResponse>>(`/sections/class/${classId}`),
+    getSubjects: () => api.get<ApiResponse<SubjectsResponse>>('/academic/subjects'),
+    getDesignations: () => api.get<ApiResponse<DesignationsResponse>>('/academic/designations'),
 };
 
 // Announcement API
 export const announcementAPI = {
-    getAll: () => api.get('/announcements'),
-    create: (data: Record<string, unknown>) => api.post('/announcements', data),
-    update: (id: string, data: Record<string, unknown>) => api.put(`/announcements/${id}`, data),
-    delete: (id: string) => api.delete(`/announcements/${id}`),
+    getAll: () => api.get<ApiResponse<{ announcements: Announcement[] }>>('/announcements'),
+    create: (data: Record<string, unknown>) => api.post<ApiResponse<{ announcement: Announcement }>>('/announcements', data),
+    update: (id: string, data: Record<string, unknown>) => api.put<ApiResponse<{ announcement: Announcement }>>(`/announcements/${id}`, data),
+    delete: (id: string) => api.delete<ApiResponse<object>>(`/announcements/${id}`),
 };
 
 // Attendance API
 export const attendanceAPI = {
-    getAttendance: (params: Record<string, unknown>) => api.get('/attendance', { params }),
-    markAttendance: (data: Record<string, unknown>) => api.post('/attendance', data),
-    updateAttendance: (id: string, data: Record<string, unknown>) => api.put(`/attendance/${id}`, data),
+    getAttendance: (params: Record<string, unknown>) => api.get<ApiResponse<{ attendance: Attendance[] }>>('/attendance', { params }),
+    markAttendance: (data: Record<string, unknown>) => api.post<ApiResponse<{ attendance: Attendance }>>('/attendance', data),
+    updateAttendance: (id: string, data: Record<string, unknown>) => api.put<ApiResponse<{ attendance: Attendance }>>(`/attendance/${id}`, data),
 };
 
 // Result API
 export const resultAPI = {
-    getResults: (params: Record<string, unknown>) => api.get('/results', { params }),
-    createResult: (data: Record<string, unknown>) => api.post('/results', data),
-    updateResult: (id: string, data: Record<string, unknown>) => api.put(`/results/${id}`, data),
+    getResults: (params: Record<string, unknown>) => api.get<ApiResponse<{ results: Result[] }>>('/results', { params }),
+    createResult: (data: Record<string, unknown>) => api.post<ApiResponse<{ result: Result }>>('/results', data),
+    updateResult: (id: string, data: Record<string, unknown>) => api.put<ApiResponse<{ result: Result }>>(`/results/${id}`, data),
 };
 
 // Leave API
 export const leaveAPI = {
-    getLeaves: (params: Record<string, unknown>) => api.get('/leaves', { params }),
-    createLeave: (data: Record<string, unknown>) => api.post('/leaves', data),
-    updateLeave: (id: string, data: Record<string, unknown>) => api.put(`/leaves/${id}`, data),
+    getLeaves: (params: Record<string, unknown>) => api.get<ApiResponse<{ leaves: Leave[] }>>('/leaves', { params }),
+    createLeave: (data: Record<string, unknown>) => api.post<ApiResponse<{ leave: Leave }>>('/leaves', data),
+    updateLeave: (id: string, data: Record<string, unknown>) => api.put<ApiResponse<{ leave: Leave }>>(`/leaves/${id}`, data),
 };
 
 export default api; 
