@@ -78,9 +78,12 @@ export const addSubjectResult = async (req, res, next) => {
                 practicalMarks: Number(practicalMarks || 0),
                 totalMarks: calculatedTotalMarks,
                 gradeId,
-                isAbsent: Boolean(isAbsent)
+                isAbsent: Boolean(isAbsent),
+                isLocked: true
             });
             
+            console.log('Created/updated result with isLocked:', result.isLocked);
+
             // Calculate overall result immediately after saving subject result
             try {
                 const overallResult = await resultService.calculateOverallResult(Number(studentId), academicYear, term);
@@ -124,19 +127,77 @@ export const addSubjectResult = async (req, res, next) => {
 
 export const getSubjectResults = async (req, res, next) => {
     try {
-        const { studentId, academicYear, term } = req.query;
+        const { studentId, classId, sectionId, subjectId, academicYear, term } = req.query;
         
-        if (!studentId || !academicYear || !term) {
-            return next(new AppError(400, 'Please provide studentId, academicYear, and term'));
+        // If studentId is provided, get results for that specific student
+        if (studentId && academicYear && term) {
+            const results = await resultService.getSubjectResults(studentId, academicYear, term);
+            
+            return res.status(200).json({
+                status: 'success',
+                data: { results }
+            });
         }
-
-        const results = await resultService.getSubjectResults(studentId, academicYear, term);
         
-        res.status(200).json({
-            status: 'success',
-            data: { results }
-        });
+        // If classId, sectionId, and subjectId are provided, get results for all students in the class/section for the subject
+        if (classId && sectionId && subjectId && academicYear && term) {
+            // Get all students in this class and section
+            const students = await prisma.student.findMany({
+                where: {
+                    classId: Number(classId),
+                    sectionId: Number(sectionId)
+                },
+                select: { id: true }
+            });
+            
+            if (students.length === 0) {
+                return next(new AppError(404, 'No students found in the specified class/section'));
+            }
+            
+            // Get all results for the students in the class/section for the specific subject
+            const results = await prisma.subjectResult.findMany({
+                where: {
+                    studentId: { in: students.map(s => s.id) },
+                    subjectId: Number(subjectId),
+                    academicYear,
+                    term
+                },
+                include: {
+                    student: {
+                        select: {
+                            name: true,
+                            rollNo: true
+                        }
+                    },
+                    subject: {
+                        select: {
+                            name: true
+                        }
+                    }
+                },
+                orderBy: {
+                    student: {
+                        rollNo: 'asc'
+                    }
+                }
+            });
+            
+            console.log('Fetched results for class/section with lock status:', results.map(r => ({ 
+                id: r.id, 
+                studentId: r.studentId, 
+                isLocked: r.isLocked 
+            })));
+            
+            return res.status(200).json({
+                status: 'success',
+                data: { results }
+            });
+        }
+        
+        // If we get here, required parameters are missing
+        return next(new AppError(400, 'Please provide either studentId OR (classId, sectionId, and subjectId) along with academicYear and term'));
     } catch (error) {
+        console.error('Error in getSubjectResults:', error);
         next(error);
     }
 };
@@ -256,6 +317,62 @@ export const recalculateResults = async (req, res, next) => {
         }
     } catch (error) {
         console.error('Error in recalculateResults:', error);
+        next(error);
+    }
+};
+
+export const toggleSubjectResultLock = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { isLocked } = req.body;
+        
+        if (isLocked === undefined) {
+            return next(new AppError(400, 'isLocked status is required'));
+        }
+
+        // Check if the result exists
+        const result = await prisma.subjectResult.findUnique({
+            where: { id: Number(id) },
+            include: {
+                student: {
+                    select: { name: true }
+                },
+                subject: {
+                    select: { name: true }
+                }
+            }
+        });
+        
+        if (!result) {
+            return next(new AppError(404, 'Subject result not found'));
+        }
+
+        // Update the lock status
+        const updatedResult = await prisma.subjectResult.update({
+            where: { id: Number(id) },
+            data: { 
+                isLocked: Boolean(isLocked),
+                updatedAt: new Date()
+            },
+            include: {
+                student: {
+                    select: { name: true }
+                },
+                subject: {
+                    select: { name: true }
+                }
+            }
+        });
+
+        const action = isLocked ? 'locked' : 'unlocked';
+        
+        res.status(200).json({
+            status: 'success',
+            data: { result: updatedResult },
+            message: `Result ${action} for ${result.student.name}'s ${result.subject.name} subject`
+        });
+    } catch (error) {
+        console.error('Error toggling subject result lock:', error);
         next(error);
     }
 }; 

@@ -6,7 +6,18 @@ const prisma = new PrismaClient();
 export class ResultService {
     async addSubjectResult(data) {
         try {
-            const { studentId, subjectId, academicYear, term, fullMarks, passMarks, theoryMarks, practicalMarks, isAbsent } = data;
+            const { 
+                studentId, 
+                subjectId, 
+                academicYear, 
+                term, 
+                fullMarks, 
+                passMarks, 
+                theoryMarks, 
+                practicalMarks, 
+                isAbsent,
+                isLocked = true // Default to locked if not specified
+            } = data;
 
             // Check if result already exists
             const existingResult = await prisma.subjectResult.findFirst({
@@ -20,6 +31,11 @@ export class ResultService {
 
             // If result exists, update it instead of creating a new one
             if (existingResult) {
+                // Check if result is locked - if so, only admin can update it
+                if (existingResult.isLocked) {
+                    throw new AppError(403, 'This result is locked. Only an admin can unlock it for editing.');
+                }
+
                 // Calculate total marks
                 const totalMarks = isAbsent ? 0 : (theoryMarks || 0) + (practicalMarks || 0);
 
@@ -37,9 +53,12 @@ export class ResultService {
                         totalMarks,
                         gradeId: grade.id,
                         isAbsent,
-                        updatedAt: new Date()
+                        updatedAt: new Date(),
+                        isLocked // Use the provided isLocked value (defaults to true)
                     }
                 });
+
+                console.log(`Updated result ${existingResult.id} with isLocked=${isLocked}`);
 
                 // Recalculate overall result
                 await this.calculateOverallResult(studentId, academicYear, term);
@@ -66,9 +85,12 @@ export class ResultService {
                     practicalMarks,
                     totalMarks,
                     gradeId: grade.id,
-                    isAbsent
+                    isAbsent,
+                    isLocked // Use the provided isLocked value (defaults to true)
                 }
             });
+
+            console.log(`Created new result for student ${studentId}, subject ${subjectId} with isLocked=${isLocked}`);
 
             // Update overall result
             await this.calculateOverallResult(studentId, academicYear, term);
@@ -83,7 +105,7 @@ export class ResultService {
         try {
             const results = await prisma.subjectResult.findMany({
                 where: {
-                    studentId,
+                    studentId: Number(studentId),
                     academicYear,
                     term
                 },
@@ -92,6 +114,13 @@ export class ResultService {
                     grade: true
                 }
             });
+
+            console.log('Fetched subject results with lock status:', results.map(r => ({ 
+                id: r.id, 
+                studentId: r.studentId, 
+                subjectId: r.subjectId, 
+                isLocked: r.isLocked 
+            })));
 
             return results;
         } catch (error) {

@@ -445,6 +445,7 @@ model SubjectResult {
   totalMarks     Float
   gradeId        Int
   isAbsent       Boolean  @default(false)
+  isLocked       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
