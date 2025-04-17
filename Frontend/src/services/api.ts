@@ -109,6 +109,7 @@ api.interceptors.request.use(
                 Authorization: `Bearer ${token}`
             };
         }
+        console.log(`Request [${config.method?.toUpperCase()}] ${config.url}`, config.params || config.data);
         return config;
     },
     (error) => {
@@ -118,8 +119,13 @@ api.interceptors.request.use(
 
 // Add response interceptor for error handling
 api.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        console.log(`Response [${response.config.method?.toUpperCase()}] ${response.config.url}:`, response.status, response.data);
+        return response;
+    },
     (error) => {
+        console.error(`API Error:`, error.response?.status, error.response?.data);
+        
         // Don't redirect on refresh token failures
         if (error.config.url === '/auth/refresh-token') {
             return Promise.reject(error);

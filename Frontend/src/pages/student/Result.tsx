@@ -50,7 +50,7 @@ type EnhancedResult = {
 
 const Result: React.FC = () => {
   const { user } = useAuth();
-  const [selectedTerm, setSelectedTerm] = useState<string>("First Term");
+  const [selectedTerm, setSelectedTerm] = useState<string>("First");
   const [subjects, setSubjects] = useState<SubjectResult[]>([]);
   const [resultSummary, setResultSummary] = useState<ResultSummary>({
     status: "",
@@ -64,28 +64,41 @@ const Result: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
-  const terms = ["First Term", "Second Term", "Final Term"];
+  const terms = ["First", "Second", "Final"];
   
   const fetchResults = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.error("No user ID found");
+      setError("User information not available");
+      return;
+    }
+    
+    // Get the actual student ID
+    const studentId = user.student?.id || user.id;
     
     setIsLoading(true);
     setError(null);
     
     try {
-      // Get the term value in the format the API expects (First Term -> First)
-      const apiTerm = selectedTerm.split(' ')[0];
+      // No need to split term anymore, we're using the exact format
+      const apiTerm = selectedTerm;
+      
+      // Use the current year from the database (2025 as per the logs)
+      const currentYear = "2025";
+      
+      console.log(`Fetching results for student ${studentId}, year ${currentYear}, term ${apiTerm}`);
       
       // Fetch subject results
       const subjectResponse = await resultAPI.getResults({
-        studentId: user.id,
-        academicYear: new Date().getFullYear().toString(),
+        studentId: studentId,
+        academicYear: currentYear,
         term: apiTerm
       });
       
       console.log("API Response:", subjectResponse.data);
+      console.log("Results data:", subjectResponse.data?.data?.results);
       
-      if (subjectResponse.data.status === 'success' && subjectResponse.data.data.results) {
+      if (subjectResponse.data.status === 'success' && Array.isArray(subjectResponse.data.data.results)) {
         const subjectResults = subjectResponse.data.data.results as unknown as EnhancedResult[];
         
         // Check if we have any results
@@ -121,10 +134,12 @@ const Result: React.FC = () => {
           try {
             // Use the API client instead of raw fetch
             const overallResponse = await resultAPI.getOverallResult({
-              studentId: user.id,
-              academicYear: new Date().getFullYear().toString(),
+              studentId: studentId,
+              academicYear: currentYear,
               term: apiTerm
             });
+            
+            console.log("Overall Result Response:", overallResponse.data);
             
             let overallResult: OverallResultData | null = null;
             
@@ -143,6 +158,8 @@ const Result: React.FC = () => {
                 strongestSubject: strongestSubject.subject,
                 subjectsToImprove: [weakestSubject.subject]
               };
+              
+              console.log("Calculated local result:", overallResult);
             }
             
             // Safe access with null check
@@ -177,7 +194,8 @@ const Result: React.FC = () => {
           }
         }
       } else {
-        setError("Failed to fetch results or no results found");
+        console.error("API response doesn't contain expected format:", subjectResponse.data);
+        setError("Failed to fetch results or no results found. Check API response in console.");
       }
     } catch (err) {
       console.error("Error fetching results:", err);
