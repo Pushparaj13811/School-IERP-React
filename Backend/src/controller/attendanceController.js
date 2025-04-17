@@ -47,11 +47,28 @@ export const getMonthlyAttendance = async (req, res, next) => {
     try {
         const { studentId, month, year } = req.query;
         
-        if (!studentId || !month || !year) {
-            return next(new AppError(400, 'Please provide studentId, month, and year'));
+        // Validate required parameters
+        if (!month || !year) {
+            return next(new AppError(400, 'Please provide month and year'));
         }
 
-        const attendance = await attendanceService.getMonthlyAttendance(studentId, month, year);
+        // If studentId is not provided but user is a student, use their ID
+        let targetStudentId = studentId;
+        if (!targetStudentId && req.user?.role === 'STUDENT') {
+            targetStudentId = req.user.student.id;
+        }
+        
+        // If we still don't have a studentId, that's an error
+        if (!targetStudentId) {
+            return next(new AppError(400, 'Student ID is required'));
+        }
+
+        // Get the attendance data from service
+        const attendance = await attendanceService.getMonthlyAttendance(
+            targetStudentId, 
+            month,
+            year
+        );
         
         res.status(200).json({
             status: 'success',

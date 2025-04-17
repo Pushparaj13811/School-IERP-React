@@ -3,6 +3,7 @@ import Table from '../../components/ui/Table';
 import { attendanceAPI } from '../../services/api';
 import { toast } from 'react-toastify';
 import { format } from 'date-fns';
+import { useAuth } from '../../context/AuthContext';
 
 interface DailyAttendance {
   id: number;
@@ -37,6 +38,8 @@ const Attendance: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   
+  const { user } = useAuth();
+  
   useEffect(() => {
     fetchAttendanceData();
   }, []);
@@ -52,39 +55,72 @@ const Attendance: React.FC = () => {
       
       // Get current date and first day of this month
       const today = new Date();
-      // const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       
       // Fetch current month's attendance
-      const monthlyResponse = await attendanceAPI.getMonthlyAttendance({
-        month: today.getMonth() + 1,
-        year: today.getFullYear()
-      });
-      
-      if (monthlyResponse.data.status === 'success') {
-        // Format monthly data
-        const data = monthlyResponse.data.data;
+      try {
+        const monthlyResponse = await attendanceAPI.getMonthlyAttendance({
+          month: today.getMonth() + 1,
+          year: today.getFullYear(),
+          studentId: user?.student?.id // Ensure we're sending the student ID
+        });
+        
+        if (monthlyResponse.data?.status === 'success' && monthlyResponse.data?.data?.attendance) {
+          // Format monthly data
+          const data = monthlyResponse.data.data.attendance;
+          setMonthlyAttendance([
+            {
+              month: format(new Date(data.month), 'MMMM yyyy'),
+              year: data.year,
+              presentCount: data.presentCount || 0,
+              absentCount: data.absentCount || 0,
+              percentage: data.percentage || 0
+            }
+          ]);
+        } else {
+          // Set default values if no data
+          setMonthlyAttendance([
+            {
+              month: format(today, 'MMMM yyyy'),
+              year: today.getFullYear(),
+              presentCount: 0,
+              absentCount: 0,
+              percentage: 0
+            }
+          ]);
+        }
+      } catch (monthlyErr) {
+        console.error('Error fetching monthly attendance:', monthlyErr);
+        // Continue with daily attendance even if monthly fails
         setMonthlyAttendance([
           {
-            month: 'Current Month',
-            year: data.year,
-            presentCount: data.presentCount,
-            absentCount: data.absentCount,
-            percentage: data.percentage
+            month: format(today, 'MMMM yyyy'),
+            year: today.getFullYear(),
+            presentCount: 0,
+            absentCount: 0,
+            percentage: 0
           }
         ]);
       }
       
       // Fetch last 30 days of attendance
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
-      const dailyResponse = await attendanceAPI.getDailyAttendance({
-        startDate: format(thirtyDaysAgo, 'yyyy-MM-dd'),
-        endDate: format(today, 'yyyy-MM-dd')
-      });
-      
-      if (dailyResponse.data.status === 'success') {
-        setRecentAttendance(dailyResponse.data.data.attendance);
+      try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const dailyResponse = await attendanceAPI.getDailyAttendance({
+          startDate: format(thirtyDaysAgo, 'yyyy-MM-dd'),
+          endDate: format(today, 'yyyy-MM-dd'),
+          studentId: user?.student?.id
+        });
+        
+        if (dailyResponse.data?.status === 'success' && Array.isArray(dailyResponse.data?.data?.attendance)) {
+          setRecentAttendance(dailyResponse.data.data.attendance);
+        } else {
+          setRecentAttendance([]);
+        }
+      } catch (dailyErr) {
+        console.error('Error fetching daily attendance:', dailyErr);
+        setRecentAttendance([]);
       }
     } catch (err) {
       console.error('Error fetching attendance data:', err);

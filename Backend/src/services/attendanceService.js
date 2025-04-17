@@ -73,19 +73,46 @@ export class AttendanceService {
 
     async getMonthlyAttendance(studentId, month, year) {
         try {
-            const startDate = new Date(year, month - 1, 1);
-            const endDate = new Date(year, month, 0);
-
+            const numMonth = parseInt(month, 10);
+            const numYear = parseInt(year, 10);
+            
+            if (isNaN(numMonth) || isNaN(numYear) || numMonth < 1 || numMonth > 12) {
+                throw new AppError(400, 'Invalid month or year parameter');
+            }
+            
+            // Create date for the first day of the month
+            const startDate = new Date(numYear, numMonth - 1, 1);
+            
+            // Get student ID if it wasn't provided but we have a user
+            const whereCondition = {};
+            
+            if (studentId) {
+                whereCondition.studentId = parseInt(studentId, 10);
+            }
+            
+            // Add month and year to the query
+            whereCondition.month = startDate;
+            whereCondition.year = numYear;
+            
+            // Find the attendance record
             const attendance = await prisma.monthlyAttendance.findFirst({
-                where: {
-                    studentId,
-                    month: {
-                        gte: startDate,
-                        lte: endDate
-                    }
-                }
+                where: whereCondition
             });
-
+            
+            // If no record found but we have the student ID, return a default structure
+            if (!attendance && studentId) {
+                return {
+                    studentId: parseInt(studentId, 10),
+                    month: startDate,
+                    year: numYear,
+                    presentCount: 0,
+                    absentCount: 0,
+                    percentage: 0,
+                    classId: null,
+                    sectionId: null
+                };
+            }
+            
             return attendance;
         } catch (error) {
             throw error;
