@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { FaPlus, FaEdit, FaTrash, FaEye } from 'react-icons/fa';
-import { Link } from 'react-router-dom';
+import {  FaEdit, FaTrash, FaEye } from 'react-icons/fa';
 import { announcementAPI } from '../../services/api';
 import { toast } from 'react-toastify';
+import Button from '../../components/ui/Button';
+import { useNavigate } from 'react-router-dom';
 
 interface AnnouncementAttachment {
   name: string;
@@ -47,6 +48,7 @@ interface Announcement {
 }
 
 const Announcements: React.FC = () => {
+  const navigate = useNavigate();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [filter, setFilter] = useState<'all' | 'active' | 'expired'>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'>('all');
@@ -59,13 +61,13 @@ const Announcements: React.FC = () => {
       try {
         setLoading(true);
         const response = await announcementAPI.getAll();
-        
+
         if (response.data?.status === 'success' && response.data?.data?.announcements) {
           // Type as API response type first, then process into our component's Announcement type
           const apiAnnouncements = response.data.data.announcements as unknown as AnnouncementData[];
-          
+
           const formattedAnnouncements: Announcement[] = [];
-          
+
           // Map the API data to our component's Announcement type
           for (const announcement of apiAnnouncements) {
             formattedAnnouncements.push({
@@ -82,7 +84,7 @@ const Announcements: React.FC = () => {
               attachments: announcement.attachments || []
             });
           }
-          
+
           setAnnouncements(formattedAnnouncements);
         } else {
           setError('Failed to load announcements');
@@ -96,17 +98,17 @@ const Announcements: React.FC = () => {
         setLoading(false);
       }
     };
-    
+
     fetchAnnouncements();
   }, []);
 
   const filteredAnnouncements = announcements.filter(announcement => {
-    const matchesFilter = filter === 'all' || 
+    const matchesFilter = filter === 'all' ||
       (filter === 'active' && announcement.isActive) ||
       (filter === 'expired' && !announcement.isActive);
-    
+
     const matchesPriority = priorityFilter === 'all' || announcement.priority === priorityFilter;
-    
+
     const matchesSearch = announcement.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       announcement.content.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -117,7 +119,7 @@ const Announcements: React.FC = () => {
     if (window.confirm('Are you sure you want to delete this announcement?')) {
       try {
         const response = await announcementAPI.delete(id.toString());
-        
+
         if (response.data?.status === 'success') {
           setAnnouncements(announcements.filter(a => a.id !== id));
           toast.success('Announcement deleted successfully');
@@ -129,6 +131,10 @@ const Announcements: React.FC = () => {
         toast.error('Error deleting announcement');
       }
     }
+  };
+
+  const handleEdit = (id: number) => {
+    navigate(`/announcements/create-announcement?id=${id}`);
   };
 
   const getPriorityColor = (priority: string) => {
@@ -150,13 +156,13 @@ const Announcements: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Announcements</h1>
-        <Link
-          to="/admin/announcements/create-announcement"
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+        <Button
+          variant="primary"
+          onClick={() => navigate('/announcements/create-announcement')}
         >
-          <FaPlus />
           Create Announcement
-        </Link>
+        </Button>
+
       </div>
 
       {/* Filters */}
@@ -272,9 +278,8 @@ const Announcements: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      announcement.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${announcement.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
                       {announcement.isActive ? 'Active' : 'Expired'}
                     </span>
                   </td>
@@ -289,6 +294,7 @@ const Announcements: React.FC = () => {
                       <button
                         className="text-yellow-600 hover:text-yellow-800"
                         title="Edit"
+                        onClick={() => handleEdit(announcement.id)}
                       >
                         <FaEdit />
                       </button>

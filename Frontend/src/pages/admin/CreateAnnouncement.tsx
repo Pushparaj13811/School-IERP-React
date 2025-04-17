@@ -16,7 +16,7 @@ interface Attachment {
 }
 
 interface AnnouncementData {
-  id: number;
+    id: number;
   title: string;
   content: string;
   priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
@@ -215,17 +215,17 @@ const CreateAnnouncement: React.FC = () => {
             
             // If we're removing a class, also remove its sections
             if (isSelected) {
-                setSelectedSections(prev => 
-                    prev.filter(sectionId => 
+        setSelectedSections(prev =>
+            prev.filter(sectionId =>
                         !classSections[classId]?.some(section => section.id === sectionId)
-                    )
-                );
+            )
+        );
             }
             
             return newSelectedClasses;
         });
     };
-    
+
     // Handle section toggle
     const handleSectionChange = (sectionId: number) => {
         setSelectedSections(prev => 
@@ -244,7 +244,7 @@ const CreateAnnouncement: React.FC = () => {
             return [...prev, role];
         });
     };
-    
+
     // Handle file upload
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
@@ -315,19 +315,19 @@ const CreateAnnouncement: React.FC = () => {
             }
             
             if (response?.data?.status === 'success') {
-                // Reset form
-                setTitle('');
-                setContent('');
-                setPriority('NORMAL');
-                setExpiresAt('');
-                setSelectedClasses([]);
-                setSelectedSections([]);
-                setSelectedRoles([]);
-                setAttachments([]);
+            // Reset form
+            setTitle('');
+            setContent('');
+            setPriority('NORMAL');
+            setExpiresAt('');
+            setSelectedClasses([]);
+            setSelectedSections([]);
+            setSelectedRoles([]);
+            setAttachments([]);
                 
-                // Navigate back to announcements page
+            // Navigate back to announcements page
                 setTimeout(() => {
-                    navigate('/announcements');
+            navigate('/announcements');
                 }, 2000);
             } else {
                 throw new Error(isEditMode ? 'Failed to update announcement' : 'Failed to publish announcement');
@@ -349,178 +349,178 @@ const CreateAnnouncement: React.FC = () => {
                     <p className="text-gray-500">Loading announcement data...</p>
                 </div>
             ) : (
-                <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Title
+                    </label>
+                    <input
+                        type="text"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        className="w-full p-2 border rounded-md"
+                        required
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Content
+                    </label>
+                    <textarea
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        className="w-full p-2 border rounded-md h-32"
+                        required
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Title
+                            Priority
+                        </label>
+                        <select
+                            value={priority}
+                                onChange={(e) => setPriority(e.target.value as 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT')}
+                            className="w-full p-2 border rounded-md"
+                        >
+                            <option value="LOW">Low</option>
+                            <option value="NORMAL">Normal</option>
+                            <option value="HIGH">High</option>
+                            <option value="URGENT">Urgent</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Expires At
                         </label>
                         <input
-                            type="text"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
+                            type="datetime-local"
+                            value={expiresAt}
+                            onChange={(e) => setExpiresAt(e.target.value)}
                             className="w-full p-2 border rounded-md"
-                            required
                         />
                     </div>
+                </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Content
-                        </label>
-                        <textarea
-                            value={content}
-                            onChange={(e) => setContent(e.target.value)}
-                            className="w-full p-2 border rounded-md h-32"
-                            required
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Priority
-                            </label>
-                            <select
-                                value={priority}
-                                onChange={(e) => setPriority(e.target.value as 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT')}
-                                className="w-full p-2 border rounded-md"
-                            >
-                                <option value="LOW">Low</option>
-                                <option value="NORMAL">Normal</option>
-                                <option value="HIGH">High</option>
-                                <option value="URGENT">Urgent</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Expires At
-                            </label>
-                            <input
-                                type="datetime-local"
-                                value={expiresAt}
-                                onChange={(e) => setExpiresAt(e.target.value)}
-                                className="w-full p-2 border rounded-md"
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Target Audience
-                        </label>
-                        <div className="space-y-4">
-                            {/* Role-based targeting */}
-                            <div className="border rounded-md p-4">
-                                <h3 className="font-medium mb-2">Select Roles</h3>
-                                <div className="space-y-2">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Target Audience
+                    </label>
+                    <div className="space-y-4">
+                        {/* Role-based targeting */}
+                        <div className="border rounded-md p-4">
+                            <h3 className="font-medium mb-2">Select Roles</h3>
+                            <div className="space-y-2">
                                     {Object.values(UserRole).map((role) => (
-                                        <label key={role} className="flex items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedRoles.includes(role)}
-                                                onChange={() => handleRoleChange(role)}
-                                                className="rounded"
-                                            />
+                                    <label key={role} className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedRoles.includes(role)}
+                                            onChange={() => handleRoleChange(role)}
+                                            className="rounded"
+                                        />
                                             <span>{role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()}</span>
-                                        </label>
-                                    ))}
-                                </div>
+                                    </label>
+                                ))}
                             </div>
+                        </div>
 
-                            {/* Class and Section targeting */}
-                            <div className="border rounded-md p-4">
-                                <h3 className="font-medium mb-2">Select Classes and Sections</h3>
+                        {/* Class and Section targeting */}
+                        <div className="border rounded-md p-4">
+                            <h3 className="font-medium mb-2">Select Classes and Sections</h3>
                                 {classesLoading ? (
                                     <p className="text-gray-500">Loading classes...</p>
                                 ) : (
-                                    <div className="space-y-4">
+                            <div className="space-y-4">
                                         {classes.map(cls => (
-                                            <div key={cls.id} className="border rounded-md p-4">
-                                                <label className="flex items-center gap-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedClasses.includes(cls.id)}
-                                                        onChange={() => handleClassChange(cls.id)}
-                                                        className="rounded"
-                                                    />
-                                                    <span className="font-medium">{cls.name}</span>
-                                                </label>
-                                                {selectedClasses.includes(cls.id) && (
-                                                    <div className="ml-6 mt-2 space-y-2">
+                                    <div key={cls.id} className="border rounded-md p-4">
+                                        <label className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedClasses.includes(cls.id)}
+                                                onChange={() => handleClassChange(cls.id)}
+                                                className="rounded"
+                                            />
+                                            <span className="font-medium">{cls.name}</span>
+                                        </label>
+                                        {selectedClasses.includes(cls.id) && (
+                                            <div className="ml-6 mt-2 space-y-2">
                                                         {sectionsLoading && !classSections[cls.id] ? (
                                                             <p className="text-gray-500">Loading sections...</p>
                                                         ) : (
                                                             classSections[cls.id]?.map(section => (
-                                                                <label key={section.id} className="flex items-center gap-2">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={selectedSections.includes(section.id)}
-                                                                        onChange={() => handleSectionChange(section.id)}
-                                                                        className="rounded"
-                                                                    />
-                                                                    <span>Section {section.name}</span>
-                                                                </label>
+                                                    <label key={section.id} className="flex items-center gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedSections.includes(section.id)}
+                                                            onChange={() => handleSectionChange(section.id)}
+                                                            className="rounded"
+                                                        />
+                                                        <span>Section {section.name}</span>
+                                                    </label>
                                                             ))
                                                         )}
-                                                    </div>
-                                                )}
                                             </div>
-                                        ))}
+                                        )}
+                                    </div>
+                                ))}
                                     </div>
                                 )}
-                            </div>
                         </div>
                     </div>
+                </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Attachments
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Attachments
+                    </label>
+                    <div className="flex items-center gap-4">
+                        <label className="px-4 py-2 bg-primary text-white rounded-md cursor-pointer hover:bg-primary/90 flex items-center gap-2">
+                            <FaUpload />
+                            Upload Files
+                            <input
+                                type="file"
+                                multiple
+                                onChange={handleFileChange}
+                                className="hidden"
+                            />
                         </label>
-                        <div className="flex items-center gap-4">
-                            <label className="px-4 py-2 bg-primary text-white rounded-md cursor-pointer hover:bg-primary/90 flex items-center gap-2">
-                                <FaUpload />
-                                Upload Files
-                                <input
-                                    type="file"
-                                    multiple
-                                    onChange={handleFileChange}
-                                    className="hidden"
-                                />
-                            </label>
-                        </div>
-                        {attachments.length > 0 && (
+                    </div>
+                    {attachments.length > 0 && (
                             <div className="mt-4 space-y-2">
-                                {attachments.map((file, index) => (
+                            {attachments.map((file, index) => (
                                     <div key={index} className="flex items-center justify-between border rounded-md p-2 pr-4">
                                         <span className="truncate">{file.name}</span>
                                         <button
                                             type="button"
-                                            onClick={() => removeFile(index)}
+                                        onClick={() => removeFile(index)}
                                             className="text-red-500 hover:text-red-700"
-                                        >
-                                            <FaTimes />
+                                    >
+                                        <FaTimes />
                                         </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
 
-                    <div className="flex justify-end">
-                        <Button
-                            type="submit"
-                            disabled={isSubmitting}
+                <div className="flex justify-end">
+                    <Button
+                        type="submit"
+                        disabled={isSubmitting}
                             className="flex items-center gap-2"
-                        >
-                            <FaPaperPlane />
+                    >
+                        <FaPaperPlane />
                             {isSubmitting 
                                 ? (isEditMode ? 'Updating...' : 'Publishing...') 
                                 : (isEditMode ? 'Update Announcement' : 'Publish Announcement')
                             }
-                        </Button>
-                    </div>
-                </form>
+                    </Button>
+                </div>
+            </form>
             )}
         </div>
     );
