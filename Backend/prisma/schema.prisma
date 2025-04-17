@@ -64,8 +64,8 @@ model Student {
   parent            Parent?             @relation(fields: [parentId], references: [id]) // Make relation optional
   address           Address             @relation(fields: [addressId], references: [id])
   profilePicture    ProfilePicture?     @relation(fields: [profilePictureId], references: [id])
-  subjectAttendance SubjectAttendance[]
   monthlyAttendance MonthlyAttendance[]
+  dailyAttendance   DailyAttendance[]
   subjectResults    SubjectResult[]
   overallResults    OverallResult[]
   leaveApplications LeaveApplication[]  @relation("StudentLeaveApplications")
@@ -104,6 +104,7 @@ model Teacher {
   sections          TeacherSection[]
   periods           Period[]
   classResults      OverallResult[] // For class teacher role
+  markedAttendances DailyAttendance[]  @relation("TeacherAttendanceMarking")
   leaveApplications LeaveApplication[] @relation("TeacherLeaveApplications")
   achievements      Achievement[]
   Feedback          Feedback[]
@@ -143,13 +144,15 @@ model Class {
   updatedAt DateTime @updatedAt
 
   // Relations
-  students       Student[]
-  sections       Section[]
-  teacherClasses TeacherClass[]
-  timetables     Timetable[]
-  periods        Period[]
-  announcements  AnnouncementClass[]
-  subjects       ClassSubject[]
+  students           Student[]
+  sections           Section[]
+  teacherClasses     TeacherClass[]
+  timetables         Timetable[]
+  periods            Period[]
+  dailyAttendances   DailyAttendance[]
+  monthlyAttendances MonthlyAttendance[]
+  announcements      AnnouncementClass[]
+  subjects           ClassSubject[]
 
   @@map("classes")
 }
@@ -163,11 +166,10 @@ model Subject {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  teacherSubjects   TeacherSubject[]
-  subjectAttendance SubjectAttendance[]
-  periods           Period[]
-  subjectResults    SubjectResult[]
-  classes           ClassSubject[]
+  teacherSubjects TeacherSubject[]
+  periods         Period[]
+  subjectResults  SubjectResult[]
+  classes         ClassSubject[]
 
   @@map("subjects")
 }
@@ -297,12 +299,14 @@ model Section {
   classId Int
 
   // Relations
-  class           Class                 @relation(fields: [classId], references: [id])
-  students        Student[]
-  timetables      Timetable[]
-  periods         Period[]
-  teacherSections TeacherSection[]
-  announcements   AnnouncementSection[]
+  class              Class                 @relation(fields: [classId], references: [id])
+  students           Student[]
+  timetables         Timetable[]
+  periods            Period[]
+  dailyAttendances   DailyAttendance[]
+  monthlyAttendances MonthlyAttendance[]
+  teacherSections    TeacherSection[]
+  announcements      AnnouncementSection[]
 
   @@unique([classId, name])
   @@map("sections")
@@ -323,40 +327,49 @@ model ProfilePicture {
   @@map("profile_pictures")
 }
 
-// Subject-wise attendance tracking
-model SubjectAttendance {
-  id               Int      @id @default(autoincrement())
-  studentId        Int
-  subjectId        Int
-  lectureConducted Int
-  presentCount     Int
-  absentCount      Int
-  attendanceDate   DateTime @default(now())
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+// Daily attendance tracking
+model DailyAttendance {
+  id         Int              @id @default(autoincrement())
+  studentId  Int
+  classId    Int
+  sectionId  Int
+  date       DateTime         @default(now())
+  status     AttendanceStatus @default(PRESENT)
+  remarks    String?
+  markedById Int // Teacher who marked attendance
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   // Relations
-  student Student @relation(fields: [studentId], references: [id])
-  subject Subject @relation(fields: [subjectId], references: [id])
+  student  Student @relation(fields: [studentId], references: [id])
+  class    Class   @relation(fields: [classId], references: [id])
+  section  Section @relation(fields: [sectionId], references: [id])
+  markedBy Teacher @relation("TeacherAttendanceMarking", fields: [markedById], references: [id])
 
-  @@unique([studentId, subjectId, attendanceDate])
-  @@map("subject_attendance")
+  @@unique([studentId, date])
+  @@map("daily_attendance")
 }
 
 // Monthly attendance summary
 model MonthlyAttendance {
   id           Int      @id @default(autoincrement())
   studentId    Int
+  classId      Int
+  sectionId    Int
   month        DateTime // Store as first day of the month
+  year         Int // Store year separately for easier querying
   presentCount Int
   absentCount  Int
+  percentage   Float // Store attendance percentage for easy retrieval
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   // Relations
   student Student @relation(fields: [studentId], references: [id])
+  class   Class   @relation(fields: [classId], references: [id])
+  section Section @relation(fields: [sectionId], references: [id])
 
-  @@unique([studentId, month])
+  @@unique([studentId, month, year])
   @@map("monthly_attendance")
 }
 
@@ -450,10 +463,10 @@ model SubjectResult {
   updatedAt      DateTime @updatedAt
 
   // Relations
-  student         Student        @relation(fields: [studentId], references: [id])
-  subject         Subject        @relation(fields: [subjectId], references: [id])
+  student         Student         @relation(fields: [studentId], references: [id])
+  subject         Subject         @relation(fields: [subjectId], references: [id])
   grade           GradeDefinition @relation(fields: [gradeId], references: [id])
-  OverallResult   OverallResult? @relation(fields: [overallResultId], references: [id])
+  OverallResult   OverallResult?  @relation(fields: [overallResultId], references: [id])
   overallResultId Int?
 
   @@unique([studentId, subjectId, academicYear, term])
@@ -509,9 +522,9 @@ model LeaveApplication {
   updatedAt     DateTime      @updatedAt
 
   // Separate nullable foreign keys for each type
-  studentId     Int?
-  teacherId     Int?
-  adminId       Int?
+  studentId Int?
+  teacherId Int?
+  adminId   Int?
 
   // Relations
   leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
@@ -767,4 +780,13 @@ model ClassSubject {
 
   @@unique([classId, subjectId])
   @@map("class_subjects")
+}
+
+// Add this enum for attendance status
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  EXCUSED
 }
