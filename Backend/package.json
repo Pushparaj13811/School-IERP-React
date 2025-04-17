@@ -13,7 +13,8 @@
     "seed:classes": "node src/scripts/seedClassesAndSections.js",
     "seed:admin": "node src/seeds/adminSeeder.js",
     "seed:designations": "node src/scripts/seed-designations.js",
-    "seed:subjects": "node src/scripts/seed-subjects.js"
+    "seed:subjects": "node src/scripts/seed-subjects.js",
+    "seed-leave-types": "node --experimental-json-modules src/scripts/seed-leave-types.js"
   },
   "repository": {
     "type": "git",
