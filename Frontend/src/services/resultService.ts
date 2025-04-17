@@ -119,19 +119,6 @@ class ResultService {
                 // Calculate total marks (theory + practical)
                 const totalMarks = student.theoryMarks + student.practicalMarks;
                 
-                // Calculate percentage for grading
-                const percentage = (totalMarks / fullMarks) * 100;
-                
-                // Create a simple grade scheme directly instead of using gradeId
-                let grade = '';
-                if (percentage >= 90) grade = 'A+';
-                else if (percentage >= 80) grade = 'A';
-                else if (percentage >= 70) grade = 'B+';
-                else if (percentage >= 60) grade = 'B';
-                else if (percentage >= 50) grade = 'C+';
-                else if (percentage >= 40) grade = 'C';
-                else grade = 'F';
-                
                 return {
                     studentId: student.id,
                     subjectId,
@@ -142,8 +129,6 @@ class ResultService {
                     theoryMarks: student.theoryMarks,
                     practicalMarks: student.practicalMarks,
                     totalMarks,
-                    totalPercentage: percentage,
-                    grade, // Send grade as string
                     isAbsent: false
                 };
             });
@@ -198,6 +183,39 @@ class ResultService {
             }
             return student;
         });
+    }
+
+    async recalculateResults(
+        classId: number | null,
+        sectionId: number | null,
+        academicYear: string,
+        term: string
+    ): Promise<boolean> {
+        if (!classId) return false;
+        
+        try {
+            console.log(`Recalculating results for class ${classId}, section ${sectionId || 'all'}, year ${academicYear}, term ${term}`);
+            
+            const payload = {
+                classId,
+                ...(sectionId && { sectionId }),
+                academicYear,
+                term
+            };
+            
+            const response = await resultAPI.recalculateResults(payload);
+            
+            if (response.data?.status === 'success' || response.data?.status === 'partial_success') {
+                console.log("Results recalculation response:", response.data);
+                return true;
+            }
+            
+            console.error("Failed to recalculate results");
+            return false;
+        } catch (error) {
+            console.error('Error recalculating results:', error);
+            throw error;
+        }
     }
 }
 
