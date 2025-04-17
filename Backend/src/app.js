@@ -19,6 +19,7 @@ import sectionRoutes from './routes/sectionRoutes.js';
 import subjectRoutes from './routes/subjectRoutes.js';
 import announcementRoutes from './routes/announcementRoutes.js';
 import leaveRoutes from './routes/leaveRoutes.js';
+import teacherRoutes from './routes/teacherRoutes.js';
 import { fileURLToPath } from 'url';
 
 // Get directory name in ESM
@@ -65,6 +66,7 @@ app.use('/api/v1/sections', sectionRoutes);
 app.use('/api/v1/subjects', subjectRoutes);
 app.use('/api/v1/announcements', announcementRoutes);
 app.use('/api/v1/leaves', leaveRoutes);
+app.use('/api/v1/teachers', teacherRoutes);
 
 // Error handling
 app.use(notFoundHandler);

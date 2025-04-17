@@ -1,10 +1,13 @@
+import { ApiError } from '../utils/apiError.js';
+import { prisma } from '../databases/prismaClient.js';
+
 // Add these controller methods for class teacher assignments
 export const assignClassTeacher = async (req, res, next) => {
     try {
         const { teacherId, classId, sectionId } = req.body;
         
         if (!teacherId || !classId || !sectionId) {
-            return next(new AppError(400, 'Teacher ID, Class ID, and Section ID are required'));
+            return next(new ApiError(400, 'Teacher ID, Class ID, and Section ID are required'));
         }
         
         // Verify the teacher exists
@@ -13,7 +16,7 @@ export const assignClassTeacher = async (req, res, next) => {
         });
         
         if (!teacher) {
-            return next(new AppError(404, 'Teacher not found'));
+            return next(new ApiError(404, 'Teacher not found'));
         }
         
         // Verify the class exists
@@ -22,7 +25,7 @@ export const assignClassTeacher = async (req, res, next) => {
         });
         
         if (!classRecord) {
-            return next(new AppError(404, 'Class not found'));
+            return next(new ApiError(404, 'Class not found'));
         }
         
         // Verify the section exists and belongs to the class
@@ -34,7 +37,7 @@ export const assignClassTeacher = async (req, res, next) => {
         });
         
         if (!section) {
-            return next(new AppError(404, 'Section not found or does not belong to the specified class'));
+            return next(new ApiError(404, 'Section not found or does not belong to the specified class'));
         }
         
         // Check if there's already a class teacher assigned
@@ -163,6 +166,53 @@ export const getAllClassTeacherAssignments = async (req, res, next) => {
         if (teacherId) {
             whereCondition.teacherId = parseInt(teacherId);
         }
+
+        console.log('Fetching class teacher assignments with conditions:', whereCondition);
+        
+        // Check if prisma.classTeacherAssignment exists
+        if (!prisma.classTeacherAssignment) {
+            console.error('prisma.classTeacherAssignment is undefined');
+            // Try accessing with a different casing or check your Prisma client
+            const assignments = await prisma.ClassTeacherAssignment.findMany({
+                where: whereCondition,
+                include: {
+                    teacher: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            designation: {
+                                select: {
+                                    name: true
+                                }
+                            }
+                        }
+                    },
+                    class: {
+                        select: {
+                            id: true,
+                            name: true
+                        }
+                    },
+                    section: {
+                        select: {
+                            id: true,
+                            name: true
+                        }
+                    }
+                },
+                orderBy: [
+                    { classId: 'asc' },
+                    { sectionId: 'asc' }
+                ]
+            });
+            
+            return res.status(200).json({
+                status: 'success',
+                results: assignments.length,
+                data: { assignments }
+            });
+        }
         
         const assignments = await prisma.classTeacherAssignment.findMany({
             where: whereCondition,
@@ -214,7 +264,7 @@ export const removeClassTeacherAssignment = async (req, res, next) => {
         const { id } = req.params;
         
         if (!id) {
-            return next(new AppError(400, 'Assignment ID is required'));
+            return next(new ApiError(400, 'Assignment ID is required'));
         }
         
         // Check if the assignment exists
@@ -240,7 +290,7 @@ export const removeClassTeacherAssignment = async (req, res, next) => {
         });
         
         if (!assignment) {
-            return next(new AppError(404, 'Class teacher assignment not found'));
+            return next(new ApiError(404, 'Class teacher assignment not found'));
         }
         
         // Delete the assignment

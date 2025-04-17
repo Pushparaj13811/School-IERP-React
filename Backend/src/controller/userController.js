@@ -1,10 +1,9 @@
 import { UserService } from '../services/userService.js';
 import { AppError } from '../middlewares/errorHandler.js';
 import { emailService } from '../services/emailService.js';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../databases/prismaClient.js';
 
 const userService = new UserService();
-const prisma = new PrismaClient();
 
 export const getProfile = async (req, res, next) => {
     try {
