@@ -152,177 +152,108 @@ export const getLeaveApplications = async (req, res, next) => {
             applicantType, 
             fromDate, 
             toDate, 
-            studentId, 
-            teacherId,
-            classId,
-            sectionId
+            startDate, 
+            endDate 
         } = req.query;
+
+        const where = {};
         
-        // Build the where clause based on user role and query parameters
-        let where = {};
-        
-        // Add filters if provided
+        // Handle status filtering
         if (status) {
-            where.status = status;
+            // Check if status is an array and handle accordingly
+            if (Array.isArray(status)) {
+                where.status = {
+                    in: status
+                };
+            } else {
+                where.status = status;
+            }
         }
         
+        // Handle applicant type filtering
         if (applicantType) {
             where.applicantType = applicantType;
         }
         
-        if (fromDate) {
-            where.fromDate = {
+        // Handle date range filtering (for application date)
+        if (fromDate && toDate) {
+            where.createdAt = {
+                gte: new Date(fromDate),
+                lte: new Date(toDate)
+            };
+        } else if (fromDate) {
+            where.createdAt = {
                 gte: new Date(fromDate)
             };
-        }
-        
-        if (toDate) {
-            where.toDate = {
+        } else if (toDate) {
+            where.createdAt = {
                 lte: new Date(toDate)
             };
         }
         
-        // Role-based filters
-        switch (req.user.role) {
-            case 'STUDENT':
-                // Students can only see their own applications
-                where.studentId = req.user.student.id;
-                where.applicantType = 'STUDENT';
-                break;
-                
-            case 'TEACHER':
-                // If specific student is requested
-                if (studentId) {
-                    // Verify teacher teaches the student's class
-                    const student = await prisma.student.findUnique({
-                        where: { id: Number(studentId) },
-                        select: { 
-                            classId: true,
-                            sectionId: true
-                        }
-                    });
-                    
-                    if (!student) {
-                        return next(new AppError(404, 'Student not found'));
-                    }
-                    
-                    // Check if teacher teaches this class/section
-                    const teachesClass = await prisma.teacherClass.findFirst({
-                        where: {
-                            teacherId: req.user.teacher.id,
-                            classId: student.classId
-                        }
-                    });
-                    
-                    const teachesSection = await prisma.teacherSection.findFirst({
-                        where: {
-                            teacherId: req.user.teacher.id,
-                            sectionId: student.sectionId
-                        }
-                    });
-                    
-                    if (!teachesClass || !teachesSection) {
-                        return next(new AppError(403, 'You do not teach this student'));
-                    }
-                    
-                    where.studentId = Number(studentId);
-                    where.applicantType = 'STUDENT';
-                } else if (classId && sectionId) {
-                    // Check if teacher teaches this class/section
-                    const teachesClass = await prisma.teacherClass.findFirst({
-                        where: {
-                            teacherId: req.user.teacher.id,
-                            classId: Number(classId)
-                        }
-                    });
-                    
-                    const teachesSection = await prisma.teacherSection.findFirst({
-                        where: {
-                            teacherId: req.user.teacher.id,
-                            sectionId: Number(sectionId)
-                        }
-                    });
-                    
-                    if (!teachesClass || !teachesSection) {
-                        return next(new AppError(403, 'You do not teach this class/section'));
-                    }
-                    
-                    // Get all students in this class and section
-                    const students = await prisma.student.findMany({
-                        where: {
-                            classId: Number(classId),
-                            sectionId: Number(sectionId)
-                        },
-                        select: { id: true }
-                    });
-                    
-                    where.studentId = {
-                        in: students.map(s => s.id)
-                    };
-                    where.applicantType = 'STUDENT';
-                } else {
-                    // Teacher's own applications or applications they can approve
-                    where.OR = [
-                        // Teacher's own applications
-                        {
-                            teacherId: req.user.teacher.id,
-                            applicantType: 'TEACHER'
-                        },
-                        // Students' applications from classes they teach
-                        {
-                            applicantType: 'STUDENT',
-                            student: {
-                                class: {
-                                    teacherClasses: {
-                                        some: {
-                                            teacherId: req.user.teacher.id
-                                        }
+        // Handle date range filtering (for leave dates)
+        if (startDate && endDate) {
+            where.fromDate = {
+                gte: new Date(startDate)
+            };
+            where.toDate = {
+                lte: new Date(endDate)
+            };
+        } else if (startDate) {
+            where.fromDate = {
+                gte: new Date(startDate)
+            };
+        } else if (endDate) {
+            where.toDate = {
+                lte: new Date(endDate)
+            };
+        }
+        
+        // Handle permissions based on user role
+        const userRole = req.user.role;
+        
+        if (userRole === 'STUDENT') {
+            // Students can only see their own leave applications
+            where.studentId = req.user.student.id;
+        } else if (userRole === 'TEACHER') {
+            const teacherId = req.user.teacher.id;
+            
+            // If no specific filters are set, show leaves that the teacher can approve
+            if (!where.applicantType || where.applicantType === 'STUDENT') {
+                // Teachers can see leaves from:
+                // 1. Their own leaves
+                // 2. Leaves of students in their classes/sections
+                where.OR = [
+                    // Teacher's own leaves
+                    {
+                        teacherId,
+                        applicantType: 'TEACHER'
+                    },
+                    // Leaves of students in teacher's classes/sections
+                    {
+                        applicantType: 'STUDENT',
+                        student: {
+                            class: {
+                                teacherClasses: {
+                                    some: {
+                                        teacherId
                                     }
-                                },
-                                section: {
-                                    teacherSections: {
-                                        some: {
-                                            teacherId: req.user.teacher.id
-                                        }
+                                }
+                            },
+                            section: {
+                                teacherSections: {
+                                    some: {
+                                        teacherId
                                     }
                                 }
                             }
                         }
-                    ];
-                }
-                break;
-                
-            case 'ADMIN':
-                // Admin can see all applications
-                // Admin can filter by specific teacher or student
-                if (teacherId) {
-                    where.teacherId = Number(teacherId);
-                    where.applicantType = 'TEACHER';
-                } else if (studentId) {
-                    where.studentId = Number(studentId);
-                    where.applicantType = 'STUDENT';
-                } else if (classId) {
-                    // Get all students in this class
-                    const students = await prisma.student.findMany({
-                        where: {
-                            classId: Number(classId),
-                            ...(sectionId ? { sectionId: Number(sectionId) } : {})
-                        },
-                        select: { id: true }
-                    });
-                    
-                    where.studentId = {
-                        in: students.map(s => s.id)
-                    };
-                    where.applicantType = 'STUDENT';
-                }
-                break;
-                
-            default:
-                return next(new AppError(403, 'Unauthorized to view leave applications'));
+                    }
+                ];
+            }
         }
+        // Admin can see all leave applications, so no additional filtering needed
         
-        // Get leave applications with appropriate includes
         const leaveApplications = await prisma.leaveApplication.findMany({
             where,
             include: {
