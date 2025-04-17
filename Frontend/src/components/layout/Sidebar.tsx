@@ -34,6 +34,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     { icon: 'bi-speedometer2', label: 'Dashboard', path: '/' },
     { icon: 'bi-person', label: 'Profile', path: '/profile' },
     
+    { icon: 'bi-file-earmark-text', label: 'Results Management', isGroup: true },
+    { icon: 'bi-key', label: 'Manage Results', path: '/manage-results' },
     { icon: 'bi-clipboard-data', label: 'Report', path: '/report' },
     
     { icon: 'bi-people', label: 'User Management', isGroup: true },

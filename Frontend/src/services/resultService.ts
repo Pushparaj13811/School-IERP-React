@@ -9,6 +9,7 @@ export interface Student {
     theoryMarks: number;
     practicalMarks: number;
     isEditable: boolean;
+    isLocked?: boolean;
 }
 
 // Define interface for result data
@@ -21,6 +22,7 @@ export interface ResultData {
     theoryMarks?: number;
     practicalMarks?: number;
     isAbsent?: boolean;
+    isLocked?: boolean;
     [key: string]: unknown;
 }
 
@@ -174,11 +176,16 @@ class ResultService {
             if (existingResult) {
                 const result = existingResult as ResultData;
                 console.log(`Found existing result for student ${student.id}:`, result);
+                
+                // Check if result is locked (from backend)
+                const isLocked = result.isLocked !== undefined ? result.isLocked : true;
+                
                 return {
                     ...student,
                     theoryMarks: typeof result.theoryMarks === 'number' ? result.theoryMarks : 0,
                     practicalMarks: typeof result.practicalMarks === 'number' ? result.practicalMarks : 0,
-                    isEditable: false // Lock edited marks
+                    isEditable: !isLocked, // Set editable based on lock status
+                    isLocked: isLocked // Store lock status
                 };
             }
             return student;

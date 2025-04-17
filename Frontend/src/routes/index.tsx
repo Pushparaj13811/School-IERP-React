@@ -34,6 +34,7 @@ const Report = lazy(() => import('../pages/admin/Report'));
 const StudentsList = lazy(() => import('../pages/admin/StudentsList'));
 const TeachersList = lazy(() => import('../pages/admin/TeachersList'));
 const ParentsList = lazy(() => import('../pages/admin/ParentsList'));
+const ManageResults = lazy(() => import('../pages/admin/ManageResults'));
 
 const ResultEntry = lazy(() => import('../pages/teacher/ResultEntry'));
 const CreateAnnouncementTeacher = lazy(() => import('../pages/teacher/CreateAnnouncement'));
@@ -172,6 +173,11 @@ export const routes: Route[] = [
     roles: [UserRole.ADMIN],
   },
   {
+    path: '/manage-results',
+    component: ManageResults,
+    roles: [UserRole.ADMIN],
+  },
+  {
     path: 'teachers/add-teacher',
     component: AddTeacher,
     roles: [UserRole.ADMIN],
@@ -251,6 +257,14 @@ export const routeGroups = [
       '/students',
       '/teachers',
       '/parents'
+    ],
+  },
+  {
+    title: 'Admin Tools',
+    icon: 'bi-gear-fill',
+    routes: [
+      '/manage-results',
+      '/report'
     ],
   },
 ]; 
