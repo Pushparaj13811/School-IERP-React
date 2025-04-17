@@ -222,6 +222,7 @@ export const resultAPI = {
     getResults: (params: Record<string, unknown>) => api.get<ApiResponse<{ results: Result[] }>>('/results', { params }),
     createResult: (data: Record<string, unknown>) => api.post<ApiResponse<{ result: Result }>>('/results/subject', data),
     updateResult: (id: string, data: Record<string, unknown>) => api.put<ApiResponse<{ result: Result }>>(`/results/${id}`, data),
+    recalculateResults: (data: Record<string, unknown>) => api.post<ApiResponse<{ message: string }>>('/results/recalculate', data),
 };
 
 // Leave API

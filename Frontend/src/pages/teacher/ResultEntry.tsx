@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Button from '../../components/ui/Button';
-import { FaSave, FaLock, FaUnlock } from 'react-icons/fa';
+import { FaSave, FaLock, FaUnlock, FaSync } from 'react-icons/fa';
 import { academicAPI } from '../../services/api';
 import { Class, Section, Subject, Teacher } from '../../types/api';
 import teacherService from '../../services/teacherService';
@@ -20,7 +20,9 @@ const ResultEntry: React.FC = () => {
     const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
     const [students, setStudents] = useState<Student[]>([]);
     const [isSaving, setIsSaving] = useState(false);
+    const [isRecalculating, setIsRecalculating] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'success' | 'error' | null>(null);
+    const [recalculateStatus, setRecalculateStatus] = useState<'success' | 'error' | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [teacherData, setTeacherData] = useState<Teacher | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -274,6 +276,43 @@ const ResultEntry: React.FC = () => {
         }
     };
 
+    const handleRecalculate = async () => {
+        if (!selectedClass) {
+            setError("Please select at least a class to recalculate results");
+            return;
+        }
+
+        setIsRecalculating(true);
+        setRecalculateStatus(null);
+        setError(null);
+
+        try {
+            const success = await resultService.recalculateResults(
+                selectedClass,
+                selectedSection,
+                academicYear,
+                term
+            );
+            
+            if (success) {
+                setRecalculateStatus('success');
+                // Refresh student data if a subject is selected
+                if (selectedClass && selectedSection && selectedSubject) {
+                    await fetchStudentsAndResults();
+                }
+            } else {
+                setRecalculateStatus('error');
+                setError("Failed to recalculate results. Please try again.");
+            }
+        } catch (error) {
+            console.error('Error recalculating results:', error);
+            setRecalculateStatus('error');
+            setError("Failed to recalculate results. Please try again.");
+        } finally {
+            setIsRecalculating(false);
+        }
+    };
+
     if (isLoading && !teacherData) {
         return <div className="flex justify-center items-center h-64">Loading teacher data...</div>;
     }
@@ -413,6 +452,47 @@ const ResultEntry: React.FC = () => {
                 </div>
             </div>
 
+            <div className="mb-6">
+                <div className="flex justify-between items-start">
+                    <div className="max-w-2xl">
+                        <h3 className="text-md font-medium text-gray-700 mb-1">Results Recalculation</h3>
+                        <p className="text-sm text-gray-600 mb-3">
+                            Click the button to recalculate overall results for students based on their subject marks. 
+                            This will update total marks, percentage, and grades in the database.
+                            {selectedClass 
+                                ? selectedSection 
+                                    ? ` Recalculation will run for all students in class ${classes.find(c => c.id === selectedClass)?.name || ''} section ${sections.find(s => s.id === selectedSection)?.name || ''}.`
+                                    : ` Recalculation will run for all students in class ${classes.find(c => c.id === selectedClass)?.name || ''}.`
+                                : ' Recalculation will run for all students in the system.'}
+                        </p>
+                    </div>
+                    <Button
+                        variant="secondary"
+                        onClick={handleRecalculate}
+                        disabled={isRecalculating}
+                        className={`px-4 py-2 rounded-md text-white flex items-center gap-2 ${isRecalculating
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-blue-500 hover:bg-blue-600'
+                            }`}
+                    >
+                        <FaSync className={isRecalculating ? 'animate-spin' : ''} />
+                        {isRecalculating ? 'Processing...' : selectedClass 
+                            ? `Recalculate ${selectedSection ? 'Section' : 'Class'} Results` 
+                            : 'Recalculate All Results'}
+                    </Button>
+                </div>
+                {recalculateStatus === 'success' && (
+                    <div className="mt-2 p-2 bg-green-100 text-green-700 rounded-md">
+                        Results recalculated successfully!
+                    </div>
+                )}
+                {recalculateStatus === 'error' && (
+                    <div className="mt-2 p-2 bg-red-100 text-red-700 rounded-md">
+                        Error recalculating results. Please try again.
+                    </div>
+                )}
+            </div>
+            
             {isLoading && selectedSubject ? (
                 <div className="flex justify-center items-center h-64">Loading students...</div>
             ) : students.length > 0 ? (
@@ -493,7 +573,12 @@ const ResultEntry: React.FC = () => {
             ) : null}
             
             {students.length > 0 && (
-                <div className="mt-6 flex justify-end">
+                <div className="mt-6 flex justify-end gap-4">
+                    <div className="flex-1 self-center">
+                        <p className="text-sm text-gray-600 italic">
+                            Note: After saving marks, grades and overall results will be automatically calculated by the system.
+                        </p>
+                    </div>
                     <Button
                         variant="primary"
                         onClick={handleSave}

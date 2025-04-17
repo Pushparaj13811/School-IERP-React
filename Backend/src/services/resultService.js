@@ -154,7 +154,6 @@ export class ResultService {
                                 }
                             },
                             teacherClasses: {
-                                where: { isClassTeacher: true },
                                 include: { teacher: true }
                             }
                         }
@@ -213,9 +212,12 @@ export class ResultService {
 
             // Get class teacher
             const classTeacher = student.class.teacherClasses[0]?.teacher;
-
-            if (!classTeacher) {
-                console.warn('Class teacher not found for student', studentId);
+            let classTeacherId = 1; // Default value
+            
+            if (classTeacher && classTeacher.id) {
+                classTeacherId = classTeacher.id;
+            } else {
+                console.warn('No teacher found for class. Using default teacher ID.');
             }
 
             // Prepare overall result data
@@ -228,14 +230,7 @@ export class ResultService {
                 strongestSubject,
                 subjectsToImprove,
                 rank: null, // Will be calculated separately in a batch process
-                classTeacherId: classTeacher?.id || 1, // Fallback to a default value if needed
-                // Include completion status in the metadata
-                metadata: {
-                    completedSubjects: completedSubjectsCount,
-                    totalSubjects: totalExpectedSubjects,
-                    isComplete,
-                    processingStatus: isComplete ? 'COMPLETE' : 'IN_PROGRESS'
-                }
+                classTeacherId // Use the variable we defined above
             };
 
             // Create or update overall result
@@ -251,7 +246,13 @@ export class ResultService {
                 create: resultData
             });
 
-            return overallResult;
+            // Add processing status to return value but not to database
+            return {
+                ...overallResult,
+                completedSubjects: completedSubjectsCount,
+                totalSubjects: totalExpectedSubjects,
+                processingStatus: isComplete ? 'COMPLETE' : 'IN_PROGRESS'
+            };
         } catch (error) {
             console.error('Error calculating overall result:', error);
             throw error;
