@@ -18,11 +18,36 @@ export class ResultService {
                 }
             });
 
+            // If result exists, update it instead of creating a new one
             if (existingResult) {
-                throw new AppError(400, 'Result already exists for this subject, term, and academic year');
+                // Calculate total marks
+                const totalMarks = isAbsent ? 0 : (theoryMarks || 0) + (practicalMarks || 0);
+
+                // Get grade based on total marks
+                const grade = await this.calculateGrade(totalMarks, fullMarks);
+
+                // Update existing result
+                const updatedResult = await prisma.subjectResult.update({
+                    where: {
+                        id: existingResult.id
+                    },
+                    data: {
+                        theoryMarks,
+                        practicalMarks,
+                        totalMarks,
+                        gradeId: grade.id,
+                        isAbsent,
+                        updatedAt: new Date()
+                    }
+                });
+
+                // Recalculate overall result
+                await this.calculateOverallResult(studentId, academicYear, term);
+
+                return updatedResult;
             }
 
-            // Calculate total marks
+            // Calculate total marks for new result
             const totalMarks = isAbsent ? 0 : (theoryMarks || 0) + (practicalMarks || 0);
 
             // Get grade based on total marks
@@ -100,7 +125,7 @@ export class ResultService {
 
     async calculateOverallResult(studentId, academicYear, term) {
         try {
-            // Get all subject results
+            // Get all subject results for this student, term and academic year
             const subjectResults = await prisma.subjectResult.findMany({
                 where: {
                     studentId,
@@ -108,6 +133,7 @@ export class ResultService {
                     term
                 },
                 include: {
+                    subject: true,
                     grade: true
                 }
             });
@@ -116,34 +142,101 @@ export class ResultService {
                 throw new AppError(400, 'No subject results found for calculation');
             }
 
-            // Calculate total percentage
-            const totalMarks = subjectResults.reduce((sum, result) => sum + result.totalMarks, 0);
-            const totalFullMarks = subjectResults.reduce((sum, result) => sum + result.fullMarks, 0);
-            const totalPercentage = (totalMarks / totalFullMarks) * 100;
-
-            // Determine result status
-            const status = this.determineResultStatus(subjectResults, totalPercentage);
-
-            // Get class teacher
+            // Get all subjects assigned to the student's class
             const student = await prisma.student.findUnique({
                 where: { id: studentId },
                 include: {
                     class: {
                         include: {
+                            subjects: {
+                                include: {
+                                    subject: true
+                                }
+                            },
                             teacherClasses: {
                                 where: { isClassTeacher: true },
                                 include: { teacher: true }
                             }
                         }
-                    }
+                    },
+                    section: true
                 }
             });
 
+            if (!student) {
+                throw new AppError(404, 'Student not found');
+            }
+
+            // Get expected subjects for this class
+            const expectedSubjectIds = student.class.subjects.map(s => s.subjectId);
+            
+            // Calculate how many subjects have marks entered vs total expected
+            const subjectsWithMarks = new Set(subjectResults.map(r => r.subjectId));
+            const completedSubjectsCount = subjectsWithMarks.size;
+            const totalExpectedSubjects = expectedSubjectIds.length;
+
+            // Determine if all subjects have results
+            const isComplete = completedSubjectsCount >= totalExpectedSubjects;
+            
+            // Calculate result metrics based on entered subjects
+            const totalMarks = subjectResults.reduce((sum, result) => sum + result.totalMarks, 0);
+            const totalFullMarks = subjectResults.reduce((sum, result) => sum + result.fullMarks, 0);
+            const totalPercentage = totalFullMarks > 0 ? (totalMarks / totalFullMarks) * 100 : 0;
+
+            // Determine result status (pass/fail)
+            const resultStatus = this.determineResultStatus(subjectResults, totalPercentage);
+            
+            // Calculate strongest and weakest subjects
+            let strongestSubject = null;
+            let weakestSubject = null;
+            let subjectsToImprove = [];
+
+            if (subjectResults.length > 0) {
+                // Find strongest subject (highest percentage)
+                const subjectPercentages = subjectResults.map(result => ({
+                    subjectId: result.subjectId,
+                    subjectName: result.subject.name,
+                    percentage: (result.totalMarks / result.fullMarks) * 100
+                }));
+
+                subjectPercentages.sort((a, b) => b.percentage - a.percentage);
+                strongestSubject = subjectPercentages[0]?.subjectName || null;
+                
+                // Find subjects that need improvement (below 50%)
+                subjectsToImprove = subjectPercentages
+                    .filter(s => s.percentage < 50)
+                    .map(s => s.subjectName);
+                    
+                // Find weakest subject
+                weakestSubject = subjectPercentages[subjectPercentages.length - 1]?.subjectName || null;
+            }
+
+            // Get class teacher
             const classTeacher = student.class.teacherClasses[0]?.teacher;
 
             if (!classTeacher) {
-                throw new AppError(400, 'Class teacher not found');
+                console.warn('Class teacher not found for student', studentId);
             }
+
+            // Prepare overall result data
+            const resultData = {
+                studentId,
+                academicYear,
+                term,
+                totalPercentage,
+                status: resultStatus,
+                strongestSubject,
+                subjectsToImprove,
+                rank: null, // Will be calculated separately in a batch process
+                classTeacherId: classTeacher?.id || 1, // Fallback to a default value if needed
+                // Include completion status in the metadata
+                metadata: {
+                    completedSubjects: completedSubjectsCount,
+                    totalSubjects: totalExpectedSubjects,
+                    isComplete,
+                    processingStatus: isComplete ? 'COMPLETE' : 'IN_PROGRESS'
+                }
+            };
 
             // Create or update overall result
             const overallResult = await prisma.overallResult.upsert({
@@ -154,23 +247,13 @@ export class ResultService {
                         term
                     }
                 },
-                update: {
-                    totalPercentage,
-                    status,
-                    classTeacherId: classTeacher.id
-                },
-                create: {
-                    studentId,
-                    academicYear,
-                    term,
-                    totalPercentage,
-                    status,
-                    classTeacherId: classTeacher.id
-                }
+                update: resultData,
+                create: resultData
             });
 
             return overallResult;
         } catch (error) {
+            console.error('Error calculating overall result:', error);
             throw error;
         }
     }
@@ -232,5 +315,44 @@ export class ResultService {
         }
 
         return 'FAILED';
+    }
+
+    /**
+     * Batch process to update all results for a given class, section, academic year and term
+     * @param {number} classId - Class ID
+     * @param {number} sectionId - Section ID
+     * @param {string} academicYear - Academic year (e.g. "2023-2024")
+     * @param {string} term - Term (e.g. "First Term")
+     * @returns {Promise<{updated: number, failed: number}>} - Number of updated and failed records
+     */
+    async recalculateClassResults(classId, sectionId, academicYear, term) {
+        try {
+            // Get all students in this class and section
+            const students = await prisma.student.findMany({
+                where: {
+                    classId,
+                    sectionId
+                }
+            });
+
+            let updated = 0;
+            let failed = 0;
+
+            // Process each student
+            for (const student of students) {
+                try {
+                    await this.calculateOverallResult(student.id, academicYear, term);
+                    updated++;
+                } catch (error) {
+                    console.error(`Failed to update result for student ${student.id}:`, error);
+                    failed++;
+                }
+            }
+
+            return { updated, failed };
+        } catch (error) {
+            console.error('Error in batch recalculation:', error);
+            throw error;
+        }
     }
 } 

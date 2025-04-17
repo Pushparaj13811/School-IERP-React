@@ -148,7 +148,6 @@ model Class {
   teacherClasses TeacherClass[]
   timetables     Timetable[]
   periods        Period[]
-  SubjectResult  SubjectResult[]
   announcements  AnnouncementClass[]
   subjects       ClassSubject[]
 
@@ -427,6 +426,9 @@ model GradeDefinition {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Relations
+  subjectResults SubjectResult[]
+
   @@map("grade_definitions")
 }
 
@@ -449,7 +451,7 @@ model SubjectResult {
   // Relations
   student         Student        @relation(fields: [studentId], references: [id])
   subject         Subject        @relation(fields: [subjectId], references: [id])
-  grade           Class          @relation(fields: [gradeId], references: [id])
+  grade           GradeDefinition @relation(fields: [gradeId], references: [id])
   OverallResult   OverallResult? @relation(fields: [overallResultId], references: [id])
   overallResultId Int?
 
