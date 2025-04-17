@@ -29,6 +29,7 @@ const ClassTeacherAssignment: React.FC = () => {
   const [sections, setSections] = useState<Section[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingSections, setLoadingSections] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -46,17 +47,44 @@ const ClassTeacherAssignment: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
+      setError(null);
+      
       try {
-        // Fetch all required data
-        const [teachersRes, classesRes, assignmentsRes] = await Promise.all([
+        // Fetch teachers and classes data in parallel
+        const [teachersRes, classesRes] = await Promise.all([
           userAPI.getTeachers(),
-          academicAPI.getClasses(),
-          teacherAPI.getClassTeacherAssignments()
+          academicAPI.getClasses()
         ]);
         
-        setTeachers(teachersRes.data.data.teachers);
-        setClasses(classesRes.data.data.classes);
-        setAssignments(assignmentsRes.data.data.assignments);
+        if (teachersRes.data?.status === 'success') {
+          console.log("Teachers loaded:", teachersRes.data.data.teachers);
+          setTeachers(teachersRes.data.data.teachers);
+        } else {
+          setError('Failed to load teachers data');
+        }
+        
+        if (classesRes.data?.status === 'success') {
+          console.log("Classes loaded:", classesRes.data.data.classes);
+          setClasses(classesRes.data.data.classes);
+        } else {
+          setError('Failed to load classes data');
+        }
+
+        // Attempt to fetch assignments separately to handle errors gracefully
+        try {
+          const assignmentsRes = await teacherAPI.getClassTeacherAssignments();
+          if (assignmentsRes.data?.status === 'success') {
+            setAssignments(assignmentsRes.data.data.assignments);
+          } else {
+            console.warn('No assignments data available');
+            setAssignments([]);
+          }
+        } catch (assignmentErr) {
+          console.error('Error fetching assignments:', assignmentErr);
+          // Don't set error here, as we still want to show the form
+          setAssignments([]);
+        }
+        
       } catch (err) {
         console.error('Error fetching data:', err);
         setError('Failed to load data. Please refresh the page.');
@@ -72,13 +100,31 @@ const ClassTeacherAssignment: React.FC = () => {
   useEffect(() => {
     if (formData.classId) {
       const fetchSections = async () => {
+        setLoadingSections(true);
+        setError(null);
+        setSections([]);
+        
         try {
           const classId = parseInt(formData.classId);
+          console.log("Fetching sections for class ID:", classId);
           const res = await academicAPI.getSections(classId);
-          setSections(res.data.data.sections);
+          
+          if (res.data?.status === 'success') {
+            console.log("Sections loaded:", res.data.data.sections);
+            setSections(res.data.data.sections);
+            if (res.data.data.sections.length === 0) {
+              setError('No sections available for this class');
+            }
+          } else {
+            setError('Failed to load sections data');
+            setSections([]);
+          }
         } catch (err) {
           console.error('Error fetching sections:', err);
           setError('Failed to load sections');
+          setSections([]);
+        } finally {
+          setLoadingSections(false);
         }
       };
       
@@ -93,6 +139,9 @@ const ClassTeacherAssignment: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Clear error when user makes selection
+    setError(null);
   };
   
   // Filter handlers
@@ -131,33 +180,37 @@ const ClassTeacherAssignment: React.FC = () => {
         sectionId: parseInt(formData.sectionId)
       });
       
-      // Update assignments list
-      if (existingAssignment) {
-        // Replace the existing assignment
-        setAssignments(prev => 
-          prev.map(a => a.id === existingAssignment.id ? res.data.data.assignment : a)
-        );
+      if (res.data?.status === 'success') {
+        // Update assignments list
+        if (existingAssignment) {
+          // Replace the existing assignment
+          setAssignments(prev => 
+            prev.map(a => a.id === existingAssignment.id ? res.data.data.assignment : a)
+          );
+        } else {
+          // Add the new assignment
+          setAssignments(prev => [...prev, res.data.data.assignment]);
+        }
+        
+        setSuccess('Class teacher assigned successfully');
+        
+        // Reset form after successful submission
+        setFormData({
+          teacherId: '',
+          classId: '',
+          sectionId: ''
+        });
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setSuccess(null);
+        }, 3000);
       } else {
-        // Add the new assignment
-        setAssignments(prev => [...prev, res.data.data.assignment]);
+        setError('Failed to assign class teacher: ' + (res.data.message || 'Unknown error'));
       }
-      
-      setSuccess('Class teacher assigned successfully');
-      
-      // Reset form after successful submission
-      setFormData({
-        teacherId: '',
-        classId: '',
-        sectionId: ''
-      });
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccess(null);
-      }, 3000);
     } catch (err) {
       console.error('Error assigning class teacher:', err);
-      setError('Failed to assign class teacher');
+      setError('Failed to assign class teacher. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -168,22 +221,26 @@ const ClassTeacherAssignment: React.FC = () => {
     if (!confirmDialog.assignmentId) return;
     
     try {
-      await teacherAPI.removeClassTeacherAssignment(confirmDialog.assignmentId);
+      const res = await teacherAPI.removeClassTeacherAssignment(confirmDialog.assignmentId);
       
-      // Remove the assignment from the list
-      setAssignments(prev => 
-        prev.filter(a => a.id !== confirmDialog.assignmentId)
-      );
-      
-      setSuccess('Class teacher assignment removed successfully');
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccess(null);
-      }, 3000);
+      if (res.data?.status === 'success') {
+        // Remove the assignment from the list
+        setAssignments(prev => 
+          prev.filter(a => a.id !== confirmDialog.assignmentId)
+        );
+        
+        setSuccess('Class teacher assignment removed successfully');
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setSuccess(null);
+        }, 3000);
+      } else {
+        setError('Failed to remove class teacher assignment: ' + (res.data.message || 'Unknown error'));
+      }
     } catch (err) {
       console.error('Error removing class teacher assignment:', err);
-      setError('Failed to remove class teacher assignment');
+      setError('Failed to remove class teacher assignment. Please try again.');
     } finally {
       setConfirmDialog({ open: false, assignmentId: 0 });
     }
@@ -235,15 +292,16 @@ const ClassTeacherAssignment: React.FC = () => {
                 value={formData.teacherId}
                 onChange={handleInputChange}
                 className="w-full p-2 border rounded-md"
-                disabled={saving}
+                disabled={saving || loading}
               >
                 <option value="">Select Teacher</option>
-                {teachers.map(teacher => (
-                  <option key={teacher.id} value={teacher.id}>
-                    {teacher.name} - {teacher.designation?.name || 'Teacher'}
+                {teachers && teachers.length > 0 ? teachers.map(teacher => (
+                  <option key={teacher.id} value={teacher.id.toString()}>
+                    {teacher.name} {teacher.designation?.name ? `- ${teacher.designation.name}` : ''}
                   </option>
-                ))}
+                )) : <option value="" disabled>No teachers available</option>}
               </select>
+              {loading && <p className="text-sm text-gray-500 mt-1">Loading teachers...</p>}
             </div>
             
             <div>
@@ -256,15 +314,16 @@ const ClassTeacherAssignment: React.FC = () => {
                 value={formData.classId}
                 onChange={handleInputChange}
                 className="w-full p-2 border rounded-md"
-                disabled={saving}
+                disabled={saving || loading}
               >
                 <option value="">Select Class</option>
-                {classes.map(cls => (
-                  <option key={cls.id} value={cls.id}>
+                {classes && classes.length > 0 ? classes.map(cls => (
+                  <option key={cls.id} value={cls.id.toString()}>
                     {cls.name}
                   </option>
-                ))}
+                )) : <option value="" disabled>No classes available</option>}
               </select>
+              {loading && <p className="text-sm text-gray-500 mt-1">Loading classes...</p>}
             </div>
             
             <div>
@@ -277,16 +336,17 @@ const ClassTeacherAssignment: React.FC = () => {
                 value={formData.sectionId}
                 onChange={handleInputChange}
                 className="w-full p-2 border rounded-md"
-                disabled={saving || !formData.classId || sections.length === 0}
+                disabled={saving || !formData.classId || loadingSections}
               >
                 <option value="">Select Section</option>
-                {sections.map(section => (
-                  <option key={section.id} value={section.id}>
+                {sections && sections.length > 0 ? sections.map(section => (
+                  <option key={section.id} value={section.id.toString()}>
                     {section.name}
                   </option>
-                ))}
+                )) : <option value="" disabled>{formData.classId ? (loadingSections ? "Loading sections..." : "No sections available") : "Select a class first"}</option>}
               </select>
-              {formData.classId && sections.length === 0 && (
+              {loadingSections && <p className="text-sm text-gray-500 mt-1">Loading sections...</p>}
+              {formData.classId && sections.length === 0 && !loadingSections && (
                 <p className="text-sm text-red-500 mt-1">No sections available for this class</p>
               )}
             </div>
@@ -296,7 +356,9 @@ const ClassTeacherAssignment: React.FC = () => {
             <button
               type="submit"
               className={`px-4 py-2 rounded-md text-white ${
-                saving ? 'bg-gray-400 cursor-not-allowed' : 'bg-primary hover:bg-primary/90'
+                saving || !formData.teacherId || !formData.classId || !formData.sectionId
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-primary hover:bg-primary/90'
               }`}
               disabled={saving || !formData.teacherId || !formData.classId || !formData.sectionId}
             >
@@ -329,11 +391,11 @@ const ClassTeacherAssignment: React.FC = () => {
               className="p-2 border rounded-md"
             >
               <option value="">All Classes</option>
-              {classes.map(cls => (
-                <option key={cls.id} value={cls.id}>
+              {classes && classes.length > 0 ? classes.map(cls => (
+                <option key={cls.id} value={cls.id.toString()}>
                   {cls.name}
                 </option>
-              ))}
+              )) : <option value="" disabled>No classes available</option>}
             </select>
           </div>
         </div>
@@ -400,7 +462,7 @@ const ClassTeacherAssignment: React.FC = () => {
           </div>
         ) : (
           <div className="text-center py-8 text-gray-500">
-            No class teacher assignments found.
+            {error ? 'Error loading assignments. Please try refreshing the page.' : 'No class teacher assignments found.'}
           </div>
         )}
       </div>
