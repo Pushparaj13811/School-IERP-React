@@ -244,7 +244,7 @@ const Leave: React.FC = () => {
                   ${
                     selected
                       ? 'bg-[#292648] text-white shadow'
-                      : 'text-[#292648] hover:bg-[#D2E5FC]'
+                      : 'text-blue-50 hover:bg-[#D2E5FC]'
                   }`
                 }
               >
@@ -256,7 +256,7 @@ const Leave: React.FC = () => {
                   ${
                     selected
                       ? 'bg-[#292648] text-white shadow'
-                      : 'text-[#292648] hover:bg-[#D2E5FC]'
+                      : 'text-blue-50 hover:bg-[#D2E5FC]'
                   }`
                 }
               >
@@ -268,7 +268,7 @@ const Leave: React.FC = () => {
                   ${
                     selected
                       ? 'bg-[#292648] text-white shadow'
-                      : 'text-[#292648] hover:bg-[#D2E5FC]'
+                      : 'text-blue-50 hover:bg-[#D2E5FC]'
                   }`
                 }
               >
