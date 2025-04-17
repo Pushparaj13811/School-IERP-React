@@ -78,6 +78,19 @@ interface Leave {
   user?: { name: string };
 }
 
+interface OverallResult {
+  id: number;
+  studentId: number;
+  academicYear: string;
+  term: string;
+  totalPercentage: number;
+  status: string; 
+  rank?: number | string;
+  strongestSubject?: string;
+  subjectsToImprove?: string[];
+  classTeacherId: number;
+}
+
 // Create axios instance with default config
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1', // Update this with your backend URL
@@ -220,6 +233,7 @@ export const attendanceAPI = {
 // Result API
 export const resultAPI = {
     getResults: (params: Record<string, unknown>) => api.get<ApiResponse<{ results: Result[] }>>('/results/subject', { params }),
+    getOverallResult: (params: Record<string, unknown>) => api.get<ApiResponse<{ result: OverallResult }>>('/results/overall', { params }),
     createResult: (data: Record<string, unknown>) => api.post<ApiResponse<{ result: Result }>>('/results/subject', data),
     updateResult: (id: string, data: Record<string, unknown>) => api.put<ApiResponse<{ result: Result }>>(`/results/${id}`, data),
     recalculateResults: (data: Record<string, unknown>) => api.post<ApiResponse<{ message: string }>>('/results/recalculate', data),
