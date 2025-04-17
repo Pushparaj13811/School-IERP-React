@@ -51,7 +51,8 @@ class ResultService {
                     name: student.name,
                     theoryMarks: 0,
                     practicalMarks: 0,
-                    isEditable: true
+                    isEditable: true,
+                    isLocked: false  // Initialize with unlocked status
                 }));
                 
                 // Sort students by roll number
@@ -79,27 +80,59 @@ class ResultService {
         
         try {
             console.log(`Checking for existing results for subject ${subjectId}, year ${academicYear}, term ${term}`);
-            const existingResults = await resultAPI.getResults({
-                subjectId,
-                academicYear,
-                term
-            });
             
-            console.log("Existing results response:", existingResults.data);
+            // Create an array to hold updated students
+            const updatedStudents: Student[] = [...students];
             
-            if (existingResults.data?.status === 'success' && 
-                existingResults.data.data.results && 
-                Array.isArray(existingResults.data.data.results) &&
-                existingResults.data.data.results.length > 0) {
-                
-                // Map existing results to students
-                const updatedStudents = this.processExistingResults(students, existingResults.data.data.results);
-                
-                console.log("Updated students with existing results:", updatedStudents);
-                return updatedStudents;
+            // Fetch results for each student individually to ensure we get the correct lock status
+            for (let i = 0; i < students.length; i++) {
+                const student = students[i];
+                try {
+                    const existingResult = await resultAPI.getResults({
+                        studentId: student.id,
+                        subjectId,
+                        academicYear,
+                        term
+                    });
+                    
+                    console.log(`API response for student ${student.id}:`, JSON.stringify(existingResult.data));
+                    
+                    if (existingResult.data?.status === 'success' && 
+                        existingResult.data.data.results && 
+                        Array.isArray(existingResult.data.data.results) &&
+                        existingResult.data.data.results.length > 0) {
+                        
+                        // Get the first result (should only be one for this combination)
+                        const result = existingResult.data.data.results[0] as unknown as ResultData;
+                        
+                        // Check if the result is locked - explicitly handle the value
+                        let isLocked = true; // Default to locked for safety
+                        if (result.isLocked === false) {
+                            isLocked = false;
+                        }
+                        
+                        console.log(`Student ${student.id} result has isLocked=${isLocked}, raw value:`, 
+                            typeof result.isLocked, result.isLocked);
+                        
+                        // Update the student with the result data
+                        updatedStudents[i] = {
+                            ...student,
+                            theoryMarks: typeof result.theoryMarks === 'number' ? result.theoryMarks : 0,
+                            practicalMarks: typeof result.practicalMarks === 'number' ? result.practicalMarks : 0,
+                            isEditable: !isLocked, // Set editable based on lock status
+                            isLocked: isLocked // Store lock status
+                        };
+                        
+                        console.log(`Updated student ${student.id}:`, updatedStudents[i]);
+                    } else {
+                        console.log(`No results found for student ${student.id}`);
+                    }
+                } catch (error) {
+                    console.error(`Error fetching results for student ${student.id}:`, error);
+                }
             }
             
-            return students;
+            return updatedStudents;
         } catch (error) {
             console.error('Error fetching existing results:', error);
             // Return original students array if there was an error
