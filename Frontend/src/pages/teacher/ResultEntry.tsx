@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Button from '../../components/ui/Button';
 import { FaSave, FaLock, FaUnlock, FaSync } from 'react-icons/fa';
-import { academicAPI } from '../../services/api';
+import { academicAPI, resultAPI } from '../../services/api';
 import { Class, Section, Subject, Teacher } from '../../types/api';
 import teacherService from '../../services/teacherService';
 import resultService, { Student } from '../../services/resultService';
@@ -150,6 +150,23 @@ const ResultEntry: React.FC = () => {
             setIsLoading(true);
             setError(null);
             
+            // For debugging - directly check the API response
+            if (selectedSubject) {
+                try {
+                    // Directly get one student to test
+                    const directTest = await resultAPI.getResults({
+                        classId: selectedClass,
+                        sectionId: selectedSection,
+                        subjectId: selectedSubject,
+                        academicYear,
+                        term
+                    });
+                    console.log("DIRECT API TEST:", JSON.stringify(directTest.data, null, 2));
+                } catch (e) {
+                    console.error("Debug direct API test failed:", e);
+                }
+            }
+
             // First fetch students for the selected class and section
             const fetchedStudents = await resultService.getStudentsForClassAndSection(
                 selectedClass, 
@@ -175,6 +192,16 @@ const ResultEntry: React.FC = () => {
                 );
                 
                 setStudents(updatedStudents);
+                
+                // Additional debug logging
+                console.log("Final students state after update:", 
+                    updatedStudents.map(s => ({
+                        id: s.id,
+                        name: s.name,
+                        isLocked: s.isLocked,
+                        isEditable: s.isEditable
+                    }))
+                );
             }
         } catch (error) {
             console.error('Error fetching students and results:', error);
@@ -245,6 +272,13 @@ const ResultEntry: React.FC = () => {
             return;
         }
 
+        // Check if there are any editable results
+        const editableStudents = students.filter(student => student.isEditable);
+        if (editableStudents.length === 0) {
+            setError("No editable results to save. Please unlock results first.");
+            return;
+        }
+
         setIsSaving(true);
         setSaveStatus(null);
         setError(null);
@@ -260,9 +294,15 @@ const ResultEntry: React.FC = () => {
             );
             
             if (success) {
-                // Mark as locked after successful save
-                setStudents(students.map(student => ({ ...student, isEditable: false })));
+                // Mark as locked after successful save, but preserve the admin lock status
+                setStudents(students.map(student => ({
+                    ...student,
+                    isEditable: student.isLocked ? false : false // Always set to false, but keep this format for clarity
+                })));
                 setSaveStatus('success');
+                
+                // Refresh the results to ensure the UI reflects the current state
+                await fetchStudentsAndResults();
             } else {
                 setSaveStatus('error');
                 setError("Failed to save all results. Please try again.");
@@ -551,13 +591,20 @@ const ResultEntry: React.FC = () => {
                                         />
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        {student.isEditable ? (
+                                        {student.isLocked ? (
+                                            <span className="text-red-600 flex items-center gap-1">
+                                                <FaLock /> Locked
+                                                <small className="ml-2 text-gray-500">(isLocked={String(student.isLocked)})</small>
+                                            </span>
+                                        ) : student.isEditable ? (
                                             <span className="text-green-600 flex items-center gap-1">
                                                 <FaUnlock /> Editable
+                                                <small className="ml-2 text-gray-500">(isLocked={String(student.isLocked)})</small>
                                             </span>
                                         ) : (
                                             <span className="text-red-600 flex items-center gap-1">
                                                 <FaLock /> Locked
+                                                <small className="ml-2 text-gray-500">(isLocked={String(student.isLocked)})</small>
                                             </span>
                                         )}
                                     </td>
