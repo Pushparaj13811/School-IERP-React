@@ -185,7 +185,21 @@ export const createTeacher = async (req, res, next) => {
 
 export const getStudents = async (req, res, next) => {
     try {
+        const { classId, sectionId } = req.query;
+        
+        // Build where clause based on provided filters
+        const whereClause = {};
+        
+        if (classId) {
+            whereClause.classId = Number(classId);
+        }
+        
+        if (sectionId) {
+            whereClause.sectionId = Number(sectionId);
+        }
+        
         const students = await prisma.student.findMany({
+            where: whereClause,
             include: {
                 user: true,
                 class: true,
