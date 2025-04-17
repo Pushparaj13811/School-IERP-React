@@ -18,7 +18,9 @@ const Attendance = lazy(() => import('../pages/student/Attendance'));
 const Holiday = lazy(() => import('../pages/student/Holiday'));
 const Achievement = lazy(() => import('../pages/student/Achievement'));
 const Result = lazy(() => import('../pages/student/Result'));
-const Leave = lazy(() => import('../pages/student/Leave'));
+const StudentLeave = lazy(() => import('../pages/student/Leave'));
+const TeacherLeave = lazy(() => import('../pages/teacher/Leave'));
+const AdminLeave = lazy(() => import('../pages/admin/Leave'));
 const LeaveApplicationCreate = lazy(() => import('../pages/student/LeaveApplicationCreate'));
 const Feedback = lazy(() => import('../pages/student/Feedback'));
 const TimeTable = lazy(() => import('../pages/student/TimeTable'));
@@ -123,13 +125,22 @@ export const routes: Route[] = [
   },
   {
     path: '/leave',
-    component: Leave,
-    roles: [UserRole.STUDENT, UserRole.TEACHER],
+    component: ({ user }: RouteComponentProps) => {
+      switch (user?.role) {
+        case UserRole.ADMIN:
+          return <AdminLeave />;
+        case UserRole.TEACHER:
+          return <TeacherLeave />;
+        default:
+          return <StudentLeave />;
+      }
+    },
+    roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN],
   },
   {
     path: '/leave/create',
     component: LeaveApplicationCreate,
-    roles: [UserRole.STUDENT, UserRole.TEACHER],
+    roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN],
   },
   {
     path: '/feedback',
