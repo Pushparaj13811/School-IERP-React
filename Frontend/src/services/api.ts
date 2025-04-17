@@ -204,6 +204,7 @@ export const academicAPI = {
 // Announcement API
 export const announcementAPI = {
     getAll: () => api.get<ApiResponse<{ announcements: Announcement[] }>>('/announcements'),
+    getById: (id: string) => api.get<ApiResponse<{ announcement: Announcement }>>(`/announcements/${id}`),
     create: (data: Record<string, unknown>) => api.post<ApiResponse<{ announcement: Announcement }>>('/announcements', data),
     update: (id: string, data: Record<string, unknown>) => api.put<ApiResponse<{ announcement: Announcement }>>(`/announcements/${id}`, data),
     delete: (id: string) => api.delete<ApiResponse<object>>(`/announcements/${id}`),
