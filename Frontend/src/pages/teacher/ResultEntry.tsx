@@ -1,41 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import Button from '../../components/ui/Button';
 import { FaSave, FaLock, FaUnlock } from 'react-icons/fa';
-import { academicAPI, resultAPI, userAPI } from '../../services/api';
-import { Class, Section, Subject, Student as StudentType, Teacher } from '../../types/api';
-
-interface Student {
-    id: number;
-    rollNo: string;
-    name: string;
-    theoryMarks: number;
-    practicalMarks: number;
-    isEditable: boolean;
-}
-
-// Define interface for teacher subject wrapper
-interface TeacherSubjectWrapper {
-    subject?: Subject;
-    class?: Class;
-    section?: Section;
-    id?: number;
-    name?: string;
-    code?: string;
-    [key: string]: unknown;
-}
-
-// Define interface for result data
-interface ResultData {
-    id?: number;
-    studentId: number;
-    subjectId?: number;
-    academicYear?: string;
-    term?: string;
-    theoryMarks?: number;
-    practicalMarks?: number;
-    isAbsent?: boolean;
-    [key: string]: unknown;
-}
+import { academicAPI } from '../../services/api';
+import { Class, Section, Subject, Teacher } from '../../types/api';
+import teacherService from '../../services/teacherService';
+import resultService, { Student } from '../../services/resultService';
 
 const ResultEntry: React.FC = () => {
     const [classes, setClasses] = useState<Class[]>([]);
@@ -62,42 +31,24 @@ const ResultEntry: React.FC = () => {
             try {
                 setIsLoading(true);
                 setError(null);
-                console.log("Fetching teacher profile...");
                 
-                const response = await userAPI.getProfile();
-                console.log("Full profile response:", response);
+                const teacher = await teacherService.getTeacherProfile();
                 
-                // Log the exact structure to find where teacher data is
-                const responseData = response.data;
-                console.log("Response data structure:", JSON.stringify(responseData, null, 2));
-                
-                if (responseData?.status === 'success') {
-                    // Type assertion to access the nested structure safely
-                    const userData = responseData.data as { user?: { teacher?: Teacher } };
-                    
-                    if (userData?.user?.teacher) {
-                        console.log("Teacher data found:", userData.user.teacher);
-                        setTeacherData(userData.user.teacher);
-                    } else {
-                        console.error("Teacher data not found in response");
-                        console.log("Looking for teacher data in:", responseData.data);
-                        
-                        // Fallback: fetch classes directly from API if we can't get teacher data
-                        try {
-                            const classesResponse = await academicAPI.getClasses();
-                            if (classesResponse.data?.status === 'success') {
-                                setClasses(classesResponse.data.data.classes);
-                                console.log("Loaded all classes as fallback");
-                            }
-                        } catch (error) {
-                            console.error("Failed to load classes:", error);
-                        }
-                        
-                        setError("Could not find teacher data. Showing all classes instead.");
-                    }
+                if (teacher) {
+                    setTeacherData(teacher);
                 } else {
-                    console.error("API response was not successful");
-                    setError("Failed to load teacher profile. Please try again.");
+                    // Fallback: fetch classes directly from API if we can't get teacher data
+                    try {
+                        const classesResponse = await academicAPI.getClasses();
+                        if (classesResponse.data?.status === 'success') {
+                            setClasses(classesResponse.data.data.classes);
+                            console.log("Loaded all classes as fallback");
+                        }
+                    } catch (error) {
+                        console.error("Failed to load classes:", error);
+                    }
+                    
+                    setError("Could not find teacher data. Showing all classes instead.");
                 }
             } catch (error) {
                 console.error('Error fetching teacher profile:', error);
@@ -112,91 +63,37 @@ const ResultEntry: React.FC = () => {
 
     // Fetch teacher's assigned classes based on teacher data
     useEffect(() => {
-        if (!teacherData) return;
+        const fetchTeacherClasses = async () => {
+            try {
+                const teacherClasses = await teacherService.getAssignedClasses(teacherData);
+                if (teacherClasses.length > 0) {
+                    setClasses(teacherClasses);
+                } else {
+                    setError("No classes assigned to this teacher");
+                }
+            } catch (error) {
+                console.error('Error processing teacher classes:', error);
+                setError("Error processing assigned classes");
+            }
+        };
         
-        try {
-            console.log("Processing teacher classes from:", teacherData);
-            
-            // Check for classes array and its structure
-            if (!teacherData.classes || !Array.isArray(teacherData.classes)) {
-                console.error("No classes array found in teacher data");
-                setError("No classes assigned to this teacher");
-                return;
-            }
-            
-            // Extract classes assigned to the teacher
-            const teacherClasses = teacherData.classes
-                .map(c => {
-                    // Log the class object to debug its structure
-                    console.log("Class entry:", c);
-                    
-                    if (c && typeof c === 'object') {
-                        // Check if it has a class property
-                        if ('class' in c && c.class) {
-                            return c.class;
-                        }
-                        // Or if it already has the class structure directly
-                        else if ('id' in c && 'name' in c) {
-                            return c;
-                        }
-                    }
-                    return null;
-                })
-                .filter((c): c is Class => c !== null);
-            
-            console.log("Extracted teacher classes:", teacherClasses);
-            
-            if (teacherClasses.length > 0) {
-                setClasses(teacherClasses);
-            } else {
-                console.error("No valid classes found in teacher data");
-                setError("No classes assigned to this teacher");
-            }
-        } catch (error) {
-            console.error('Error processing teacher classes:', error);
-            setError("Error processing assigned classes");
+        if (teacherData) {
+            fetchTeacherClasses();
         }
     }, [teacherData]);
 
     // Fetch sections when a class is selected
     useEffect(() => {
         const fetchSections = async () => {
-            if (!selectedClass) return;
-            
             try {
                 setIsLoading(true);
                 setError(null);
-                console.log("Fetching sections for class ID:", selectedClass);
                 
-                // Check for sections array and its structure if teacher data is available
-                if (teacherData?.sections && Array.isArray(teacherData.sections)) {
-                    // Get sections for class that teacher is assigned to
-                    const filteredSections = teacherData.sections
-                        .map(s => {
-                            if (s && typeof s === 'object' && 'section' in s && s.section) {
-                                return s.section;
-                            }
-                            return null;
-                        })
-                        .filter((s): s is Section => s !== null && s.classId === selectedClass);
-                    
-                    console.log("Filtered teacher sections:", filteredSections);
-                    
-                    if (filteredSections.length > 0) {
-                        setSections(filteredSections);
-                        return;
-                    }
-                }
+                const sectionsList = await teacherService.getSectionsForClass(selectedClass, teacherData);
                 
-                // Fallback: fetch all sections for the class
-                console.log("No matching sections found in teacher data, fetching from API");
-                const response = await academicAPI.getSections(selectedClass);
-                console.log("Sections API response:", response.data);
-                
-                if (response.data?.status === 'success') {
-                    setSections(response.data.data.sections);
+                if (sectionsList.length > 0) {
+                    setSections(sectionsList);
                 } else {
-                    console.error("Failed to load sections from API");
                     setError("No sections available for this class");
                 }
             } catch (error) {
@@ -207,113 +104,27 @@ const ResultEntry: React.FC = () => {
             }
         };
 
-        fetchSections();
+        if (selectedClass) {
+            fetchSections();
+        } else {
+            setSections([]);
+        }
     }, [selectedClass, teacherData]);
 
     // Fetch subjects for the selected class
     useEffect(() => {
         const fetchSubjects = async () => {
-            if (!selectedClass) return;
-            
             try {
                 setIsLoading(true);
                 setError(null);
-                console.log("Fetching subjects for class ID:", selectedClass);
                 
-                // Check teacher's assigned subjects if teacher data is available
-                if (teacherData?.subjects) {
-                    console.log("Teacher subjects:", teacherData.subjects);
+                const subjectsList = await teacherService.getSubjectsForClass(selectedClass, teacherData);
+                
+                if (subjectsList.length > 0) {
+                    setSubjects(subjectsList);
                 } else {
-                    console.log("No subjects found in teacher data");
-                }
-                
-                // Get subjects for this specific class from API
-                console.log("Getting class-specific subjects");
-                const classSubjectsResponse = await academicAPI.getSubjectsByClass(selectedClass);
-                console.log("Class subjects response:", classSubjectsResponse);
-                
-                // Since we're not sure about the exact shape, let's handle multiple possibilities
-                let classSubjects: Subject[] = [];
-                
-                // Handle the case where the response directly contains data in success/data format
-                if (typeof classSubjectsResponse === 'object' && classSubjectsResponse !== null) {
-                    if ('success' in classSubjectsResponse && 
-                        classSubjectsResponse.success && 
-                        Array.isArray(classSubjectsResponse.data)) {
-                        classSubjects = classSubjectsResponse.data;
-                    }
-                    // Handle the case with nested data structure
-                    else if ('data' in classSubjectsResponse && 
-                             typeof classSubjectsResponse.data === 'object' && 
-                             classSubjectsResponse.data !== null) {
-                        const dataObj = classSubjectsResponse.data;
-                        
-                        // If data.data is an array, use it directly
-                        if ('data' in dataObj && Array.isArray(dataObj.data)) {
-                            classSubjects = dataObj.data;
-                        }
-                        // If data.data.subjects exists and is an array, use that
-                        else if ('data' in dataObj && 
-                                 typeof dataObj.data === 'object' && 
-                                 dataObj.data !== null &&
-                                 'subjects' in dataObj.data && 
-                                 Array.isArray(dataObj.data.subjects)) {
-                            classSubjects = dataObj.data.subjects;
-                        }
-                    }
-                }
-                
-                console.log("Processed class subjects:", classSubjects);
-                
-                if (classSubjects.length === 0) {
-                    console.error("No subjects found for this class");
                     setError("No subjects available for this class");
-                    return;
                 }
-                
-                // If we have teacher data with subjects, filter by teacher's assigned subjects
-                if (teacherData?.subjects && Array.isArray(teacherData.subjects)) {
-                    const teacherSubjects: Subject[] = [];
-                    
-                    // Process teacherData.subjects based on its structure
-                    teacherData.subjects.forEach((s: unknown) => {
-                        // Log to inspect the structure
-                        console.log("Teacher subject entry:", s);
-                        
-                        if (typeof s === 'object' && s !== null) {
-                            const subjectWrapper = s as TeacherSubjectWrapper;
-                            
-                            // If it's a direct Subject object
-                            if ('id' in subjectWrapper && 'name' in subjectWrapper) {
-                                teacherSubjects.push(subjectWrapper as unknown as Subject);
-                            }
-                            // If it's a wrapper with a subject property
-                            else if ('subject' in subjectWrapper && typeof subjectWrapper.subject === 'object' && subjectWrapper.subject !== null) {
-                                teacherSubjects.push(subjectWrapper.subject);
-                            }
-                        }
-                    });
-                    
-                    console.log("Processed teacher subjects:", teacherSubjects);
-                    
-                    if (teacherSubjects.length > 0) {
-                        // Find subjects that are both assigned to the teacher AND for this class
-                        const teacherSubjectIds = new Set(teacherSubjects.map(s => s.id));
-                        const assignedSubjects = classSubjects.filter(s => teacherSubjectIds.has(s.id));
-                        
-                        console.log("Assigned subjects for this class:", assignedSubjects);
-                        
-                        if (assignedSubjects.length > 0) {
-                            setSubjects(assignedSubjects);
-                            return;
-                        }
-                    }
-                }
-                
-                // Fallback: if we couldn't filter by teacher's subjects, show all subjects for the class
-                setSubjects(classSubjects);
-                console.log("Showing all class subjects as fallback");
-                
             } catch (error) {
                 console.error('Error fetching subjects:', error);
                 setError("Error loading subjects");
@@ -322,78 +133,51 @@ const ResultEntry: React.FC = () => {
             }
         };
 
-        fetchSubjects();
+        if (selectedClass) {
+            fetchSubjects();
+        } else {
+            setSubjects([]);
+        }
     }, [selectedClass, teacherData]);
 
-    // Function to fetch students for the selected class and section
-    const fetchStudents = async () => {
+    // Function to fetch students and existing results
+    const fetchStudentsAndResults = async () => {
         if (!selectedClass || !selectedSection) return;
         
         try {
             setIsLoading(true);
             setError(null);
-            console.log(`Fetching students for class ${selectedClass}, section ${selectedSection}`);
             
-            // Ensure we're fetching students from the specific class and section
-            const response = await userAPI.getStudents({
-                classId: selectedClass,
-                sectionId: selectedSection
-            });
+            // First fetch students for the selected class and section
+            const fetchedStudents = await resultService.getStudentsForClassAndSection(
+                selectedClass, 
+                selectedSection
+            );
             
-            console.log("Students API response:", response.data);
-            
-            if (response.data?.status === 'success' && Array.isArray(response.data.data.students)) {
-                const fetchedStudents = response.data.data.students.map((student: StudentType) => ({
-                    id: student.id,
-                    rollNo: student.rollNo || '',
-                    name: student.name,
-                    theoryMarks: 0,
-                    practicalMarks: 0,
-                    isEditable: true
-                }));
-                
-                // Sort students by roll number
-                fetchedStudents.sort((a, b) => a.rollNo.localeCompare(b.rollNo));
-                console.log("Fetched and sorted students:", fetchedStudents);
-                
-                setStudents(fetchedStudents);
-                
-                // Only try to fetch existing results if a subject is selected
-                if (selectedSubject) {
-                    // Try to fetch existing results if any
-                    try {
-                        console.log(`Checking for existing results for subject ${selectedSubject}, year ${academicYear}, term ${term}`);
-                        const existingResults = await resultAPI.getResults({
-                            subjectId: selectedSubject,
-                            academicYear,
-                            term
-                        });
-                        
-                        console.log("Existing results response:", existingResults.data);
-                        
-                        if (existingResults.data?.status === 'success' && 
-                            existingResults.data.data.results && 
-                            Array.isArray(existingResults.data.data.results) &&
-                            existingResults.data.data.results.length > 0) {
-                            
-                            // Map existing results to students
-                            const updatedStudents = processExistingResults(fetchedStudents, existingResults.data.data.results);
-                            
-                            setStudents(updatedStudents);
-                            console.log("Updated students with existing results:", updatedStudents);
-                        }
-                    } catch (error) {
-                        console.error('Error fetching existing results:', error);
-                        // Don't set error state here, as we still want to show students
-                    }
-                }
-            } else {
-                console.error("Failed to load students or empty response");
+            if (fetchedStudents.length === 0) {
                 setError("No students found in this class and section");
+                setStudents([]);
+                return;
+            }
+            
+            // Set initial student list
+            setStudents(fetchedStudents);
+            
+            // If a subject is selected, check for existing results
+            if (selectedSubject) {
+                const updatedStudents = await resultService.getExistingResults(
+                    fetchedStudents,
+                    selectedSubject,
+                    academicYear,
+                    term
+                );
+                
+                setStudents(updatedStudents);
             }
         } catch (error) {
-            console.error('Error fetching students:', error);
+            console.error('Error fetching students and results:', error);
             setError("Error loading students");
+            setStudents([]);
         } finally {
             setIsLoading(false);
         }
@@ -407,7 +191,7 @@ const ResultEntry: React.FC = () => {
             return;
         }
         
-        fetchStudents();
+        fetchStudentsAndResults();
     }, [selectedClass, selectedSection, selectedSubject, academicYear, term]);
 
     const handleClassChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -433,7 +217,7 @@ const ResultEntry: React.FC = () => {
         
         // Refetch students to get updated results for this subject
         if (selectedClass && selectedSection) {
-            fetchStudents();
+            fetchStudentsAndResults();
         }
     };
 
@@ -464,34 +248,23 @@ const ResultEntry: React.FC = () => {
         setError(null);
 
         try {
-            // Create result data for each student
-            const results = students.map(student => ({
-                studentId: student.id,
-                subjectId: selectedSubject as number,
+            const success = await resultService.saveResults(
+                students,
+                selectedSubject,
                 academicYear,
                 term,
                 fullMarks,
-                passMarks,
-                theoryMarks: student.theoryMarks,
-                practicalMarks: student.practicalMarks,
-                isAbsent: false // Add UI for marking absent if needed
-            }));
-
-            console.log("Saving results:", results);
-            
-            // Save each result
-            const savePromises = results.map(result => 
-                resultAPI.createResult(result)
+                passMarks
             );
-
-            const saveResponses = await Promise.all(savePromises);
-            console.log("Save responses:", saveResponses);
             
-            // Mark as locked after successful save
-            setStudents(students.map(student => ({ ...student, isEditable: false })));
-            
-            setSaveStatus('success');
-            console.log('Results saved successfully');
+            if (success) {
+                // Mark as locked after successful save
+                setStudents(students.map(student => ({ ...student, isEditable: false })));
+                setSaveStatus('success');
+            } else {
+                setSaveStatus('error');
+                setError("Failed to save all results. Please try again.");
+            }
         } catch (error) {
             console.error('Error saving results:', error);
             setSaveStatus('error');
@@ -500,28 +273,6 @@ const ResultEntry: React.FC = () => {
             setIsSaving(false);
         }
     };
-
-    const processExistingResults = (fetchedStudents: Student[], results: unknown[]) => {
-        return fetchedStudents.map(student => {
-            // Type assert the result to our ResultData interface
-            const existingResult = results.find(r => {
-                const result = r as ResultData;
-                return result.studentId === student.id;
-            });
-            
-            if (existingResult) {
-                const result = existingResult as ResultData;
-                console.log(`Found existing result for student ${student.id}:`, result);
-                return {
-                    ...student,
-                    theoryMarks: typeof result.theoryMarks === 'number' ? result.theoryMarks : 0,
-                    practicalMarks: typeof result.practicalMarks === 'number' ? result.practicalMarks : 0,
-                    isEditable: false // Lock edited marks
-                };
-            }
-            return student;
-        });
-    }
 
     if (isLoading && !teacherData) {
         return <div className="flex justify-center items-center h-64">Loading teacher data...</div>;
