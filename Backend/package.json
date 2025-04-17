@@ -8,7 +8,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "seed": "node src/scripts/seedClassesAndSections.js",
+    "seed": "node prisma/seed.js",
+    "seed:classes": "node src/scripts/seedClassesAndSections.js",
     "seed:admin": "node src/seeds/adminSeeder.js",
     "seed:designations": "node src/scripts/seed-designations.js",
     "seed:subjects": "node src/scripts/seed-subjects.js"
@@ -48,5 +49,8 @@
   "devDependencies": {
     "nodemon": "^3.1.9",
     "prettier": "^3.5.2"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   }
 }
