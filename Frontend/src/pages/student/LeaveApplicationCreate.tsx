@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { format } from "date-fns";
 import LeaveApplicationForm from "../../components/common/LeaveApplicationForm";
 import { leaveAPI } from "../../services/api";
 
@@ -33,6 +34,18 @@ const LeaveApplicationCreate: React.FC = () => {
     
     if (!formData.leaveTypeId) {
       toast.error("Please select a leave type");
+      return;
+    }
+
+    // Extra validation for dates
+    const today = format(new Date(), "yyyy-MM-dd");
+    if (formData.fromDate < today) {
+      toast.error("Cannot apply for leave in the past");
+      return;
+    }
+
+    if (formData.toDate < formData.fromDate) {
+      toast.error("End date cannot be before start date");
       return;
     }
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { format } from 'date-fns';
+import { format, isAfter, parseISO } from 'date-fns';
 import { attendanceAPI, userAPI, teacherAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { Student as ApiStudent } from '../../types/api';
@@ -70,6 +70,9 @@ const Attendance: React.FC = () => {
   const [dialogOpen, setDialogOpen] = useState<boolean>(false);
   const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
   const [remarkText, setRemarkText] = useState<string>('');
+  const [holidays, setHolidays] = useState<{date: string, name: string}[]>([]);
+  const [isHoliday, setIsHoliday] = useState<boolean>(false);
+  const [holidayName, setHolidayName] = useState<string>('');
 
   // Fetch classes assigned to the teacher as class teacher and their students
   useEffect(() => {
@@ -146,8 +149,17 @@ const Attendance: React.FC = () => {
         setStudents(allStudents);
         setGroupedStudents(newGroupedStudents);
         
-        // Fetch attendance for all students on the selected date
+        // Fetch attendance data for all students on the selected date
         fetchAttendanceData(allStudents, assignments);
+        
+        // Mock holidays until API endpoint is available
+        // This would be replaced with the actual API call when implemented
+        const mockHolidays = [
+          { date: '2025-04-14', name: 'New Year Holiday' },
+          { date: '2025-04-25', name: 'School Foundation Day' },
+          { date: '2025-04-30', name: 'Labor Day' }
+        ];
+        setHolidays(mockHolidays);
         
       } catch (err) {
         console.error('Error fetching class teacher data:', err);
@@ -160,12 +172,37 @@ const Attendance: React.FC = () => {
     fetchClassTeacherData();
   }, [user]);
 
-  // Fetch attendance data when date changes
+  // Check if selected date is a holiday or in future when date changes
   useEffect(() => {
-    if (students.length > 0 && assignedClasses.length > 0) {
-      fetchAttendanceData(students, assignedClasses);
+    // Check if selected date is in the future
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDateObj = parseISO(selectedDate);
+    
+    if (isAfter(selectedDateObj, today)) {
+      setError('Cannot mark attendance for future dates');
+      return;
     }
-  }, [selectedDate]);
+
+    // Check if selected date is a holiday
+    const holiday = holidays.find(h => h.date === selectedDate);
+    if (holiday) {
+      setIsHoliday(true);
+      setHolidayName(holiday.name);
+      setError(`Cannot mark attendance on ${holiday.name} (Holiday)`);
+    } else {
+      setIsHoliday(false);
+      setHolidayName('');
+      setError(null);
+    }
+
+    // Fetch attendance data if date is valid
+    if (!isAfter(selectedDateObj, today) && !holiday) {
+      if (students.length > 0 && assignedClasses.length > 0) {
+        fetchAttendanceData(students, assignedClasses);
+      }
+    }
+  }, [selectedDate, holidays, students, assignedClasses]);
 
   const fetchAttendanceData = async (studentsList: Student[], assignments: ClassTeacherAssignment[]) => {
     try {
@@ -239,7 +276,20 @@ const Attendance: React.FC = () => {
   };
 
   const handleDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedDate(event.target.value);
+    const newDate = event.target.value;
+    
+    // Validate date is not in the future
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDateObj = parseISO(newDate);
+    
+    if (isAfter(selectedDateObj, today)) {
+      setError('Cannot mark attendance for future dates');
+    } else {
+      setError(null);
+    }
+    
+    setSelectedDate(newDate);
   };
 
   const handleStatusChange = (studentId: number, status: 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'EXCUSED') => {
@@ -276,6 +326,22 @@ const Attendance: React.FC = () => {
 
   const saveAttendance = async () => {
     try {
+      // Validate date is not in the future
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selectedDateObj = parseISO(selectedDate);
+      
+      if (isAfter(selectedDateObj, today)) {
+        setError('Cannot mark attendance for future dates');
+        return;
+      }
+
+      // Check if selected date is a holiday
+      if (isHoliday) {
+        setError(`Cannot mark attendance on ${holidayName} (Holiday)`);
+        return;
+      }
+
       setSaving(true);
       setError(null);
       setSuccess(null);
@@ -295,11 +361,23 @@ const Attendance: React.FC = () => {
       const savePromises = Object.entries(recordsByClass).map(async ([key, records]) => {
         const [classId, sectionId] = key.split('-').map(Number);
         
+        // Log the data being sent to help debug
+        console.log(`Saving attendance for class ${classId}, section ${sectionId}:`, {
+          date: selectedDate,
+          classId,
+          sectionId,
+          attendanceData: records.map(({ studentId, status, remarks }) => ({
+            studentId,
+            status,
+            remarks
+          }))
+        });
+        
         await attendanceAPI.markDailyAttendance({
           date: selectedDate,
           classId,
           sectionId,
-          attendance: records.map(({ studentId, status, remarks }) => ({
+          attendanceData: records.map(({ studentId, status, remarks }) => ({
             studentId,
             status,
             remarks
@@ -357,15 +435,21 @@ const Attendance: React.FC = () => {
               value={selectedDate}
               onChange={handleDateChange}
               className="w-full p-2 border rounded-md"
+              max={format(new Date(), 'yyyy-MM-dd')} // Prevent selecting future dates
             />
+            {isHoliday && (
+              <p className="mt-1 text-sm text-red-500">
+                Holiday: {holidayName}
+              </p>
+            )}
           </div>
           
           <div>
             <button
               onClick={saveAttendance}
-              disabled={saving || students.length === 0}
+              disabled={saving || students.length === 0 || isHoliday || isAfter(parseISO(selectedDate), new Date())}
               className={`px-4 py-2 rounded-md text-white flex items-center gap-2 ${
-                saving || students.length === 0
+                saving || students.length === 0 || isHoliday || isAfter(parseISO(selectedDate), new Date())
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-primary hover:bg-primary/90'
               }`}
