@@ -19,7 +19,6 @@ export class UserService {
                         parent: true,
                         address: true,
                         profilePicture: true,
-                        subjectAttendance: true,
                         monthlyAttendance: true,
                         subjectResults: {
                             include: {
