@@ -498,7 +498,6 @@ model LeaveType {
 
 model LeaveApplication {
   id            Int           @id @default(autoincrement())
-  applicantId   Int // ID of the person applying (student/teacher)
   applicantType ApplicantType
   leaveTypeId   Int
   subject       String
@@ -509,11 +508,16 @@ model LeaveApplication {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
+  // Separate nullable foreign keys for each type
+  studentId     Int?
+  teacherId     Int?
+  adminId       Int?
+
   // Relations
   leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
-  student   Student?  @relation("StudentLeaveApplications", fields: [applicantId], references: [id], map: "leave_applications_student_fkey")
-  teacher   Teacher?  @relation("TeacherLeaveApplications", fields: [applicantId], references: [id], map: "leave_applications_teacher_fkey")
-  admin     Admin?    @relation("AdminLeaveApplications", fields: [applicantId], references: [id], map: "leave_applications_admin_fkey")
+  student   Student?  @relation("StudentLeaveApplications", fields: [studentId], references: [id])
+  teacher   Teacher?  @relation("TeacherLeaveApplications", fields: [teacherId], references: [id])
+  admin     Admin?    @relation("AdminLeaveApplications", fields: [adminId], references: [id])
 
   @@map("leave_applications")
 }

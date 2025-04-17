@@ -18,54 +18,119 @@ export const createLeaveApplication = async (req, res, next) => {
             return next(new AppError(400, 'Missing required fields'));
         }
         
-        // Determine the applicant type based on the user's role
-        let applicantType;
-        let applicantId;
+        // Verify leaveType exists
+        const leaveTypeExists = await prisma.leaveType.findUnique({
+            where: { id: Number(leaveTypeId) }
+        });
+
+        if (!leaveTypeExists) {
+            return next(new AppError(404, 'Leave type not found'));
+        }
         
+        let leaveApplication;
+        const baseData = {
+            subject,
+            fromDate: new Date(fromDate),
+            toDate: new Date(toDate),
+            description,
+            status: 'PENDING',
+            leaveType: { 
+                connect: { id: Number(leaveTypeId) } 
+            }
+        };
+        
+        // Handle applicant type based on user role
         switch (req.user.role) {
             case 'STUDENT':
-                applicantType = 'STUDENT';
-                applicantId = req.user.student.id;
+                const studentId = req.user.student.id;
+                
+                // Verify student exists
+                const studentExists = await prisma.student.findUnique({
+                    where: { id: studentId }
+                });
+                
+                if (!studentExists) {
+                    return next(new AppError(404, 'Student record not found. Please contact admin'));
+                }
+                
+                // Create student leave application with proper connect syntax
+                leaveApplication = await prisma.leaveApplication.create({
+                    data: {
+                        ...baseData,
+                        applicantType: 'STUDENT',
+                        student: { connect: { id: studentId } } // Use connect instead of direct ID
+                    },
+                    include: {
+                        leaveType: true,
+                        student: {
+                            include: {
+                                class: true,
+                                section: true
+                            }
+                        }
+                    }
+                });
                 break;
+                
             case 'TEACHER':
-                applicantType = 'TEACHER';
-                applicantId = req.user.teacher.id;
+                const teacherId = req.user.teacher.id;
+                
+                // Verify teacher exists
+                const teacherExists = await prisma.teacher.findUnique({
+                    where: { id: teacherId }
+                });
+                
+                if (!teacherExists) {
+                    return next(new AppError(404, 'Teacher record not found. Please contact admin'));
+                }
+                
+                // Create teacher leave application with proper connect syntax
+                leaveApplication = await prisma.leaveApplication.create({
+                    data: {
+                        ...baseData,
+                        applicantType: 'TEACHER',
+                        teacher: { connect: { id: teacherId } } // Use connect instead of direct ID
+                    },
+                    include: {
+                        leaveType: true,
+                        teacher: {
+                            include: {
+                                designation: true
+                            }
+                        }
+                    }
+                });
                 break;
+                
             case 'ADMIN':
-                applicantType = 'ADMIN';
-                applicantId = req.user.admin.id;
+                const adminId = req.user.admin.id;
+                
+                // Verify admin exists
+                const adminExists = await prisma.admin.findUnique({
+                    where: { id: adminId }
+                });
+                
+                if (!adminExists) {
+                    return next(new AppError(404, 'Admin record not found. Please contact system administrator'));
+                }
+                
+                // Create admin leave application with proper connect syntax
+                leaveApplication = await prisma.leaveApplication.create({
+                    data: {
+                        ...baseData,
+                        applicantType: 'ADMIN',
+                        admin: { connect: { id: adminId } } // Use connect instead of direct ID
+                    },
+                    include: {
+                        leaveType: true,
+                        admin: true
+                    }
+                });
                 break;
+                
             default:
                 return next(new AppError(400, 'Invalid user role for leave application'));
         }
-        
-        // Create the leave application
-        const leaveApplication = await prisma.leaveApplication.create({
-            data: {
-                leaveTypeId: Number(leaveTypeId),
-                subject,
-                fromDate: new Date(fromDate),
-                toDate: new Date(toDate),
-                description,
-                applicantId,
-                applicantType,
-                status: 'PENDING'
-            },
-            include: {
-                leaveType: true,
-                student: {
-                    include: {
-                        class: true,
-                        section: true
-                    }
-                },
-                teacher: {
-                    include: {
-                        designation: true
-                    }
-                }
-            }
-        });
         
         res.status(201).json({
             status: 'success',
@@ -121,7 +186,7 @@ export const getLeaveApplications = async (req, res, next) => {
         switch (req.user.role) {
             case 'STUDENT':
                 // Students can only see their own applications
-                where.applicantId = req.user.student.id;
+                where.studentId = req.user.student.id;
                 where.applicantType = 'STUDENT';
                 break;
                 
@@ -160,7 +225,7 @@ export const getLeaveApplications = async (req, res, next) => {
                         return next(new AppError(403, 'You do not teach this student'));
                     }
                     
-                    where.applicantId = Number(studentId);
+                    where.studentId = Number(studentId);
                     where.applicantType = 'STUDENT';
                 } else if (classId && sectionId) {
                     // Check if teacher teaches this class/section
@@ -191,7 +256,7 @@ export const getLeaveApplications = async (req, res, next) => {
                         select: { id: true }
                     });
                     
-                    where.applicantId = {
+                    where.studentId = {
                         in: students.map(s => s.id)
                     };
                     where.applicantType = 'STUDENT';
@@ -200,7 +265,7 @@ export const getLeaveApplications = async (req, res, next) => {
                     where.OR = [
                         // Teacher's own applications
                         {
-                            applicantId: req.user.teacher.id,
+                            teacherId: req.user.teacher.id,
                             applicantType: 'TEACHER'
                         },
                         // Students' applications from classes they teach
@@ -231,10 +296,10 @@ export const getLeaveApplications = async (req, res, next) => {
                 // Admin can see all applications
                 // Admin can filter by specific teacher or student
                 if (teacherId) {
-                    where.applicantId = Number(teacherId);
+                    where.teacherId = Number(teacherId);
                     where.applicantType = 'TEACHER';
                 } else if (studentId) {
-                    where.applicantId = Number(studentId);
+                    where.studentId = Number(studentId);
                     where.applicantType = 'STUDENT';
                 } else if (classId) {
                     // Get all students in this class
@@ -246,7 +311,7 @@ export const getLeaveApplications = async (req, res, next) => {
                         select: { id: true }
                     });
                     
-                    where.applicantId = {
+                    where.studentId = {
                         in: students.map(s => s.id)
                     };
                     where.applicantType = 'STUDENT';
@@ -327,7 +392,7 @@ export const getLeaveApplicationById = async (req, res, next) => {
                 // Students can only view their own applications
                 if (
                     leaveApplication.applicantType !== 'STUDENT' || 
-                    leaveApplication.applicantId !== req.user.student.id
+                    leaveApplication.studentId !== req.user.student.id
                 ) {
                     return next(new AppError(403, 'You can only view your own leave applications'));
                 }
@@ -336,7 +401,7 @@ export const getLeaveApplicationById = async (req, res, next) => {
             case 'TEACHER':
                 // Teachers can view their own applications or those of students they teach
                 if (leaveApplication.applicantType === 'TEACHER') {
-                    if (leaveApplication.applicantId !== req.user.teacher.id) {
+                    if (leaveApplication.teacherId !== req.user.teacher.id) {
                         return next(new AppError(403, 'You can only view your own leave applications'));
                     }
                 } else if (leaveApplication.applicantType === 'STUDENT') {
@@ -421,7 +486,7 @@ export const updateLeaveStatus = async (req, res, next) => {
                 // Students can only cancel their own applications
                 if (
                     leaveApplication.applicantType !== 'STUDENT' || 
-                    leaveApplication.applicantId !== req.user.student.id
+                    leaveApplication.studentId !== req.user.student.id
                 ) {
                     return next(new AppError(403, 'You can only update your own leave applications'));
                 }
@@ -440,7 +505,7 @@ export const updateLeaveStatus = async (req, res, next) => {
                 // Teachers can approve/reject student applications (if they teach the class)
                 // Or cancel their own pending applications
                 if (leaveApplication.applicantType === 'TEACHER') {
-                    if (leaveApplication.applicantId !== req.user.teacher.id) {
+                    if (leaveApplication.teacherId !== req.user.teacher.id) {
                         return next(new AppError(403, 'You can only update your own leave applications'));
                     }
                     
