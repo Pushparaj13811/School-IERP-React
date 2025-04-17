@@ -15,6 +15,7 @@ const ParentProfile = lazy(() => import('../pages/parent/Profile'));
 const AdminProfile = lazy(() => import('../pages/admin/Profile'));
 
 const Attendance = lazy(() => import('../pages/student/Attendance'));
+const TeacherAttendance = lazy(() => import('../pages/teacher/Attendance'));
 const Holiday = lazy(() => import('../pages/student/Holiday'));
 const Achievement = lazy(() => import('../pages/student/Achievement'));
 const Result = lazy(() => import('../pages/student/Result'));
@@ -37,6 +38,7 @@ const StudentsList = lazy(() => import('../pages/admin/StudentsList'));
 const TeachersList = lazy(() => import('../pages/admin/TeachersList'));
 const ParentsList = lazy(() => import('../pages/admin/ParentsList'));
 const ManageResults = lazy(() => import('../pages/admin/ManageResults'));
+const ClassTeacherAssignment = lazy(() => import('../pages/admin/ClassTeacherAssignment'));
 
 const ResultEntry = lazy(() => import('../pages/teacher/ResultEntry'));
 const CreateAnnouncementTeacher = lazy(() => import('../pages/teacher/CreateAnnouncement'));
@@ -95,7 +97,14 @@ export const routes: Route[] = [
   },
   {
     path: '/attendance',
-    component: Attendance,
+    component: ({user} : RouteComponentProps) => {
+      switch (user?.role) {
+        case UserRole.TEACHER:
+          return <TeacherAttendance />;
+        default:
+          return <Attendance />;
+      }
+    },
     roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.PARENT],
   },
   {
@@ -189,6 +198,11 @@ export const routes: Route[] = [
     roles: [UserRole.ADMIN],
   },
   {
+    path: '/class-teacher-assignment',
+    component: ClassTeacherAssignment,
+    roles: [UserRole.ADMIN],
+  },
+  {
     path: 'teachers/add-teacher',
     component: AddTeacher,
     roles: [UserRole.ADMIN],
@@ -275,6 +289,7 @@ export const routeGroups = [
     icon: 'bi-gear-fill',
     routes: [
       '/manage-results',
+      '/class-teacher-assignment',
       '/report'
     ],
   },
