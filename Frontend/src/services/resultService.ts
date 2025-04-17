@@ -115,28 +115,63 @@ class ResultService {
     ): Promise<boolean> {
         try {
             // Create result data for each student
-            const results = students.map(student => ({
-                studentId: student.id,
-                subjectId,
-                academicYear,
-                term,
-                fullMarks,
-                passMarks,
-                theoryMarks: student.theoryMarks,
-                practicalMarks: student.practicalMarks,
-                isAbsent: false // Add UI for marking absent if needed
-            }));
+            const results = students.map(student => {
+                // Calculate total marks (theory + practical)
+                const totalMarks = student.theoryMarks + student.practicalMarks;
+                
+                // Calculate percentage for grading
+                const percentage = (totalMarks / fullMarks) * 100;
+                
+                // Create a simple grade scheme directly instead of using gradeId
+                let grade = '';
+                if (percentage >= 90) grade = 'A+';
+                else if (percentage >= 80) grade = 'A';
+                else if (percentage >= 70) grade = 'B+';
+                else if (percentage >= 60) grade = 'B';
+                else if (percentage >= 50) grade = 'C+';
+                else if (percentage >= 40) grade = 'C';
+                else grade = 'F';
+                
+                return {
+                    studentId: student.id,
+                    subjectId,
+                    academicYear,
+                    term,
+                    fullMarks,
+                    passMarks,
+                    theoryMarks: student.theoryMarks,
+                    practicalMarks: student.practicalMarks,
+                    totalMarks,
+                    totalPercentage: percentage,
+                    grade, // Send grade as string
+                    isAbsent: false
+                };
+            });
 
             console.log("Saving results:", results);
             
-            // Save each result
+            // Save each result - use POST request directly with manually constructed parameters
             const savePromises = results.map(result => 
                 resultAPI.createResult(result)
             );
 
-            await Promise.all(savePromises);
-            console.log('Results saved successfully');
-            return true;
+            const responses = await Promise.all(savePromises.map(promise => 
+                promise.catch(error => {
+                    console.error('Error in individual result save:', error.response?.data || error.message);
+                    return { error };
+                })
+            ));
+
+            // Check if all saves were successful
+            const allSuccessful = responses.every(res => !res.error);
+            
+            if (allSuccessful) {
+                console.log('All results saved successfully');
+                return true;
+            } else {
+                console.log('Some results failed to save');
+                return false;
+            }
         } catch (error) {
             console.error('Error saving results:', error);
             throw error;
