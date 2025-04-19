@@ -5,8 +5,8 @@ interface TimetableGridProps {
   periodGrid: TimetableRow[] | null;
   onDeletePeriod: (periodId: number) => Promise<void>;
 }
-
-const TimetableGrid: React.FC<TimetableGridProps> = ({ periodGrid, onDeletePeriod }) => {
+  
+const TimetableGrid: React.FC<TimetableGridProps> = ({ periodGrid}) => {
   if (!periodGrid || periodGrid.length === 0) {
     return (
       <div className="p-4 bg-blue-50 text-blue-800 rounded-md">
@@ -14,12 +14,6 @@ const TimetableGrid: React.FC<TimetableGridProps> = ({ periodGrid, onDeletePerio
       </div>
     );
   }
-
-  const handleDelete = async (period: Period) => {
-    if (window.confirm('Are you sure you want to delete this period?')) {
-      await onDeletePeriod(period.id);
-    }
-  };
 
   return (
     <div className="overflow-x-auto">
@@ -59,12 +53,6 @@ const TimetableGrid: React.FC<TimetableGridProps> = ({ periodGrid, onDeletePerio
                       <div className="text-xs text-gray-600">
                         {(row[day] as Period).teacher.user?.name || (row[day] as Period).teacher.name}
                       </div>
-                      <button
-                        className="absolute top-2 right-2 text-red-500 hover:text-red-700"
-                        onClick={() => handleDelete(row[day] as Period)}
-                      >
-                        <span className="text-xs">×</span>
-                      </button>
                     </div>
                   ) : row.timeSlot.isBreak ? (
                     <span className="text-xs text-gray-500">Break</span>
