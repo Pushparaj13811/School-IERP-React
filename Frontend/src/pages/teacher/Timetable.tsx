@@ -1,86 +1,13 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { useAuth } from '../../context/AuthContext';  
-
-// Define API URL since config file can't be found
-const API_URL = 'http://localhost:3000';
-
-interface Subject {
-  id: number;
-  name: string;
-  code: string;
-}
-
-interface Teacher {
-  id: number;
-  name: string;
-  email: string;
-}
-
-interface TimeSlot {
-  id: number;
-  startTime: string;
-  endTime: string;
-  isBreak: boolean;
-  breakType: string | null;
-}
-
-interface Timetable {
-  id: number;
-  classId: number;
-  sectionId: number;
-  academicYear: string;
-  term: string;
-  class?: {
-    name: string;
-  };
-  section?: {
-    name: string;
-  };
-  periods?: Period[];
-}
-
-interface Period {
-  id: number;
-  dayOfWeek: number;
-  timeSlotId: number;
-  subjectId: number;
-  teacherId: number;
-  classId: number;
-  sectionId: number;
-  timetableId: number;
-  timeSlot: TimeSlot;
-  subject: Subject;
-  teacher: {
-    id: number;
-    name: string;
-    user?: {
-      name: string;
-      firstName?: string;
-      lastName?: string;
-    };
-  };
-}
-
-interface ClassTeacherAssignment {
-  id: number;
-  teacherId: number;
-  classId: number;
-  sectionId: number;
-  teacher: {
-    id: number;
-    name: string;
-    email: string;
-  };
-  class: {
-    id: number;
-    name: string;
-  };
-  section: {
-    id: number;
-    name: string;
-  };
-}
+import { useAuth } from '../../context/AuthContext';
+import timetableService, { 
+  Subject, 
+  Teacher, 
+  TimeSlot, 
+  Period, 
+  Timetable, 
+  ClassTeacherAssignment
+} from '../../services/timetableService';
 
 interface TeacherTimetable {
   teacher: {
@@ -90,18 +17,8 @@ interface TeacherTimetable {
   schedule: {
     [key: string]: {
       periodId: number;
-      timeSlot: {
-        id: number;
-        startTime: string;
-        endTime: string;
-        isBreak: boolean;
-        breakType: string | null;
-      };
-      subject: {
-        id: number;
-        name: string;
-        code: string;
-      };
+      timeSlot: TimeSlot;
+      subject: Subject;
       class: {
         id: number;
         name: string;
@@ -114,18 +31,6 @@ interface TeacherTimetable {
       term: string;
     }[];
   };
-}
-
-// Custom type for grid row
-interface TimetableRow {
-  timeSlot: TimeSlot;
-  [key: string]: Period | TimeSlot | null;
-}
-
-interface ApiResponse<T> {
-  status: string;
-  data: T;
-  message?: string;
 }
 
 // Update the User interface to include teacherId
@@ -167,6 +72,18 @@ const TeacherTimetable: React.FC = () => {
   // Loading states
   const [loading, setLoading] = useState<boolean>(true);
   
+  // Helper function to show alerts
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    setAlertMessage(message);
+    setAlertType(type);
+    setShowAlert(true);
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      setShowAlert(false);
+    }, 5000);
+  };
+  
   // Fetch teacher data and timetable
   useEffect(() => {
     const fetchData = async () => {
@@ -174,66 +91,62 @@ const TeacherTimetable: React.FC = () => {
         setLoading(true);
         
         if (!user || !user.teacherId) {
-          setAlertMessage('No teacher data found for this user');
-          setAlertType('error');
-          setShowAlert(true);
+          showNotification('No teacher data found for this user', 'error');
           setLoading(false);
           return;
         }
         
-        // Get token from localStorage
-        const token = localStorage.getItem('token');
-        if (!token) {
-          setAlertMessage('Authentication token not found');
-          setAlertType('error');
-          setShowAlert(true);
-          setLoading(false);
-          return;
+        // Get teacher data
+        const teacherId = parseInt(user.teacherId);
+        
+        // Fetch teacher data (assuming the teacher is in the teachers list)
+        const teachersList = await timetableService.getTeachers();
+        const teacher = teachersList.find(t => t.id === teacherId);
+        if (teacher) {
+          setTeacherData(teacher);
         }
         
-        // Fetch teacher data
-        const teacherResponse = await axios.get(`${API_URL}/api/v1/teachers/${user.teacherId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const teacherData = (teacherResponse.data as ApiResponse<{teacher: Teacher}>).data.teacher;
-        setTeacherData(teacherData);
-        
-        // Fetch teacher timetable
-        const timetableResponse = await axios.get(`${API_URL}/api/v1/timetables/teacher`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const teacherTimetableData = (timetableResponse.data as ApiResponse<TeacherTimetable>).data;
-        setTeacherTimetable(teacherTimetableData);
+        // Fetch teacher timetable (API endpoint through service)
+        try {
+          // Note: We need to add this method to the timetableService
+          const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/v1/timetables/teacher`, {
+            headers: { 
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch teacher timetable');
+          }
+          
+          const data = await response.json();
+          if (data.status === 'success') {
+            setTeacherTimetable(data.data);
+          }
+        } catch (error) {
+          console.error('Error fetching teacher timetable:', error);
+        }
         
         // Fetch class teacher assignments
-        const assignmentsResponse = await axios.get(`${API_URL}/api/v1/teachers/class-teachers?teacherId=${user.teacherId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const assignments = await timetableService.getClassTeachers();
+        const teacherAssignments = assignments.filter(a => a.teacherId === teacherId);
+        setClassTeacherAssignments(teacherAssignments);
+        setIsClassTeacher(teacherAssignments.length > 0);
         
-        const assignmentsData = (assignmentsResponse.data as ApiResponse<{assignments: ClassTeacherAssignment[]}>).data;
-        const assignments = assignmentsData.assignments || [];
-        setClassTeacherAssignments(assignments);
-        setIsClassTeacher(assignments.length > 0);
-        
-        if (assignments.length > 0) {
-          setSelectedAssignment(assignments[0]);
+        if (teacherAssignments.length > 0) {
+          setSelectedAssignment(teacherAssignments[0]);
           
           // Fetch additional data for class teacher
-          const [subjectsResponse, teachersResponse, timeSlotsResponse] = await Promise.all([
-            axios.get(`${API_URL}/api/v1/subjects`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-            axios.get(`${API_URL}/api/v1/teachers`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
-            axios.get(`${API_URL}/api/v1/timetables/timeslots`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }),
+          const [subjectsList, teachersList, timeSlotsList] = await Promise.all([
+            timetableService.getSubjects(),
+            timetableService.getTeachers(),
+            timetableService.getTimeSlots()
           ]);
           
-          setSubjects((subjectsResponse.data as ApiResponse<{subjects: Subject[]}>).data.subjects);
-          setTeachers((teachersResponse.data as ApiResponse<{teachers: Teacher[]}>).data.teachers);
-          setTimeSlots((timeSlotsResponse.data as ApiResponse<TimeSlot[]>).data);
+          setSubjects(subjectsList);
+          setTeachers(teachersList);
+          setTimeSlots(timeSlotsList);
           
           // Get current academic year and term (could be from a settings API)
           const academicYear = "2023-2024";
@@ -241,14 +154,13 @@ const TeacherTimetable: React.FC = () => {
           
           // Try to fetch timetable for the assigned class/section
           try {
-            const timetableResponse = await axios.get(
-              `${API_URL}/api/v1/timetables/query?classId=${assignments[0].classId}&sectionId=${assignments[0].sectionId}&academicYear=${academicYear}&term=${term}`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              }
+            const timetableData = await timetableService.getTimetable(
+              teacherAssignments[0].classId,
+              teacherAssignments[0].sectionId,
+              academicYear,
+              term
             );
             
-            const timetableData = (timetableResponse.data as ApiResponse<Timetable>).data;
             if (timetableData) {
               setTimetable(timetableData);
             }
@@ -261,9 +173,7 @@ const TeacherTimetable: React.FC = () => {
         setLoading(false);
       } catch (error) {
         console.error('Error fetching teacher data:', error);
-        setAlertMessage('Error fetching data. Please try again.');
-        setAlertType('error');
-        setShowAlert(true);
+        showNotification('Error fetching data. Please try again.', 'error');
         setLoading(false);
       }
     };
@@ -281,20 +191,15 @@ const TeacherTimetable: React.FC = () => {
     const academicYear = "2023-2024";
     const term = "First Term";
     
-    // Get token from localStorage
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    
     // Try to fetch timetable for the selected class/section
     try {
-      const timetableResponse = await axios.get(
-        `${API_URL}/api/v1/timetables/query?classId=${assignment.classId}&sectionId=${assignment.sectionId}&academicYear=${academicYear}&term=${term}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const timetableData = await timetableService.getTimetable(
+        assignment.classId,
+        assignment.sectionId,
+        academicYear,
+        term
       );
       
-      const timetableData = (timetableResponse.data as ApiResponse<Timetable>).data;
       if (timetableData) {
         setTimetable(timetableData);
       } else {
@@ -317,35 +222,22 @@ const TeacherTimetable: React.FC = () => {
       const academicYear = "2023-2024";
       const term = "First Term";
       
-      // Get token from localStorage
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      
-      const response = await axios.post(
-        `${API_URL}/api/v1/timetables`,
-        {
-          classId: selectedAssignment.classId,
-          sectionId: selectedAssignment.sectionId,
-          academicYear,
-          term,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const timetableData = await timetableService.createTimetable(
+        selectedAssignment.classId,
+        selectedAssignment.sectionId,
+        academicYear,
+        term
       );
       
-      const timetableData = (response.data as ApiResponse<Timetable>).data;
-      setTimetable(timetableData);
-      setAlertMessage('Timetable created successfully');
-      setAlertType('success');
-      setShowAlert(true);
+      if (timetableData) {
+        setTimetable(timetableData);
+        showNotification('Timetable created successfully', 'success');
+      }
       
       setLoading(false);
     } catch (error) {
       console.error('Error creating timetable:', error);
-      setAlertMessage('Error creating timetable. Please try again.');
-      setAlertType('error');
-      setShowAlert(true);
+      showNotification('Error creating timetable. Please try again.', 'error');
       setLoading(false);
     }
   };
@@ -363,64 +255,68 @@ const TeacherTimetable: React.FC = () => {
   };
   
   const handleAddPeriod = async () => {
-    if (!timetable || !selectedDay || !selectedTimeSlot || !selectedSubject || !selectedTeacher) {
-      setAlertMessage('Please fill all required fields');
-      setAlertType('error');
-      setShowAlert(true);
+    if (!timetable || !selectedDay || selectedTimeSlot === '' || selectedSubject === '' || selectedTeacher === '') {
+      showNotification('Please fill all required fields', 'error');
       return;
     }
     
     try {
       setLoading(true);
       
-      // Get token from localStorage
-      const token = localStorage.getItem('token');
-      if (!token) return;
+      // Convert selectedDay to dayOfWeek number
+      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayOfWeek = daysOfWeek.indexOf(selectedDay);
       
-      await axios.post(
-        `${API_URL}/api/v1/timetables/period`,
-        {
-          timetableId: timetable.id,
-          dayOfWeek: selectedDay,
-          timeSlotId: selectedTimeSlot,
-          subjectId: selectedSubject,
-          teacherId: selectedTeacher,
-          classId: timetable.classId,
-          sectionId: timetable.sectionId,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      if (dayOfWeek === -1) {
+        throw new Error('Invalid day selected');
+      }
+      
+      const success = await timetableService.addPeriod(
+        timetable.id,
+        dayOfWeek,
+        Number(selectedTimeSlot),
+        Number(selectedSubject),
+        Number(selectedTeacher),
+        timetable.classId,
+        timetable.sectionId
       );
       
-      // Refresh timetable data
-      const updatedTimetable = await axios.get(
-        `${API_URL}/api/v1/timetables/id/${timetable.id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
+      if (success) {
+        // Refresh timetable data
+        const updatedTimetable = await timetableService.getTimetableById(timetable.id);
+        if (updatedTimetable) {
+          setTimetable(updatedTimetable);
         }
-      );
-      
-      const timetableData = (updatedTimetable.data as ApiResponse<Timetable>).data;
-      setTimetable(timetableData);
-      setAlertMessage('Period added successfully');
-      setAlertType('success');
-      setShowAlert(true);
-      
-      // Also refresh teacher's own timetable view
-      const timetableResponse = await axios.get(`${API_URL}/api/v1/timetables/teacher`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const teacherTimetableData = (timetableResponse.data as ApiResponse<TeacherTimetable>).data;
-      setTeacherTimetable(teacherTimetableData);
+        showNotification('Period added successfully', 'success');
+        
+        // Also refresh teacher's own timetable view
+        try {
+          // Note: We need to add this method to the timetableService
+          const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/v1/timetables/teacher`, {
+            headers: { 
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch teacher timetable');
+          }
+          
+          const data = await response.json();
+          if (data.status === 'success') {
+            setTeacherTimetable(data.data);
+          }
+        } catch (error) {
+          console.error('Error refreshing teacher timetable:', error);
+        }
+      }
       
       handleClosePeriodDialog();
       setLoading(false);
     } catch (error) {
       console.error('Error adding period:', error);
-      setAlertMessage('Error adding period. Please try again.');
-      setAlertType('error');
-      setShowAlert(true);
+      showNotification('Error adding period. Please try again.', 'error');
       setLoading(false);
     }
   };
@@ -433,43 +329,46 @@ const TeacherTimetable: React.FC = () => {
     try {
       setLoading(true);
       
-      // Get token from localStorage
-      const token = localStorage.getItem('token');
-      if (!token) return;
+      const success = await timetableService.deletePeriod(periodId);
       
-      await axios.delete(`${API_URL}/api/v1/timetables/period/${periodId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      // Refresh timetable data
-      if (timetable) {
-        const updatedTimetable = await axios.get(
-          `${API_URL}/api/v1/timetables/id/${timetable.id}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
+      if (success) {
+        // Refresh timetable data
+        if (timetable) {
+          const updatedTimetable = await timetableService.getTimetableById(timetable.id);
+          if (updatedTimetable) {
+            setTimetable(updatedTimetable);
           }
-        );
+        }
         
-        const timetableData = (updatedTimetable.data as ApiResponse<Timetable>).data;
-        setTimetable(timetableData);
+        // Also refresh teacher's own timetable view
+        try {
+          // Note: We need to add this method to the timetableService
+          const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/v1/timetables/teacher`, {
+            headers: { 
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch teacher timetable');
+          }
+          
+          const data = await response.json();
+          if (data.status === 'success') {
+            setTeacherTimetable(data.data);
+          }
+        } catch (error) {
+          console.error('Error refreshing teacher timetable:', error);
+        }
+        
+        showNotification('Period deleted successfully', 'success');
       }
       
-      // Also refresh teacher's own timetable view
-      const timetableResponse = await axios.get(`${API_URL}/api/v1/timetables/teacher`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const teacherTimetableData = (timetableResponse.data as ApiResponse<TeacherTimetable>).data;
-      setTeacherTimetable(teacherTimetableData);
-      
-      setAlertMessage('Period deleted successfully');
-      setAlertType('success');
-      setShowAlert(true);
       setLoading(false);
     } catch (error) {
       console.error('Error deleting period:', error);
-      setAlertMessage('Error deleting period. Please try again.');
-      setAlertType('error');
-      setShowAlert(true);
+      showNotification('Error deleting period. Please try again.', 'error');
       setLoading(false);
     }
   };
@@ -480,39 +379,7 @@ const TeacherTimetable: React.FC = () => {
       return null;
     }
     
-    const daysOfWeek = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-    
-    // Create a grid with time slots as rows and days as columns
-    const grid = timeSlots.map((timeSlot) => {
-      const row: TimetableRow = {
-        timeSlot,
-      };
-      
-      // Initialize each day with null
-      daysOfWeek.forEach((day) => {
-        row[day] = null;
-      });
-      
-      // Fill in periods where they exist
-      timetable.periods!.forEach((period) => {
-        if (period.timeSlotId === timeSlot.id) {
-          const day = daysOfWeek[period.dayOfWeek];
-          row[day] = period;
-        }
-      });
-      
-      return row;
-    });
-    
-    return grid;
+    return timetableService.organizePeriodsForDisplay(timetable, timeSlots);
   };
   
   const periodGrid = organizePeriodsForDisplay();

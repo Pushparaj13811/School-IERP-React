@@ -4,6 +4,7 @@ import PeriodDialog from '../../components/timetable/PeriodDialog';
 import TimeSlotDialog from '../../components/timetable/TimeSlotDialog';
 import TimetableGrid from '../../components/timetable/TimetableGrid';
 import TimeSlotList from '../../components/timetable/TimeSlotList';
+import Button from '../../components/ui/Button';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -44,10 +45,10 @@ const ManageTimetable: React.FC = () => {
 
   // Period form states
   const [periodDialogOpen, setPeriodDialogOpen] = useState(false);
-  
+
   // Time slot form states
   const [timeSlotDialogOpen, setTimeSlotDialogOpen] = useState(false);
-  
+
   // Alert states
   const [alert, setAlert] = useState({
     open: false,
@@ -63,7 +64,7 @@ const ManageTimetable: React.FC = () => {
     const fetchInitialData = async () => {
       try {
         setLoading(true);
-        
+
         // Load all needed data in parallel
         const [classesData, subjectsData, teachersData, timeSlotsData] = await Promise.all([
           timetableService.getClasses(),
@@ -71,7 +72,7 @@ const ManageTimetable: React.FC = () => {
           timetableService.getTeachers(),
           timetableService.getTimeSlots()
         ]);
-        
+
         setClasses(classesData);
         setSubjects(subjectsData);
         setTeachers(teachersData);
@@ -175,14 +176,14 @@ const ManageTimetable: React.FC = () => {
 
     try {
       setLoading(true);
-      
+
       const timetableData = await timetableService.createTimetable(
         Number(selectedClass),
         Number(selectedSection),
         academicYear,
         term
       );
-      
+
       if (timetableData) {
         setSelectedTimetable(timetableData);
         setAlert({
@@ -191,7 +192,7 @@ const ManageTimetable: React.FC = () => {
           severity: 'success',
         });
       }
-      
+
       setLoading(false);
     } catch (error) {
       console.error('Error creating timetable:', error);
@@ -237,7 +238,7 @@ const ManageTimetable: React.FC = () => {
 
     try {
       setLoading(true);
-      
+
       const success = await timetableService.addPeriod(
         selectedTimetable.id,
         dayOfWeek,
@@ -255,7 +256,7 @@ const ManageTimetable: React.FC = () => {
           setSelectedTimetable(updatedTimetable);
         }
       }
-      
+
       handleClosePeriodDialog();
       setLoading(false);
     } catch (error) {
@@ -277,7 +278,7 @@ const ManageTimetable: React.FC = () => {
   ) => {
     try {
       setLoading(true);
-      
+
       const success = await timetableService.addTimeSlot(
         startTime,
         endTime,
@@ -290,7 +291,7 @@ const ManageTimetable: React.FC = () => {
         const timeSlotsData = await timetableService.getTimeSlots();
         setTimeSlots(timeSlotsData);
       }
-      
+
       handleCloseTimeSlotDialog();
       setLoading(false);
     } catch (error) {
@@ -307,7 +308,7 @@ const ManageTimetable: React.FC = () => {
   const handleDeletePeriod = async (periodId: number) => {
     try {
       setLoading(true);
-      
+
       const success = await timetableService.deletePeriod(periodId);
 
       if (success && selectedTimetable) {
@@ -317,7 +318,7 @@ const ManageTimetable: React.FC = () => {
           setSelectedTimetable(updatedTimetable);
         }
       }
-      
+
       setLoading(false);
     } catch (error) {
       console.error('Error deleting period:', error);
@@ -331,7 +332,7 @@ const ManageTimetable: React.FC = () => {
   };
 
   // Organize periods by day and time for display
-  const periodGrid = selectedTimetable ? 
+  const periodGrid = selectedTimetable ?
     timetableService.organizePeriodsForDisplay(selectedTimetable, timeSlots) :
     null;
 
@@ -340,27 +341,13 @@ const ManageTimetable: React.FC = () => {
       <h1 className="text-2xl font-bold text-gray-800 mb-4">Manage Timetables</h1>
 
       <div className="border-b border-gray-200 mb-4">
-        <div className="flex">
-          <button
-            className={`py-2 px-4 font-medium text-sm focus:outline-none ${
-              tabValue === 0
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-600 hover:text-gray-800 hover:border-gray-300'
-            }`}
-            onClick={() => handleTabChange(0)}
-          >
+        <div className="flex gap-5">
+          <Button variant="primary" onClick={() => handleTabChange(0)}>
             Manage Timetables
-          </button>
-          <button
-            className={`py-2 px-4 font-medium text-sm focus:outline-none ${
-              tabValue === 1
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-600 hover:text-gray-800 hover:border-gray-300'
-            }`}
-            onClick={() => handleTabChange(1)}
-          >
+          </Button>
+          <Button variant="primary" onClick={() => handleTabChange(1)}>
             Time Slots
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -423,7 +410,7 @@ const ManageTimetable: React.FC = () => {
               </select>
             </div>
             <div className="md:col-span-4">
-              <button 
+              <button
                 onClick={createTimetable}
                 disabled={!selectedClass || !selectedSection || loading}
                 className={`px-4 py-2 rounded-md text-white ${!selectedClass || !selectedSection || loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#292648] hover:bg-[#3b3664]'}`}
@@ -455,9 +442,9 @@ const ManageTimetable: React.FC = () => {
               </button>
             </div>
 
-            <TimetableGrid 
-              periodGrid={periodGrid} 
-              onDeletePeriod={handleDeletePeriod} 
+            <TimetableGrid
+              periodGrid={periodGrid}
+              onDeletePeriod={handleDeletePeriod}
             />
           </div>
         )}
@@ -500,12 +487,11 @@ const ManageTimetable: React.FC = () => {
 
       {/* Alert notification */}
       {alert.open && (
-        <div className={`fixed bottom-4 right-4 p-4 rounded-md shadow-lg ${
-          alert.severity === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-        }`}>
+        <div className={`fixed bottom-4 right-4 p-4 rounded-md shadow-lg ${alert.severity === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
           <div className="flex justify-between items-center">
             <span>{alert.message}</span>
-            <button 
+            <button
               onClick={() => setAlert({ ...alert, open: false })}
               className="ml-4 text-gray-500 hover:text-gray-700"
             >
