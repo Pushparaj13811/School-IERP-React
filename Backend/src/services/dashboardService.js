@@ -532,7 +532,7 @@ export const getStudentDashboardData = async (studentId) => {
       achievementType: true
     },
     orderBy: {
-      date: 'desc'
+      fromDate: 'desc'
     },
     take: 5
   });
