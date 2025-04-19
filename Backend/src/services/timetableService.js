@@ -503,15 +503,6 @@ class TimetableService {
         try {
             const teacher = await prisma.teacher.findUnique({
                 where: { id: parseInt(teacherId) },
-                include: {
-                    user: {
-                        select: {
-                            firstName: true,
-                            lastName: true,
-                            profilePicture: true
-                        }
-                    }
-                }
             });
 
             if (!teacher) {
@@ -540,7 +531,6 @@ class TimetableService {
             const timetable = {
                 teacher: {
                     id: teacher.id,
-                    name: teacher.user.firstName + ' ' + teacher.user.lastName
                 },
                 schedule: {}
             };

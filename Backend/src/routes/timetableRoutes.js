@@ -23,7 +23,7 @@ router.get('/student/:studentId', restrictTo('ADMIN', 'TEACHER'), timetableContr
 
 // Teacher timetable
 router.get('/teacher', restrictTo('TEACHER', 'ADMIN'), timetableController.getTeacherTimetable);
-router.get('/teacher/:teacherId', restrictTo('ADMIN'), timetableController.getTeacherTimetable);
+router.get('/teacher/:teacherId', restrictTo('TEACHER', 'ADMIN'), timetableController.getTeacherTimetable);
 
 // Period management
 router.post('/period', restrictTo('ADMIN'), timetableController.addPeriod);

@@ -103,10 +103,32 @@ class TimetableController {
    */
   getTeacherTimetable = asyncHandler(async (req, res) => {
     // Either get from params or from authenticated user
-    const teacherId = req.params.teacherId || req.user.teacherId;
+    let teacherId = req.params.teacherId || req.user.teacherId;
+    console.log('Teacher ID:', teacherId);
+    console.log('User:', req.user);
 
     if (!teacherId) {
-      return res.status(400).json(new ApiResponse(400, null, 'Teacher ID is required'));
+      if (req.user && req.user.role === 'TEACHER') {
+        try {
+          const { PrismaClient } = await import('@prisma/client');
+          const prisma = new PrismaClient();
+
+          const teacher = await prisma.teacher.findFirst({
+            where: {
+              userId: req.user.id
+            }
+          });
+
+          if (teacher) {
+            teacherId = teacher.id;
+            console.log('Teacher ID found:', teacherId);
+          }
+        } catch (error) {
+          console.error('Error looking up teacher record:', error);
+        }
+      } else {
+        return res.status(400).json(new ApiResponse(400, null, 'Teacher ID is required'));
+      }
     }
 
     const timetable = await timetableService.getTeacherTimetable(teacherId);
