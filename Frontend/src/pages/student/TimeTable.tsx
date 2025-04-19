@@ -53,6 +53,7 @@ interface Timetable {
     name: string;
   };
   periods: Period[];
+  breakTimeSlots?: TimeSlot[];
 }
 
 // Custom type for the grid row
@@ -65,6 +66,13 @@ interface TimetableRow {
 interface ApiResponse {
   status: string;
   data: Timetable;
+  message?: string;
+}
+
+// Define API response type for TimeSlots
+interface TimeSlotApiResponse {
+  status: string;
+  data: TimeSlot[];
   message?: string;
 }
 
@@ -89,6 +97,17 @@ const TimeTable: React.FC = () => {
         if (response.data && typeof response.data === 'object') {
           const apiResponse = response.data as ApiResponse;
           if (apiResponse.status === 'success' && apiResponse.data) {
+            // Get all timeSlots including breaks
+            const timeSlotResponse = await axios.get<TimeSlotApiResponse>(`${API_URL}/api/v1/timetables/timeslots`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            
+            // Add break time slots to the timetable
+            if (timeSlotResponse.data?.status === 'success') {
+              const breakTimeSlots = timeSlotResponse.data.data.filter((slot: TimeSlot) => slot.isBreak);
+              apiResponse.data.breakTimeSlots = breakTimeSlots;
+            }
+            
             setTimetable(apiResponse.data);
           } else {
             setError('Invalid response format from server');
@@ -112,15 +131,26 @@ const TimeTable: React.FC = () => {
       return null;
     }
 
-    // Get unique time slots
-    const timeSlots = Array.from(
+    // Get unique time slots from periods
+    const periodTimeSlots = Array.from(
       new Set(timetable.periods.map((period) => period.timeSlot.id))
     ).map((id) => {
       return timetable.periods.find((period) => period.timeSlot.id === id)?.timeSlot;
     }).filter(Boolean) as TimeSlot[];
 
+    // Add any break time slots that might not be referenced by periods
+    const breakTimeSlots = timetable.breakTimeSlots || [];
+    
+    // Combine and deduplicate time slots
+    const allTimeSlots = [...periodTimeSlots];
+    breakTimeSlots.forEach(breakSlot => {
+      if (!allTimeSlots.some(slot => slot.id === breakSlot.id)) {
+        allTimeSlots.push(breakSlot);
+      }
+    });
+
     // Sort time slots by start time
-    timeSlots.sort((a, b) => a.startTime.localeCompare(b.startTime));
+    allTimeSlots.sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     const daysOfWeek = [
       'Monday',
@@ -133,7 +163,7 @@ const TimeTable: React.FC = () => {
     ];
 
     // Create a grid with time slots as rows and days as columns
-    const grid = timeSlots.map((timeSlot) => {
+    const grid = allTimeSlots.map((timeSlot) => {
       const row: TimetableRow = {
         timeSlot: timeSlot,
       };
