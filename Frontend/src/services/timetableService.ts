@@ -104,6 +104,31 @@ export interface TimetableRow {
   [key: string]: Period | TimeSlot | null;
 }
 
+// Define teacher's timetable interface
+export interface TeacherTimetable {
+  teacher: {
+    id: number;
+    name: string;
+  };
+  schedule: {
+    [key: string]: {
+      periodId: number;
+      timeSlot: TimeSlot;
+      subject: Subject;
+      class: {
+        id: number;
+        name: string;
+      };
+      section: {
+        id: number;
+        name: string;
+      };
+      academicYear: string;
+      term: string;
+    }[];
+  };
+}
+
 // Define API data types for conversion
 interface ApiTimeSlot {
   id: number;
@@ -111,6 +136,15 @@ interface ApiTimeSlot {
   endTime: string;
   isBreak: boolean;
   breakType: string | null;
+}
+
+// Interface for user data from API
+interface UserLike {
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  profilePicture?: string | { url: string };
+  [key: string]: unknown;
 }
 
 interface ApiPeriod {
@@ -127,7 +161,7 @@ interface ApiPeriod {
   teacher?: { 
     id: number; 
     name: string;
-    user?: any; // Using any to avoid type conflicts
+    user?: UserLike;
   };
 }
 
@@ -458,6 +492,32 @@ class TimetableService {
   getDayName(dayIndex: number): string {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     return days[dayIndex];
+  }
+
+  // Get teacher's timetable
+  async getTeacherTimetable(): Promise<TeacherTimetable | null> {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/v1/timetables/teacher`, {
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch teacher timetable: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      if (data.status === 'success') {
+        return data.data;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching teacher timetable:', error);
+      toast.error('Failed to load teacher timetable');
+      return null;
+    }
   }
 }
 
