@@ -58,6 +58,54 @@ interface Attendance {
   student?: Student;
 }
 
+interface DailyAttendance {
+  id: number;
+  date: string;
+  status: 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'EXCUSED';
+  remarks?: string;
+  studentId: number;
+  student?: {
+    id: number;
+    name: string;
+    rollNumber?: string;
+  };
+}
+
+interface MonthlyAttendanceSummary {
+  studentId: number;
+  studentName: string;
+  rollNumber?: string;
+  present: number;
+  absent: number;
+  late: number;
+  excused: number;
+  halfDay: number;
+  total: number;
+  percentage: number;
+}
+
+interface AttendanceStats {
+  totalStudents: number;
+  presentCount: number;
+  absentCount: number;
+  lateCount: number;
+  excusedCount: number;
+  halfDayCount: number;
+  presentPercentage: number;
+  dailyTrend?: {
+    date: string;
+    present: number;
+    absent: number;
+    percentage: number;
+  }[];
+  classWiseStats?: {
+    className: string;
+    present: number;
+    absent: number;
+    percentage: number;
+  }[];
+}
+
 interface Result {
   id: number;
   marks: number;
@@ -66,16 +114,6 @@ interface Result {
   subjectId: number;
   student?: Student;
   subject?: { name: string };
-}
-
-interface Leave {
-  id: number;
-  startDate: string;
-  endDate: string;
-  reason: string;
-  status: string;
-  userId: number;
-  user?: { name: string };
 }
 
 interface OverallResult {
@@ -162,6 +200,50 @@ interface ClassTeacherAssignment {
   };
 }
 
+// Timetable interfaces
+interface TimeSlot {
+  id: number;
+  startTime: string;
+  endTime: string;
+  isBreak: boolean;
+  breakType: string | null;
+}
+
+interface Period {
+  id: number;
+  dayOfWeek: number;
+  timeSlotId: number;
+  subjectId: number;
+  teacherId: number;
+  classId: number;
+  sectionId: number;
+  timetableId: number;
+  timeSlot?: TimeSlot;
+  subject?: Subject;
+  teacher?: {
+    id: number;
+    name: string;
+    user?: {
+      name: string;
+    };
+  };
+}
+
+interface Timetable {
+  id: number;
+  classId: number;
+  sectionId: number;
+  academicYear: string;
+  term: string;
+  class?: {
+    name: string;
+  };
+  section?: {
+    name: string;
+  };
+  periods?: Period[];
+}
+
 // Create axios instance with default config
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1', // Update this with your backend URL
@@ -197,16 +279,22 @@ api.interceptors.response.use(
     (error) => {
         console.error(`API Error:`, error.response?.status, error.response?.data);
         
-        // Don't redirect on refresh token failures
-        if (error.config.url === '/auth/refresh-token') {
+        // Don't redirect on auth-related endpoints
+        if (error.config.url === '/auth/refresh-token' || 
+            error.config.url === '/auth/login' ||
+            error.config.url === '/auth/register') {
             return Promise.reject(error);
         }
 
         if (error.response?.status === 401) {
-            // Handle unauthorized access
+            // Handle unauthorized access for non-auth endpoints
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            window.location.href = '/login';
+            
+            // Only redirect if not already on the login page
+            if (!window.location.pathname.includes('login')) {
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }
@@ -308,7 +396,7 @@ export const attendanceAPI = {
     updateAttendance: (id: string, data: Record<string, unknown>) => api.put<ApiResponse<{ attendance: Attendance }>>(`/attendance/${id}`, data),
     
     // New endpoints for daily attendance
-    getDailyAttendance: (params?: Record<string, unknown>) => api.get<ApiResponse<{ attendance: any[] }>>('/attendance/daily', { params }),
+    getDailyAttendance: (params?: Record<string, unknown>) => api.get<ApiResponse<{ attendance: DailyAttendance[] }>>('/attendance/daily', { params }),
     markDailyAttendance: (data: { 
       date: string; 
       classId: number | string; 
@@ -321,10 +409,10 @@ export const attendanceAPI = {
     }) => api.post<ApiResponse<{ success: boolean }>>('/attendance/daily', data),
     
     // Monthly attendance summary
-    getMonthlyAttendance: (params?: Record<string, unknown>) => api.get<ApiResponse<any>>('/attendance/monthly', { params }),
+    getMonthlyAttendance: (params?: Record<string, unknown>) => api.get<ApiResponse<MonthlyAttendanceSummary[]>>('/attendance/monthly', { params }),
     
     // Statistics
-    getAttendanceStats: (params?: Record<string, unknown>) => api.get<ApiResponse<any>>('/attendance/stats', { params }),
+    getAttendanceStats: (params?: Record<string, unknown>) => api.get<ApiResponse<AttendanceStats>>('/attendance/stats', { params }),
 };
 
 // Result API
@@ -385,6 +473,44 @@ export const teacherAPI = {
     api.get<ApiResponse<{ assignments: ClassTeacherAssignment[] }>>('/teachers/class-teacher/assignments', { params }),
   removeClassTeacherAssignment: (id: number) => 
     api.delete<ApiResponse<{ message: string }>>(`/teachers/class-teacher/assignments/${id}`),
+};
+
+// Timetable API
+export const timetableAPI = {
+  // Get time slots
+  getTimeSlots: () => 
+    api.get<ApiResponse<TimeSlot[]>>('/timetables/timeslots'),
+  
+  // Add a new time slot
+  addTimeSlot: (data: { startTime: string; endTime: string; isBreak: boolean; breakType: string | null }) => 
+    api.post<ApiResponse<TimeSlot>>('/timetables/timeslots', data),
+  
+  // Get timetable by query parameters
+  getTimetable: (params: { classId: number; sectionId: number; academicYear: string; term: string }) => 
+    api.get<ApiResponse<Timetable | null>>('/timetables/query', { params }),
+  
+  // Get timetable by ID
+  getTimetableById: (id: number) => 
+    api.get<ApiResponse<Timetable>>(`/timetables/id/${id}`),
+  
+  // Create a new timetable
+  createTimetable: (data: { classId: number; sectionId: number; academicYear: string; term: string }) => 
+    api.post<ApiResponse<Timetable>>('/timetables', data),
+  
+  // Add a period to a timetable
+  addPeriod: (data: { 
+    timetableId: number;
+    dayOfWeek: number;
+    timeSlotId: number;
+    subjectId: number;
+    teacherId: number;
+    classId: number;
+    sectionId: number;
+  }) => api.post<ApiResponse<Period>>('/timetables/period', data),
+  
+  // Delete a period
+  deletePeriod: (id: number) => 
+    api.delete<ApiResponse<{ message: string }>>(`/timetables/period/${id}`),
 };
 
 export default api; 
