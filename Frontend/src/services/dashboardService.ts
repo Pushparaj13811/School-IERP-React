@@ -1,148 +1,63 @@
-import { dashboardAPI, userAPI, announcementAPI } from './api';
-import { Student } from '../types/api';
+import { dashboardAPI } from './api';
 import { toast } from 'react-toastify';
+import { 
+  StudentDashboardData, 
+  TeacherDashboardData, 
+  AdminDashboardData, 
+  ParentDashboardData 
+} from './api';
 
-// Type for student dashboard with loading and error states
-export interface StudentDashboardState {
+// Generic dashboard state with loading and error states
+interface DashboardState<T> {
   isLoading: boolean;
   error: string | null;
-  data: {
-    student: Student | null;
-    attendancePercentage: number;
-    examResults: number;
-    holidaysCount: number;
-    achievementsCount: number;
-    recentAnnouncements: Array<{
-      id: number;
-      date: string;
-      title: string;
-      content: string;
-    }>;
-  };
+  data: T | null;
 }
 
-// Interface for announcement data
-interface Announcement {
-  id: number;
-  createdAt?: string;
-  date?: string;
-  title: string;
-  content: string;
-}
-
-// Default/initial state
-const initialStudentDashboardState: StudentDashboardState = {
+// Default/initial states
+const initialStudentDashboardState: DashboardState<StudentDashboardData> = {
   isLoading: true,
   error: null,
-  data: {
-    student: null,
-    attendancePercentage: 0,
-    examResults: 0,
-    holidaysCount: 0,
-    achievementsCount: 0,
-    recentAnnouncements: []
-  }
+  data: null
+};
+
+const initialTeacherDashboardState: DashboardState<TeacherDashboardData> = {
+  isLoading: true,
+  error: null,
+  data: null
+};
+
+const initialParentDashboardState: DashboardState<ParentDashboardData> = {
+  isLoading: true,
+  error: null,
+  data: null
+};
+
+const initialAdminDashboardState: DashboardState<AdminDashboardData> = {
+  isLoading: true,
+  error: null,
+  data: null
 };
 
 class DashboardService {
   // Get student dashboard data
-  async getStudentDashboard(): Promise<StudentDashboardState> {
+  async getStudentDashboard(): Promise<DashboardState<StudentDashboardData>> {
     try {
-      // Use the mock fallback only in development if the API endpoint doesn't exist yet
-      const dashboardData: StudentDashboardState = {...initialStudentDashboardState};
-
-      try {
-        // Try to get data from the real API
-        const response = await dashboardAPI.getStudentDashboard();
-        if (response.data?.status === 'success' && response.data?.data) {
-          const apiData = response.data.data;
-          dashboardData.data = {
-            student: apiData.student,
-            attendancePercentage: apiData.attendancePercentage,
-            examResults: apiData.examResults,
-            holidaysCount: apiData.holidaysCount,
-            achievementsCount: apiData.achievementsCount,
-            recentAnnouncements: apiData.recentAnnouncements.map((announcement: Announcement) => ({
-              id: announcement.id,
-              date: this.formatDate(announcement.createdAt || announcement.date),
-              title: announcement.title,
-              content: announcement.content
-            }))
-          };
-        }
-      } catch {
-        console.warn('Dashboard API not available, falling back to profile data');
-        
-        // If dashboard API fails, try to at least get the student profile
-        try {
-          const profileResponse = await userAPI.getProfile();
-          
-          // Fetch announcements separately
-          let recentAnnouncements: Array<{
-            id: number;
-            date: string;
-            title: string;
-            content: string;
-          }> = [];
-          
-          try {
-            const announcementsResponse = await announcementAPI.getAll();
-            if (announcementsResponse.data?.status === 'success' && 
-                announcementsResponse.data?.data?.announcements) {
-              // Get the 3 most recent announcements
-              recentAnnouncements = announcementsResponse.data.data.announcements
-                .slice(0, 3)
-                .map(announcement => ({
-                  id: announcement.id,
-                  date: this.formatDate(announcement.createdAt),
-                  title: announcement.title,
-                  content: announcement.content.substring(0, 100) + (announcement.content.length > 100 ? '...' : '')
-                }));
-            }
-          } catch (announcementError) {
-            console.error('Error fetching announcements:', announcementError);
-            // Fallback to mock announcement if API call fails
-            recentAnnouncements = [
-              {
-                id: 1,
-                date: new Date().toLocaleDateString(),
-                title: 'Exam Announcement!',
-                content: 'We are excited to announce that your Second Terminal Exam will start soon. Please prepare accordingly.'
-              }
-            ];
-          }
-          
-          if (profileResponse.data?.status === 'success' && profileResponse.data?.data?.student) {
-            // Extract student data from profile response
-            const userData = profileResponse.data.data;
-            
-            // Check if student data exists
-            if (userData.student) {
-              // Set student in dashboard data
-              dashboardData.data.student = userData.student;
-              
-              // Create mock data for the other stats
-              dashboardData.data.attendancePercentage = 85; // Mock data
-              dashboardData.data.examResults = 1; // Mock count
-              dashboardData.data.holidaysCount = 15; // Mock count
-              dashboardData.data.achievementsCount = 5; // Mock count
-              
-              // Use real announcements or fallback mock
-              dashboardData.data.recentAnnouncements = recentAnnouncements;
-            }
-          }
-        } catch (profileError) {
-          console.error('Error fetching profile data:', profileError);
-          dashboardData.error = 'Failed to load dashboard data';
-        }
+      const dashboardState: DashboardState<StudentDashboardData> = {...initialStudentDashboardState};
+      
+      const response = await dashboardAPI.getStudentDashboard();
+      
+      if (response.data?.status === 'success' && response.data?.data) {
+        dashboardState.data = response.data.data;
+      } else {
+        dashboardState.error = 'No data returned from dashboard API';
       }
       
-      dashboardData.isLoading = false;
-      return dashboardData;
-      
+      dashboardState.isLoading = false;
+      return dashboardState;
     } catch (error) {
-      console.error('Error in dashboard service:', error);
-      toast.error('Failed to load dashboard data');
+      console.error('Error in student dashboard service:', error);
+      toast.error('Failed to load student dashboard data');
       
       return {
         ...initialStudentDashboardState,
@@ -151,16 +66,101 @@ class DashboardService {
       };
     }
   }
+
+  // Get teacher dashboard data
+  async getTeacherDashboard(): Promise<DashboardState<TeacherDashboardData>> {
+    try {
+      const dashboardState: DashboardState<TeacherDashboardData> = {...initialTeacherDashboardState};
+      
+      const response = await dashboardAPI.getTeacherDashboard();
+      
+      if (response.data?.status === 'success' && response.data?.data) {
+        dashboardState.data = response.data.data;
+      } else {
+        dashboardState.error = 'No data returned from dashboard API';
+      }
+      
+      dashboardState.isLoading = false;
+      return dashboardState;
+    } catch (error) {
+      console.error('Error in teacher dashboard service:', error);
+      toast.error('Failed to load teacher dashboard data');
+      
+      return {
+        ...initialTeacherDashboardState,
+        isLoading: false,
+        error: 'Failed to load dashboard data'
+      };
+    }
+  }
+
+  // Get parent dashboard data
+  async getParentDashboard(): Promise<DashboardState<ParentDashboardData>> {
+    try {
+      const dashboardState: DashboardState<ParentDashboardData> = {...initialParentDashboardState};
+      
+      const response = await dashboardAPI.getParentDashboard();
+      
+      if (response.data?.status === 'success' && response.data?.data) {
+        dashboardState.data = response.data.data;
+      } else {
+        dashboardState.error = 'No data returned from dashboard API';
+      }
+      
+      dashboardState.isLoading = false;
+      return dashboardState;
+    } catch (error) {
+      console.error('Error in parent dashboard service:', error);
+      toast.error('Failed to load parent dashboard data');
+      
+      return {
+        ...initialParentDashboardState,
+        isLoading: false,
+        error: 'Failed to load dashboard data'
+      };
+    }
+  }
+
+  // Get admin dashboard data
+  async getAdminDashboard(): Promise<DashboardState<AdminDashboardData>> {
+    try {
+      const dashboardState: DashboardState<AdminDashboardData> = {...initialAdminDashboardState};
+      
+      const response = await dashboardAPI.getAdminDashboard();
+      
+      if (response.data?.status === 'success' && response.data?.data) {
+        dashboardState.data = response.data.data;
+      } else {
+        dashboardState.error = 'No data returned from dashboard API';
+      }
+      
+      dashboardState.isLoading = false;
+      return dashboardState;
+    } catch (error) {
+      console.error('Error in admin dashboard service:', error);
+      toast.error('Failed to load admin dashboard data');
+      
+      return {
+        ...initialAdminDashboardState,
+        isLoading: false,
+        error: 'Failed to load dashboard data'
+      };
+    }
+  }
   
   // Format a student's name and class for display
-  formatStudentDisplayName(student: Student | null): string {
+  formatStudentDisplayName(student: {
+    name?: string;
+    class?: { name: string } | string;
+    section?: { name: string } | string;
+  } | null): string {
     if (!student) return 'Student';
     
     let displayName = student.name || 'Student';
-    if (student.class?.name) {
-      displayName += ` (${student.class.name}`;
-      if (student.section?.name) {
-        displayName += ` ${student.section.name}`;
+    if (student.class) {
+      displayName += ` (${typeof student.class === 'string' ? student.class : student.class.name}`;
+      if (student.section) {
+        displayName += ` ${typeof student.section === 'string' ? student.section : student.section.name}`;
       }
       displayName += ')';
     }
@@ -168,48 +168,6 @@ class DashboardService {
     return displayName;
   }
 
-  // Get the profile picture URL for a student
-  getProfileImageUrl(student: Student | null): string {
-    if (!student || !student.profilePicture) {
-      return "https://via.placeholder.com/150?text=Student";
-    }
-    
-    try {
-      const profilePicture = student.profilePicture;
-      
-      // Handle profilePicture as an object with url property
-      if (typeof profilePicture === 'object' && profilePicture !== null && 'url' in profilePicture) {
-        const url = (profilePicture as {url: string}).url;
-        
-        // Check if it's already a full URL
-        if (url.startsWith('http://') || url.startsWith('https://')) {
-          return url;
-        }
-        
-        // Build full URL
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-        return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
-      }
-      
-      // Handle profilePicture as a string
-      if (typeof profilePicture === 'string') {
-        // Check if it's already a full URL
-        if (profilePicture.startsWith('http://') || profilePicture.startsWith('https://')) {
-          return profilePicture;
-        }
-        
-        // Build full URL
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-        return `${baseUrl}${profilePicture.startsWith('/') ? '' : '/'}${profilePicture}`;
-      }
-      
-      return "https://via.placeholder.com/150?text=Student";
-    } catch {
-      console.error("Error processing profile picture");
-      return "https://via.placeholder.com/150?text=Student";
-    }
-  }
-  
   // Format date for display
   formatDate(dateString?: string): string {
     if (!dateString) return "N/A";
@@ -222,6 +180,19 @@ class DashboardService {
       });
     } catch {
       return dateString;
+    }
+  }
+
+  // Format time (e.g., "08:30" to "8:30 AM")
+  formatTime(timeString?: string): string {
+    if (!timeString) return "N/A";
+    try {
+      const [hours, minutes] = timeString.split(':').map(Number);
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12; // Convert 0 to 12 for 12 AM
+      return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+    } catch {
+      return timeString;
     }
   }
 }

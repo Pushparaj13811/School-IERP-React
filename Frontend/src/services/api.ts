@@ -438,21 +438,184 @@ export const leaveAPI = {
         api.post<ApiResponse<{ leaveType: LeaveType }>>('/leaves/types', data),
 };
 
-// Dashboard API
+// Dashboard interfaces
+export interface AdminDashboardData {
+  counts: {
+    students: number;
+    teachers: number;
+    parents: number;
+    classes: number;
+    pendingLeaves: number;
+  };
+  studentsByGender: Array<{
+    gender: string;
+    _count: { id: number };
+  }>;
+  upcomingHolidays: Array<{
+    id: number;
+    title: string;
+    date: string;
+    holidayType: { name: string };
+  }>;
+  recentAnnouncements: Array<{
+    id: number;
+    title: string;
+    content: string;
+    createdAt: string;
+    creator: { id: number; name: string };
+  }>;
+  recentAchievements: Array<{
+    id: number;
+    title: string;
+    date: string;
+    achievementType: { name: string };
+    student?: { id: number; name: string };
+    teacher?: { id: number; name: string };
+  }>;
+}
+
+export interface TeacherDashboardData {
+  teacher: {
+    id: number;
+    name: string;
+    email: string;
+    designation: { id: number; name: string };
+    subjects: Array<{ id: number; name: string; code: string }>;
+    assignedClasses: Array<{ id: number; name: string }>;
+    assignedSections: Array<{ id: number; name: string }>;
+    classTeacherOf: Array<{
+      class: { id: number; name: string };
+      section: { id: number; name: string };
+    }>;
+  };
+  todayTimetable: Array<{
+    id: number;
+    timeSlot: { startTime: string; endTime: string };
+    subject: { id: number; name: string; code: string };
+    class: { id: number; name: string };
+    section: { id: number; name: string };
+  }>;
+  pendingLeaves: Array<{
+    id: number;
+    student: { 
+      id: number; 
+      name: string;
+      class: { id: number; name: string };
+      section: { id: number; name: string };
+    };
+    leaveType: { id: number; name: string };
+    fromDate: string;
+    toDate: string;
+    reason: string;
+  }>;
+  announcements: Array<{
+    id: number;
+    title: string;
+    content: string;
+    createdAt: string;
+    creator: { id: number; name: string };
+  }>;
+}
+
 export interface StudentDashboardData {
-    student: Student;
+  student: {
+    id: number;
+    name: string;
+    rollNo: string;
+    class: { id: number; name: string };
+    section: { id: number; name: string };
+    profilePicture: string | null;
+  };
+  attendancePercentage: number;
+  todayTimetable: Array<{
+    id: number;
+    timeSlot: { startTime: string; endTime: string };
+    subject: { id: number; name: string; code: string };
+    teacher: { id: number; name: string };
+  }>;
+  examResults: Array<{
+    id: number;
+    subject: { id: number; name: string; code: string };
+    marksObtained: number;
+    totalMarks: number;
+    grade: string;
+    createdAt: string;
+  }>;
+  upcomingHolidays: Array<{
+    id: number;
+    title: string;
+    date: string;
+    holidayType: { name: string };
+  }>;
+  achievements: number;
+  recentAnnouncements: Array<{
+    id: number;
+    title: string;
+    content: string;
+    date: string;
+  }>;
+}
+
+export interface ParentDashboardData {
+  parent: {
+    id: number;
+    name: string;
+    email: string;
+    contactNo: string;
+  };
+  children: Array<{
+    student: {
+      id: number;
+      name: string;
+      rollNo: string;
+      class: string;
+      section: string;
+      profilePicture: string | null;
+    };
     attendancePercentage: number;
-    examResults: number;
-    holidaysCount: number;
-    achievementsCount: number;
-    recentAnnouncements: Announcement[];
+    recentResults: Array<{
+      subject: string;
+      marks: number;
+      totalMarks: number;
+      grade: string;
+      date: string;
+    }>;
+    leaveApplications: Array<{
+      id: number;
+      leaveType: string;
+      fromDate: string;
+      toDate: string;
+      status: string;
+      reason: string;
+    }>;
+  }>;
+  recentAnnouncements: Array<{
+    id: number;
+    title: string;
+    content: string;
+    date: string;
+  }>;
+  upcomingHolidays: Array<{
+    id: number;
+    title: string;
+    type: string;
+    date: string;
+    description: string;
+  }>;
 }
 
 export const dashboardAPI = {
-    getStudentDashboard: () => api.get<ApiResponse<StudentDashboardData>>('/dashboard/student'),
-    getTeacherDashboard: () => api.get<ApiResponse<Record<string, unknown>>>('/dashboard/teacher'),
-    getParentDashboard: () => api.get<ApiResponse<Record<string, unknown>>>('/dashboard/parent'),
-    getAdminDashboard: () => api.get<ApiResponse<Record<string, unknown>>>('/dashboard/admin'),
+  getAdminDashboard: () => 
+    api.get<ApiResponse<AdminDashboardData>>('/dashboard/admin'),
+  
+  getTeacherDashboard: () => 
+    api.get<ApiResponse<TeacherDashboardData>>('/dashboard/teacher'),
+  
+  getStudentDashboard: () => 
+    api.get<ApiResponse<StudentDashboardData>>('/dashboard/student'),
+  
+  getParentDashboard: () => 
+    api.get<ApiResponse<ParentDashboardData>>('/dashboard/parent'),
 };
 
 // Add to the teacherAPI object
