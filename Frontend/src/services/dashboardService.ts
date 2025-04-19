@@ -21,6 +21,15 @@ export interface StudentDashboardState {
   };
 }
 
+// Interface for announcement data
+interface Announcement {
+  id: number;
+  createdAt?: string;
+  date?: string;
+  title: string;
+  content: string;
+}
+
 // Default/initial state
 const initialStudentDashboardState: StudentDashboardState = {
   isLoading: true,
@@ -40,7 +49,7 @@ class DashboardService {
   async getStudentDashboard(): Promise<StudentDashboardState> {
     try {
       // Use the mock fallback only in development if the API endpoint doesn't exist yet
-      let dashboardData: StudentDashboardState = {...initialStudentDashboardState};
+      const dashboardData: StudentDashboardState = {...initialStudentDashboardState};
 
       try {
         // Try to get data from the real API
@@ -53,10 +62,15 @@ class DashboardService {
             examResults: apiData.examResults,
             holidaysCount: apiData.holidaysCount,
             achievementsCount: apiData.achievementsCount,
-            recentAnnouncements: apiData.recentAnnouncements
+            recentAnnouncements: apiData.recentAnnouncements.map((announcement: Announcement) => ({
+              id: announcement.id,
+              date: this.formatDate(announcement.createdAt || announcement.date),
+              title: announcement.title,
+              content: announcement.content
+            }))
           };
         }
-      } catch (error) {
+      } catch {
         console.warn('Dashboard API not available, falling back to profile data');
         
         // If dashboard API fails, try to at least get the student profile
@@ -98,9 +112,9 @@ class DashboardService {
             ];
           }
           
-          if (profileResponse.data?.status === 'success' && profileResponse.data?.data?.user?.student) {
-            // Extract student data from user object
-            const userData = profileResponse.data.data.user;
+          if (profileResponse.data?.status === 'success' && profileResponse.data?.data?.student) {
+            // Extract student data from profile response
+            const userData = profileResponse.data.data;
             
             // Check if student data exists
             if (userData.student) {
@@ -153,40 +167,45 @@ class DashboardService {
     
     return displayName;
   }
-  
+
   // Get the profile picture URL for a student
   getProfileImageUrl(student: Student | null): string {
     if (!student || !student.profilePicture) {
       return "https://via.placeholder.com/150?text=Student";
     }
     
-    const profilePicture = student.profilePicture;
-    
     try {
-      // Check if profilePicture is an object with url property
-      if (typeof profilePicture === 'object' && profilePicture !== null) {
-        const pictureObj = profilePicture as unknown as { url?: string };
-        if (pictureObj.url) {
-          const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-          return `${baseUrl}${pictureObj.url.startsWith('/') ? '' : '/'}${pictureObj.url}`;
+      const profilePicture = student.profilePicture;
+      
+      // Handle profilePicture as an object with url property
+      if (typeof profilePicture === 'object' && profilePicture !== null && 'url' in profilePicture) {
+        const url = (profilePicture as {url: string}).url;
+        
+        // Check if it's already a full URL
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+          return url;
         }
+        
+        // Build full URL
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+        return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
       }
       
-      // If it's a string
+      // Handle profilePicture as a string
       if (typeof profilePicture === 'string') {
         // Check if it's already a full URL
         if (profilePicture.startsWith('http://') || profilePicture.startsWith('https://')) {
           return profilePicture;
         }
         
-        // Otherwise, prepend the API base URL
+        // Build full URL
         const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
         return `${baseUrl}${profilePicture.startsWith('/') ? '' : '/'}${profilePicture}`;
       }
       
       return "https://via.placeholder.com/150?text=Student";
-    } catch (error) {
-      console.error("Error processing profile picture:", error);
+    } catch {
+      console.error("Error processing profile picture");
       return "https://via.placeholder.com/150?text=Student";
     }
   }
@@ -201,7 +220,7 @@ class DashboardService {
         month: 'long',
         day: 'numeric'
       });
-    } catch (error) {
+    } catch {
       return dateString;
     }
   }

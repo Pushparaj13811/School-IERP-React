@@ -62,6 +62,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   loading: boolean;
+  loginInProgress: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<boolean>;
@@ -76,6 +77,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loginInProgress, setLoginInProgress] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -135,7 +137,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<void> => {
     try {
-      setLoading(true);
+      setLoginInProgress(true);
       
       console.log('Attempting login with:', email);
       const response = await authAPI.login(email, password);
@@ -200,11 +202,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         throw new Error('Invalid response data: not an object');
       }
-      
-      setLoading(false);
     } catch (error) {
       console.error('Login failed:', error);
-      setLoading(false);
       
       // Rethrow for handling in the Login component
       if (error instanceof Error) {
@@ -212,6 +211,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         throw new Error('Unknown login error');
       }
+    } finally {
+      // Reset login progress state
+      setLoginInProgress(false);
     }
   };
 
@@ -233,6 +235,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         user,
         isAuthenticated: !!user,
         loading,
+        loginInProgress,
         login,
         logout,
         checkAuth
