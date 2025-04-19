@@ -1,11 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Subject, Teacher, TimeSlot } from '../../services/timetableService';
+import React, { useState } from 'react';
 import Button from '../ui/Button';
+import { Subject, Teacher, TimeSlot } from '../../services/timetableService';
 
 interface PeriodDialogProps {
   open: boolean;
   onClose: () => void;
-  onAdd: (dayOfWeek: number, timeSlotId: number, subjectId: number, teacherId: number) => Promise<void>;
+  selectedDay: string;
+  setSelectedDay: (day: string) => void;
+  selectedTimeSlot: number | '';
+  setSelectedTimeSlot: (timeSlotId: number | '') => void;
+  selectedSubject: number | '';
+  setSelectedSubject: (subjectId: number | '') => void;
+  selectedTeacher: number | '';
+  setSelectedTeacher: (teacherId: number | '') => void;
+  onAddPeriod: () => Promise<void>;
   loading: boolean;
   timeSlots: TimeSlot[];
   subjects: Subject[];
@@ -15,35 +23,21 @@ interface PeriodDialogProps {
 const PeriodDialog: React.FC<PeriodDialogProps> = ({
   open,
   onClose,
-  onAdd,
+  selectedDay,
+  setSelectedDay,
+  selectedTimeSlot,
+  setSelectedTimeSlot,
+  selectedSubject,
+  setSelectedSubject,
+  selectedTeacher,
+  setSelectedTeacher,
+  onAddPeriod,
   loading,
   timeSlots,
   subjects,
   teachers,
 }) => {
-  const [selectedDay, setSelectedDay] = useState<number>(1); // Monday
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<number | ''>('');
-  const [selectedSubject, setSelectedSubject] = useState<number | ''>('');
-  const [selectedTeacher, setSelectedTeacher] = useState<number | ''>('');
   const [validationError, setValidationError] = useState<string | null>(null);
-
-  // Reset form when dialog opens
-  useEffect(() => {
-    if (open) {
-      setValidationError(null);
-    }
-  }, [open]);
-
-  // Clear values when dialog closes
-  useEffect(() => {
-    if (!open) {
-      setSelectedDay(1);
-      setSelectedTimeSlot('');
-      setSelectedSubject('');
-      setSelectedTeacher('');
-      setValidationError(null);
-    }
-  }, [open]);
 
   if (!open) return null;
 
@@ -69,38 +63,8 @@ const PeriodDialog: React.FC<PeriodDialogProps> = ({
 
   const handleSubmit = async () => {
     if (validateForm()) {
-      await onAdd(
-        selectedDay,
-        Number(selectedTimeSlot),
-        Number(selectedSubject),
-        Number(selectedTeacher)
-      );
+      await onAddPeriod();
     }
-  };
-
-  const getDayName = (day: number): string => {
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    return days[day];
-  };
-
-  const handleDayChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedDay(Number(e.target.value));
-    setValidationError(null);
-  };
-
-  const handleTimeSlotChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedTimeSlot(e.target.value === '' ? '' : Number(e.target.value));
-    setValidationError(null);
-  };
-
-  const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedSubject(e.target.value === '' ? '' : Number(e.target.value));
-    setValidationError(null);
-  };
-
-  const handleTeacherChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedTeacher(e.target.value === '' ? '' : Number(e.target.value));
-    setValidationError(null);
   };
 
   return (
@@ -108,7 +72,7 @@ const PeriodDialog: React.FC<PeriodDialogProps> = ({
       <div className="bg-white rounded-lg w-full max-w-md p-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium">Add Period</h3>
-          <Button onClick={onClose} variant="danger">
+          <Button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             ×
           </Button>
         </div>
@@ -124,20 +88,17 @@ const PeriodDialog: React.FC<PeriodDialogProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">Day</label>
             <select
               value={selectedDay}
-              onChange={handleDayChange}
+              onChange={(e) => setSelectedDay(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value={1}>Monday</option>
-              <option value={2}>Tuesday</option>
-              <option value={3}>Wednesday</option>
-              <option value={4}>Thursday</option>
-              <option value={5}>Friday</option>
-              <option value={6}>Saturday</option>
-              <option value={0}>Sunday</option>
+              <option value="Monday">Monday</option>
+              <option value="Tuesday">Tuesday</option>
+              <option value="Wednesday">Wednesday</option>
+              <option value="Thursday">Thursday</option>
+              <option value="Friday">Friday</option>
+              <option value="Saturday">Saturday</option>
+              <option value="Sunday">Sunday</option>
             </select>
-            <div className="text-xs text-gray-500 mt-1">
-              You are adding a period for {getDayName(selectedDay)}
-            </div>
           </div>
           
           <div>
@@ -146,10 +107,8 @@ const PeriodDialog: React.FC<PeriodDialogProps> = ({
             </label>
             <select
               value={selectedTimeSlot}
-              onChange={handleTimeSlotChange}
-              className={`w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                validationError && selectedTimeSlot === '' ? 'border-red-500' : 'border-gray-300'
-              }`}
+              onChange={(e) => setSelectedTimeSlot(e.target.value === '' ? '' : Number(e.target.value))}
+              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select Time Slot</option>
               {timeSlots
@@ -173,10 +132,8 @@ const PeriodDialog: React.FC<PeriodDialogProps> = ({
             </label>
             <select
               value={selectedSubject}
-              onChange={handleSubjectChange}
-              className={`w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                validationError && selectedSubject === '' ? 'border-red-500' : 'border-gray-300'
-              }`}
+              onChange={(e) => setSelectedSubject(e.target.value === '' ? '' : Number(e.target.value))}
+              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select Subject</option>
               {subjects.map((subject) => (
@@ -198,15 +155,13 @@ const PeriodDialog: React.FC<PeriodDialogProps> = ({
             </label>
             <select
               value={selectedTeacher}
-              onChange={handleTeacherChange}
-              className={`w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                validationError && selectedTeacher === '' ? 'border-red-500' : 'border-gray-300'
-              }`}
+              onChange={(e) => setSelectedTeacher(e.target.value === '' ? '' : Number(e.target.value))}
+              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select Teacher</option>
               {teachers.map((teacher) => (
                 <option key={teacher.id} value={teacher.id}>
-                  {teacher.name} {teacher.email ? `(${teacher.email})` : ''}
+                  {teacher.name}
                 </option>
               ))}
             </select>
@@ -221,14 +176,14 @@ const PeriodDialog: React.FC<PeriodDialogProps> = ({
         <div className="flex justify-end mt-6 space-x-2">
           <Button 
             onClick={onClose}
-            variant="secondary"
+            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
           >
             Cancel
           </Button>
           <Button 
             onClick={handleSubmit}
             disabled={!selectedTimeSlot || !selectedSubject || !selectedTeacher || loading}
-            variant="primary"
+            className={`px-4 py-2 rounded-md text-white ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#292648] hover:bg-[#3b3664]'}`}
           >
             {loading ? (
               <span className="flex items-center">
