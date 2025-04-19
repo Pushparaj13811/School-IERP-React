@@ -14,8 +14,9 @@ import {
   Parent,
   StudentFormData,
   ParentFormData,
-  Subject
+  Subject,
 } from '../types/api';
+import { TeacherTimetable } from './timetableService';
 
 // Define missing interfaces
 interface TeacherFormData {
@@ -515,6 +516,12 @@ export const timetableAPI = {
   // Delete a period
   deletePeriod: (id: number) => 
     api.delete<ApiResponse<{ message: string }>>(`/timetables/period/${id}`),
+
+  // Get teacher timetable
+  getTeacherTimetable: (teacherId?: number) => 
+    teacherId || teacherId != undefined
+      ? api.get<ApiResponse<TeacherTimetable>>(`/timetables/teacher/${teacherId}`)
+      : api.get<ApiResponse<TeacherTimetable>>('/timetables/teacher')
 };
 
 export default api; 
