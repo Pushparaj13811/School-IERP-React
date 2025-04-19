@@ -21,16 +21,16 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, loginInProgress } = useAuth();
   
   // Get the previous location or default to home
   const { from } = (location.state as LocationState) || { from: { pathname: '/' } };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    // Ensure form doesn't refresh the page
     e.preventDefault();
     
     // Clear previous error
@@ -42,14 +42,14 @@ const Login: React.FC = () => {
       return;
     }
     
-    // Show loading state
-    setIsLoading(true);
-    
     try {
+      // Login - loginInProgress state is managed in AuthContext now
       await login(email, password);
-      // Navigate on success
+      
+      // Only navigate on successful login
       navigate(from?.pathname || '/', { replace: true });
     } catch (err) {
+      console.error('Login error:', err);
       const apiError = err as ApiError;
       
       // Extract error message from different possible sources
@@ -59,8 +59,13 @@ const Login: React.FC = () => {
         'Invalid email or password. Please try again.';
       
       setError(errorMessage);
-      setIsLoading(false);
     }
+  };
+
+  // Create a submit handler that just calls preventDefault
+  const onFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSubmit(e);
   };
 
   return (
@@ -87,7 +92,7 @@ const Login: React.FC = () => {
         </div>
       )}
       
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={onFormSubmit} className="space-y-4">
         <div>
           <div className="relative">
             <input
@@ -97,7 +102,7 @@ const Login: React.FC = () => {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Username"
               required
-              disabled={isLoading}
+              disabled={loginInProgress}
               className="w-full px-4 py-2 bg-[#fcfcf6] rounded-md border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#292648] disabled:opacity-70"
             />
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
@@ -117,7 +122,7 @@ const Login: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
               required
-              disabled={isLoading}
+              disabled={loginInProgress}
               className="w-full px-4 py-2 bg-[#fcfcf6] rounded-md border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#292648] disabled:opacity-70"
             />
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
@@ -130,11 +135,12 @@ const Login: React.FC = () => {
         
         <div className="pt-2">
           <button
-            type="submit"
-            disabled={isLoading}
+            type="button" 
+            onClick={handleSubmit}
+            disabled={loginInProgress}
             className="w-full py-2 px-4 bg-[#171630] hover:bg-[#292648] text-white rounded-md font-medium focus:outline-none disabled:opacity-70 flex justify-center items-center"
           >
-            {isLoading ? (
+            {loginInProgress ? (
               <>
                 <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -146,7 +152,6 @@ const Login: React.FC = () => {
           </button>
         </div>
       </form>
-      
     </div>
   );
 };
