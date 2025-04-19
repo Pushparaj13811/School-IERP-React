@@ -1,5 +1,5 @@
 import { toast } from 'react-toastify';
-import { academicAPI, timetableAPI, teacherAPI } from './api';
+import { academicAPI, timetableAPI, userAPI, teacherAPI } from './api';
 
 // Export types from the service
 export interface Class {
@@ -238,7 +238,9 @@ class TimetableService {
   async getClasses(): Promise<Class[]> {
     try {
       const response = await academicAPI.getClasses();
-      return response.data?.data?.classes || [];
+      const classes = response.data?.data?.classes || [];
+      
+      return classes;
     } catch (error) {
       console.error('Error fetching classes:', error);
       toast.error('Failed to load classes');
@@ -273,7 +275,7 @@ class TimetableService {
   // Get all teachers
   async getTeachers(): Promise<Teacher[]> {
     try {
-      const response = await teacherAPI.getAll();
+      const response = await userAPI.getTeachers();
       const apiTeachers = response.data?.data?.teachers || [];
       
       // Convert the API teachers to our Teacher format
@@ -296,9 +298,34 @@ class TimetableService {
   // Get all time slots
   async getTimeSlots(): Promise<TimeSlot[]> {
     try {
+      console.log('Starting getTimeSlots fetch...');
       const response = await timetableAPI.getTimeSlots();
+      console.log('Raw response from getTimeSlots:', response);
+      
+      if (!response.data) {
+        console.error('No data in response from getTimeSlots');
+        return [];
+      }
+      
       const apiTimeSlots = response.data?.data || [];
-      return apiTimeSlots.map(slot => convertApiTimeSlot(slot as ApiTimeSlot));
+      console.log('Time slots data from API:', apiTimeSlots);
+      
+      if (!Array.isArray(apiTimeSlots)) {
+        console.error('API returned non-array data for time slots:', apiTimeSlots);
+        return [];
+      }
+      
+      const convertedSlots = apiTimeSlots.map(slot => {
+        try {
+          return convertApiTimeSlot(slot as ApiTimeSlot);
+        } catch (conversionError) {
+          console.error('Error converting time slot:', slot, conversionError);
+          return null;
+        }
+      }).filter(slot => slot !== null) as TimeSlot[];
+      
+      console.log('Converted time slots:', convertedSlots);
+      return convertedSlots;
     } catch (error) {
       console.error('Error fetching time slots:', error);
       toast.error('Failed to load time slots');
@@ -306,14 +333,14 @@ class TimetableService {
     }
   }
 
-  // Get class teacher assignments
+  // Get class-teacher assignments
   async getClassTeachers(): Promise<ClassTeacherAssignment[]> {
     try {
       const response = await teacherAPI.getClassTeacherAssignments();
       return response.data?.data?.assignments || [];
     } catch (error) {
       console.error('Error fetching class teachers:', error);
-      toast.error('Failed to load class teacher assignments');
+      toast.error('Failed to load class teachers');
       return [];
     }
   }
@@ -321,22 +348,38 @@ class TimetableService {
   // Get timetable by query
   async getTimetable(classId: number, sectionId: number, academicYear: string, term: string): Promise<Timetable | null> {
     try {
+      console.log(`Fetching timetable for class=${classId}, section=${sectionId}, year=${academicYear}, term=${term}`);
+      
       const response = await timetableAPI.getTimetable({
         classId,
         sectionId,
         academicYear,
         term
       });
+      
+      console.log('Timetable response:', response);
       const apiTimetable = response.data?.data;
       if (!apiTimetable) return null;
       
       return convertApiTimetable(apiTimetable as ApiTimetable);
     } catch (error) {
-      const apiError = error as {response?: {status: number}};
-      if (apiError.response && apiError.response.status === 404) {
-        // Timetable doesn't exist yet - this is okay
-        return null;
+      const apiError = error as {response?: {status: number, data?: {message?: string}}};
+      
+      if (apiError.response) {
+        if (apiError.response.status === 404) {
+          // Timetable doesn't exist yet - this is okay
+          console.log('Timetable not found (404), returning null');
+          return null;
+        }
+        
+        if (apiError.response.status === 500) {
+          // Handle server error
+          console.error('Server error when fetching timetable:', apiError.response.data?.message || 'Unknown server error');
+          toast.error('Server error when loading timetable. Please try again later.');
+          return null;
+        }
       }
+      
       console.error('Error fetching timetable:', error);
       toast.error('Failed to load timetable');
       return null;
@@ -391,7 +434,8 @@ class TimetableService {
     sectionId: number
   ): Promise<boolean> {
     try {
-      await timetableAPI.addPeriod({
+      
+      const response = await timetableAPI.addPeriod({
         timetableId,
         dayOfWeek,
         timeSlotId,
@@ -400,12 +444,44 @@ class TimetableService {
         classId,
         sectionId
       });
+      
+      console.log('Period added successfully:', response);
       toast.success('Period added successfully');
       return true;
     } catch (error) {
       console.error('Error adding period:', error);
-      toast.error('Failed to add period');
-      return false;
+      
+      // Extract error information
+      const apiError = error as {
+        response?: {
+          status: number,
+          data?: {
+            message?: string,
+            error?: string
+          }
+        },
+        message?: string
+      };
+      
+      let errorMessage = 'Failed to add period';
+      
+      if (apiError.response?.data?.message) {
+        errorMessage = apiError.response.data.message;
+        
+        // Handle specific error cases
+        if (errorMessage.includes('Teacher is already assigned')) {
+          toast.error('Teacher scheduling conflict: ' + errorMessage);
+        } else if (errorMessage.includes('Subject is already assigned')) {
+          toast.error('Subject scheduling conflict: ' + errorMessage);
+        } else {
+          toast.error(errorMessage);
+        }
+      } else {
+        toast.error(errorMessage);
+      }
+      
+      // Propagate the error for the component to handle
+      throw new Error(errorMessage);
     }
   }
 
@@ -430,17 +506,98 @@ class TimetableService {
     breakType: string | null
   ): Promise<boolean> {
     try {
-      await timetableAPI.addTimeSlot({
-        startTime,
-        endTime,
+      // Type validation
+      if (typeof startTime !== 'string' || startTime.trim() === '') {
+        console.error('Invalid startTime:', startTime);
+        toast.error('Start time must be a valid time string');
+        return false;
+      }
+      
+      if (typeof endTime !== 'string' || endTime.trim() === '') {
+        console.error('Invalid endTime:', endTime);
+        toast.error('End time must be a valid time string');
+        return false;
+      }
+      
+      if (typeof isBreak !== 'boolean') {
+        console.error('Invalid isBreak (not a boolean):', isBreak);
+        toast.error('Invalid break status');
+        return false;
+      }
+
+      // Break type validation
+      if (isBreak && (!breakType || typeof breakType !== 'string' || breakType.trim() === '')) {
+        console.error('Invalid breakType for a break period:', breakType);
+        toast.error('Break type is required for break periods');
+        return false;
+      }
+      
+      // Prepare API payload - explicitly handle the breakType
+      // - For class periods: breakType should be null
+      // - For break periods: breakType should be the provided string
+      const payload = {
+        startTime: startTime.trim(),
+        endTime: endTime.trim(),
         isBreak,
-        breakType: isBreak ? breakType : null
-      });
+        breakType: isBreak ? (breakType ? breakType.trim() : null) : null
+      };
+      
+      console.log('addTimeSlot payload:', JSON.stringify(payload, null, 2));
+      
+      // Validate time format
+      const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+      if (!timeRegex.test(payload.startTime) || !timeRegex.test(payload.endTime)) {
+        console.error('Invalid time format in payload:', payload);
+        toast.error('Times must be in 24-hour format (HH:MM)');
+        return false;
+      }
+      
+      // Validate start time is before end time
+      if (payload.startTime >= payload.endTime) {
+        console.error('Start time is not before end time:', payload);
+        toast.error('Start time must be earlier than end time');
+        return false;
+      }
+      
+      const response = await timetableAPI.addTimeSlot(payload);
+      
+      console.log('Time slot creation response:', response);
       toast.success('Time slot added successfully');
       return true;
     } catch (error) {
       console.error('Error adding time slot:', error);
-      toast.error('Failed to add time slot');
+      
+      // Extract more detailed error information if available
+      const apiError = error as {
+        response?: {
+          status: number, 
+          data?: {
+            message?: string, 
+            error?: string,
+            stack?: string
+          }
+        },
+        message?: string
+      };
+      
+      console.error('API Error object:', JSON.stringify(apiError, null, 2));
+      
+      let errorMessage = 'Failed to add time slot';
+      
+      if (apiError.response) {
+        console.error('API Error details:', apiError.response);
+        if (apiError.response.data?.message) {
+          errorMessage += `: ${apiError.response.data.message}`;
+        } else if (apiError.response.status === 400) {
+          errorMessage += ': Invalid time slot data';
+        } else if (apiError.response.status === 500) {
+          errorMessage += ': Server error, please try again later';
+        }
+      } else if (apiError.message) {
+        errorMessage += `: ${apiError.message}`;
+      }
+      
+      toast.error(errorMessage);
       return false;
     }
   }
@@ -517,6 +674,51 @@ class TimetableService {
       console.error('Error fetching teacher timetable:', error);
       toast.error('Failed to load teacher timetable');
       return null;
+    }
+  }
+
+  // Delete a time slot
+  async deleteTimeSlot(timeSlotId: number): Promise<boolean> {
+    try {
+      console.log(`Deleting time slot with ID: ${timeSlotId}`);
+      
+      await timetableAPI.deleteTimeSlot(timeSlotId);
+      
+      toast.success('Time slot deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('Error deleting time slot:', error);
+      
+      // Extract more detailed error information if available
+      const apiError = error as {
+        response?: {
+          status: number, 
+          data?: {
+            message?: string, 
+            error?: string
+          }
+        },
+        message?: string
+      };
+      
+      let errorMessage = 'Failed to delete time slot';
+      
+      if (apiError.response) {
+        if (apiError.response.data?.message) {
+          errorMessage += `: ${apiError.response.data.message}`;
+        } else if (apiError.response.status === 400) {
+          errorMessage += ': Cannot delete time slot as it is being used in timetable periods';
+        } else if (apiError.response.status === 404) {
+          errorMessage += ': Time slot not found';
+        } else if (apiError.response.status === 500) {
+          errorMessage += ': Server error, please try again later';
+        }
+      } else if (apiError.message) {
+        errorMessage += `: ${apiError.message}`;
+      }
+      
+      toast.error(errorMessage);
+      return false;
     }
   }
 }

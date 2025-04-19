@@ -3,6 +3,7 @@ import timetableService, { TimeSlot } from '../../services/timetableService';
 import TimeSlotDialog from '../../components/timetable/TimeSlotDialog';
 import TimeSlotList from '../../components/timetable/TimeSlotList';
 import Button from '../../components/ui/Button';
+import Spinner from '../../components/ui/Spinner';
 
 const TimeSlotsManagement: React.FC = () => {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
@@ -10,6 +11,7 @@ const TimeSlotsManagement: React.FC = () => {
   const [dialogOpen, setDialogOpen] = useState<boolean>(false);
   const [formLoading, setFormLoading] = useState<boolean>(false);
   const [alert, setAlert] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch time slots on component mount
   useEffect(() => {
@@ -19,26 +21,67 @@ const TimeSlotsManagement: React.FC = () => {
   const fetchTimeSlots = async () => {
     try {
       setLoading(true);
+      setError(null);
+      console.log("Fetching time slots...");
+      
       const slots = await timetableService.getTimeSlots();
-      // Sort by start time
-      slots.sort((a, b) => a.startTime.localeCompare(b.startTime));
-      setTimeSlots(slots);
+      console.log("Time slots received:", slots);
+      
+      if (Array.isArray(slots)) {
+        // Sort by start time
+        slots.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        setTimeSlots(slots);
+      } else {
+        throw new Error("Invalid response format from API");
+      }
     } catch (error) {
       console.error('Error fetching time slots:', error);
       showAlert('Failed to load time slots', 'error');
+      setError('There was an error loading time slots. The API might be unavailable or experiencing issues.');
+      // Still show empty list instead of spinner on error
+      setTimeSlots([]);
     } finally {
       setLoading(false);
+      console.log("Loading state set to false");
     }
   };
 
-  const handleAddTimeSlot = async (startTime: string, endTime: string, isBreak: boolean, breakType: string) => {
+  const handleAddTimeSlot = async (startTime: string, endTime: string, isBreak: boolean, breakType: string | null) => {
     try {
       setFormLoading(true);
+      setError(null);
+      
+      console.log('TimeSlotsManagement received:', { startTime, endTime, isBreak, breakType });
+      
+      // Basic validation
+      if (!startTime || !endTime) {
+        showAlert('Start time and end time are required', 'error');
+        setFormLoading(false);
+        return;
+      }
+      
+      // For break periods, breakType is required
+      if (isBreak && (breakType === null || breakType === undefined || breakType === '')) {
+        showAlert('Break type is required for break periods', 'error');
+        setFormLoading(false);
+        return;
+      }
+      
+      // For class periods, breakType should be null
+      const finalBreakType = isBreak ? breakType : null;
+      
+      console.log('Calling timetableService.addTimeSlot with:', { 
+        startTime, 
+        endTime, 
+        isBreak, 
+        breakType: finalBreakType 
+      });
+      
       const success = await timetableService.addTimeSlot(
         startTime,
         endTime,
         isBreak,
-        isBreak ? breakType : null
+        finalBreakType
       );
 
       if (success) {
@@ -82,10 +125,42 @@ const TimeSlotsManagement: React.FC = () => {
 
         {loading ? (
           <div className="flex justify-center items-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            <Spinner size="lg" />
+          </div>
+        ) : error ? (
+          <div className="p-4 bg-red-50 text-red-700 rounded-md">
+            <p className="font-medium mb-2">Error</p>
+            <p>{error}</p>
+            <Button 
+              variant="primary"
+              onClick={fetchTimeSlots}
+              className="mt-4"
+            >
+              Retry
+            </Button>
+          </div>
+        ) : timeSlots.length === 0 ? (
+          <div className="py-8 text-center text-gray-500">
+            <p className="mb-4">No time slots available yet.</p>
+            <p>Click the "Add Time Slot" button to create your first time slot.</p>
           </div>
         ) : (
-          <TimeSlotList timeSlots={timeSlots} />
+          <TimeSlotList 
+            timeSlots={timeSlots} 
+            isAdmin={true}
+            onDelete={async (timeSlotId) => {
+              try {
+                const success = await timetableService.deleteTimeSlot(timeSlotId);
+                if (success) {
+                  await fetchTimeSlots(); // Refresh the list
+                  showAlert('Time slot deleted successfully', 'success');
+                }
+              } catch (error) {
+                console.error('Error deleting time slot:', error);
+                showAlert('Failed to delete time slot', 'error');
+              }
+            }}
+          />
         )}
       </div>
 
