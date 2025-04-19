@@ -64,6 +64,12 @@ const ManageTimetable: React.FC = () => {
   const [initialLoading, setInitialLoading] = useState<boolean>(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  // Additional form states
+  const [selectedDay, setSelectedDay] = useState<string>('Monday');
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<number | ''>('');
+  const [selectedSubject, setSelectedSubject] = useState<number | ''>('');
+  const [selectedTeacher, setSelectedTeacher] = useState<number | ''>('');
+
   // Fetch initial data
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -613,11 +619,24 @@ const ManageTimetable: React.FC = () => {
       <PeriodDialog
         open={periodDialogOpen}
         onClose={handleClosePeriodDialog}
-        onAdd={handleAddPeriod}
+        onAddPeriod={async () => {
+          if (selectedDay && selectedTimeSlot && selectedSubject && selectedTeacher) {
+            const dayIndex = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].indexOf(selectedDay);
+            await handleAddPeriod(dayIndex, Number(selectedTimeSlot), Number(selectedSubject), Number(selectedTeacher));
+          }
+        }}
         loading={isAddingPeriod}
         timeSlots={timeSlots}
         subjects={subjects}
         teachers={teachers}
+        selectedDay={selectedDay || 'Monday'}
+        setSelectedDay={setSelectedDay}
+        selectedTimeSlot={selectedTimeSlot}
+        setSelectedTimeSlot={setSelectedTimeSlot}
+        selectedSubject={selectedSubject}
+        setSelectedSubject={setSelectedSubject}
+        selectedTeacher={selectedTeacher}
+        setSelectedTeacher={setSelectedTeacher}
       />
 
       {/* Time Slot Dialog */}

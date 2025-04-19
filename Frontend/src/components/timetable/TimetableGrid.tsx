@@ -1,12 +1,18 @@
 import React from 'react';
-import { TimetableRow, Period } from '../../services/timetableService';
+import Button from '../ui/Button';
+import { Period, TimeSlot } from '../../services/timetableService';
+
+interface TimetableRow {
+  timeSlot: TimeSlot;
+  [key: string]: Period | TimeSlot | null;
+}
 
 interface TimetableGridProps {
   periodGrid: TimetableRow[] | null;
-  onDeletePeriod: (periodId: number) => Promise<void>;
+  onDeletePeriod: (periodId: number) => void;
 }
-  
-const TimetableGrid: React.FC<TimetableGridProps> = ({ periodGrid}) => {
+
+const TimetableGrid: React.FC<TimetableGridProps> = ({ periodGrid, onDeletePeriod }) => {
   if (!periodGrid || periodGrid.length === 0) {
     return (
       <div className="p-4 bg-blue-50 text-blue-800 rounded-md">
@@ -15,19 +21,17 @@ const TimetableGrid: React.FC<TimetableGridProps> = ({ periodGrid}) => {
     );
   }
 
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse min-w-[700px]">
         <thead className="bg-[#292648] text-white">
           <tr>
             <th className="p-3 text-left">Time Slot</th>
-            <th className="p-3 text-center">Monday</th>
-            <th className="p-3 text-center">Tuesday</th>
-            <th className="p-3 text-center">Wednesday</th>
-            <th className="p-3 text-center">Thursday</th>
-            <th className="p-3 text-center">Friday</th>
-            <th className="p-3 text-center">Saturday</th>
-            <th className="p-3 text-center">Sunday</th>
+            {daysOfWeek.map(day => (
+              <th key={day} className="p-3 text-center">{day}</th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -43,7 +47,7 @@ const TimetableGrid: React.FC<TimetableGridProps> = ({ periodGrid}) => {
                   </div>
                 )}
               </td>
-              {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+              {daysOfWeek.map((day) => (
                 <td key={day} className="p-3 border text-center relative">
                   {row[day] && 'subject' in row[day] ? (
                     <div>
@@ -53,6 +57,12 @@ const TimetableGrid: React.FC<TimetableGridProps> = ({ periodGrid}) => {
                       <div className="text-xs text-gray-600">
                         {(row[day] as Period).teacher.user?.name || (row[day] as Period).teacher.name}
                       </div>
+                      <Button
+                        className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+                        onClick={() => onDeletePeriod((row[day] as Period).id)}
+                      >
+                        <span className="text-xs">×</span>
+                      </Button>
                     </div>
                   ) : row.timeSlot.isBreak ? (
                     <span className="text-xs text-gray-500">Break</span>
