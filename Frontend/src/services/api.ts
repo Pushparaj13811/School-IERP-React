@@ -447,6 +447,19 @@ export interface AdminDashboardData {
     classes: number;
     pendingLeaves: number;
   };
+  totalStudents: number;
+  totalTeachers: number;
+  totalClasses: number;
+  totalSubjects: number;
+  totalSections: number;
+  activeStudents: number;
+  activeTeachers: number;
+  usersByRole: {
+    STUDENT: number;
+    TEACHER: number;
+    PARENT: number;
+    ADMIN: number;
+  };
   studentsByGender: Array<{
     gender: string;
     _count: { id: number };
@@ -462,6 +475,7 @@ export interface AdminDashboardData {
     title: string;
     content: string;
     createdAt: string;
+    date?: string;
     creator: { id: number; name: string };
   }>;
   recentAchievements: Array<{
@@ -471,6 +485,12 @@ export interface AdminDashboardData {
     achievementType: { name: string };
     student?: { id: number; name: string };
     teacher?: { id: number; name: string };
+  }>;
+  recentActivities: Array<{
+    id?: number;
+    type: string;
+    description: string;
+    timestamp: string;
   }>;
 }
 
@@ -487,7 +507,13 @@ export interface TeacherDashboardData {
       class: { id: number; name: string };
       section: { id: number; name: string };
     }>;
+    profilePicture?: string;
+    phone?: string;
   };
+  totalClasses: number;
+  totalStudents: number;
+  pendingAttendances: number;
+  pendingLeaveRequests: number;
   todayTimetable: Array<{
     id: number;
     timeSlot: { startTime: string; endTime: string };
@@ -507,6 +533,32 @@ export interface TeacherDashboardData {
     fromDate: string;
     toDate: string;
     reason: string;
+  }>;
+  assignedClasses: Array<{
+    class: { id: number; name: string };
+    section: { id: number; name: string };
+    subject: { id: number; name: string; code: string };
+    studentsCount: number;
+  }>;
+  pendingLeaveApplications: Array<{
+    id: number;
+    student: {
+      id: number;
+      name: string;
+      class?: { id: number; name: string } | string;
+      section?: { id: number; name: string } | string;
+    };
+    status: string;
+    startDate: string;
+    endDate: string;
+    createdAt: string;
+  }>;
+  recentAnnouncements: Array<{
+    id: number;
+    title: string;
+    content: string;
+    date: string;
+    creator?: { id: number; name: string };
   }>;
   announcements: Array<{
     id: number;
