@@ -15,7 +15,8 @@
     "seed:designations": "node src/scripts/seed-designations.js",
     "seed:subjects": "node src/scripts/seed-subjects.js",
     "seed-leave-types": "node --experimental-json-modules src/scripts/seed-leave-types.js",
-    "seed:teachers": "node src/scripts/seed-teachers.js"
+    "seed:teachers": "node src/scripts/seed-teachers.js",
+    "seed:holidays": "node src/scripts/seed-holidays.js"
   },
   "repository": {
     "type": "git",

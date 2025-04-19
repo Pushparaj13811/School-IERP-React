@@ -52,12 +52,18 @@ const getHolidayById = asyncHandler(async (req, res) => {
  * @access  Admin, Teacher, Student, Parent
  */
 const getUpcomingHolidays = asyncHandler(async (req, res) => {
-  const days = req.query.days ? parseInt(req.query.days) : 30;
-  const holidays = await holidayService.getUpcomingHolidays(days);
-  
-  return res
-    .status(200)
-    .json(new ApiResponse(200, { holidays }, "Upcoming holidays fetched successfully"));
+  try {
+    // Get upcoming holidays for the next 30 days
+    const upcomingHolidays = await holidayService.getUpcomingHolidays();
+    
+    // Return the response
+    return res.status(200).json(
+      new ApiResponse(200, { holidays: upcomingHolidays }, 'Upcoming holidays fetched successfully')
+    );
+  } catch (error) {
+    console.error('Error in getUpcomingHolidays:', error);
+    throw new ApiError(500, 'Something went wrong while fetching upcoming holidays');
+  }
 });
 
 /**

@@ -833,6 +833,10 @@ export const holidayApi = {
     api.get<ApiResponse<{ holidays: UpcomingHoliday[] }>>('/holidays/upcoming', { 
       params: { days } 
     }),
+
+  // Add holiday API functions for the student view
+  getStudentHolidays: () => 
+    api.get<ApiResponse<{ holidays: Holiday[] }>>('/holidays/upcoming'),
 };
 
 export default api;
