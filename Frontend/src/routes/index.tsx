@@ -25,6 +25,8 @@ const AdminLeave = lazy(() => import('../pages/admin/Leave'));
 const LeaveApplicationCreate = lazy(() => import('../pages/student/LeaveApplicationCreate'));
 const Feedback = lazy(() => import('../pages/student/Feedback'));
 const TimeTable = lazy(() => import('../pages/student/TimeTable'));
+const TeacherTimetable = lazy(() => import('../pages/teacher/Timetable'));
+const ManageTimetable = lazy(() => import('../pages/admin/ManageTimetable'));
 const Announcements = lazy(() => import('../pages/shared/AnnouncementView'));
 const Logout = lazy(() => import('../pages/Logout'));
 
@@ -158,7 +160,12 @@ export const routes: Route[] = [
   },
   {
     path: '/time-table',
-    component: TimeTable,
+    component: ({ user }: RouteComponentProps) => {
+      if (user?.role === UserRole.TEACHER) {
+        return <TeacherTimetable />;
+      }
+      return <TimeTable />;
+    },
     roles: [UserRole.STUDENT, UserRole.TEACHER],
   },
   {
@@ -195,6 +202,11 @@ export const routes: Route[] = [
   {
     path: '/manage-results',
     component: ManageResults,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: '/manage-timetable',
+    component: ManageTimetable,
     roles: [UserRole.ADMIN],
   },
   {
