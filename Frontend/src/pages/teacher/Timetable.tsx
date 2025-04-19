@@ -106,26 +106,10 @@ const TeacherTimetable: React.FC = () => {
           setTeacherData(teacher);
         }
         
-        // Fetch teacher timetable (API endpoint through service)
-        try {
-          // Note: We need to add this method to the timetableService
-          const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/v1/timetables/teacher`, {
-            headers: { 
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error('Failed to fetch teacher timetable');
-          }
-          
-          const data = await response.json();
-          if (data.status === 'success') {
-            setTeacherTimetable(data.data);
-          }
-        } catch (error) {
-          console.error('Error fetching teacher timetable:', error);
+        // Fetch teacher timetable using the service
+        const teacherTimetableData = await timetableService.getTeacherTimetable();
+        if (teacherTimetableData) {
+          setTeacherTimetable(teacherTimetableData);
         }
         
         // Fetch class teacher assignments
@@ -290,25 +274,9 @@ const TeacherTimetable: React.FC = () => {
         showNotification('Period added successfully', 'success');
         
         // Also refresh teacher's own timetable view
-        try {
-          // Note: We need to add this method to the timetableService
-          const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/v1/timetables/teacher`, {
-            headers: { 
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error('Failed to fetch teacher timetable');
-          }
-          
-          const data = await response.json();
-          if (data.status === 'success') {
-            setTeacherTimetable(data.data);
-          }
-        } catch (error) {
-          console.error('Error refreshing teacher timetable:', error);
+        const teacherTimetableData = await timetableService.getTeacherTimetable();
+        if (teacherTimetableData) {
+          setTeacherTimetable(teacherTimetableData);
         }
       }
       
@@ -341,25 +309,9 @@ const TeacherTimetable: React.FC = () => {
         }
         
         // Also refresh teacher's own timetable view
-        try {
-          // Note: We need to add this method to the timetableService
-          const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/v1/timetables/teacher`, {
-            headers: { 
-              'Authorization': `Bearer ${localStorage.getItem('token')}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error('Failed to fetch teacher timetable');
-          }
-          
-          const data = await response.json();
-          if (data.status === 'success') {
-            setTeacherTimetable(data.data);
-          }
-        } catch (error) {
-          console.error('Error refreshing teacher timetable:', error);
+        const teacherTimetableData = await timetableService.getTeacherTimetable();
+        if (teacherTimetableData) {
+          setTeacherTimetable(teacherTimetableData);
         }
         
         showNotification('Period deleted successfully', 'success');

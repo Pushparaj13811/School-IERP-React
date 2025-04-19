@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-
+import React, { useState, useEffect } from 'react';
+import Button from '../ui/Button';
 interface TimeSlotDialogProps {
   open: boolean;
   onClose: () => void;
@@ -12,11 +12,55 @@ const TimeSlotDialog: React.FC<TimeSlotDialogProps> = ({ open, onClose, onAdd, l
   const [endTime, setEndTime] = useState<string>('');
   const [isBreak, setIsBreak] = useState<boolean>(false);
   const [breakType, setBreakType] = useState<string>('');
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Reset form when dialog opens or closes
+  useEffect(() => {
+    if (open) {
+      setValidationError(null);
+    } else {
+      // Reset form on close
+      setStartTime('');
+      setEndTime('');
+      setIsBreak(false);
+      setBreakType('');
+    }
+  }, [open]);
 
   if (!open) return null;
   
+  const validateForm = (): boolean => {
+    // Check if start time and end time are provided
+    if (!startTime) {
+      setValidationError('Please select a start time');
+      return false;
+    }
+    
+    if (!endTime) {
+      setValidationError('Please select an end time');
+      return false;
+    }
+    
+    // Compare the times to ensure end time is after start time
+    if (startTime >= endTime) {
+      setValidationError('End time must be after start time');
+      return false;
+    }
+    
+    // Ensure break type is selected if isBreak is true
+    if (isBreak && !breakType) {
+      setValidationError('Please select a break type');
+      return false;
+    }
+    
+    setValidationError(null);
+    return true;
+  };
+  
   const handleSubmit = async () => {
-    await onAdd(startTime, endTime, isBreak, breakType);
+    if (validateForm()) {
+      await onAdd(startTime, endTime, isBreak, breakType);
+    }
   };
 
   return (
@@ -24,10 +68,20 @@ const TimeSlotDialog: React.FC<TimeSlotDialogProps> = ({ open, onClose, onAdd, l
       <div className="bg-white rounded-lg w-full max-w-md p-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium">Add Time Slot</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <Button 
+            variant="outline" 
+            onClick={onClose} 
+            className="py-1 px-2 text-gray-400 hover:text-gray-600"
+          >
             ×
-          </button>
+          </Button>
         </div>
+        
+        {validationError && (
+          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
+            {validationError}
+          </div>
+        )}
         
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -35,7 +89,10 @@ const TimeSlotDialog: React.FC<TimeSlotDialogProps> = ({ open, onClose, onAdd, l
               <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
               <select
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                onChange={(e) => {
+                  setStartTime(e.target.value);
+                  setValidationError(null);
+                }}
                 className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select Start Time</option>
@@ -56,7 +113,10 @@ const TimeSlotDialog: React.FC<TimeSlotDialogProps> = ({ open, onClose, onAdd, l
               <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
               <select
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
+                onChange={(e) => {
+                  setEndTime(e.target.value);
+                  setValidationError(null);
+                }}
                 className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select End Time</option>
@@ -78,7 +138,10 @@ const TimeSlotDialog: React.FC<TimeSlotDialogProps> = ({ open, onClose, onAdd, l
             <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
             <select
               value={isBreak ? 'break' : 'period'}
-              onChange={(e) => setIsBreak(e.target.value === 'break')}
+              onChange={(e) => {
+                setIsBreak(e.target.value === 'break');
+                setValidationError(null);
+              }}
               className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="period">Period</option>
@@ -91,7 +154,10 @@ const TimeSlotDialog: React.FC<TimeSlotDialogProps> = ({ open, onClose, onAdd, l
               <label className="block text-sm font-medium text-gray-700 mb-1">Break Type</label>
               <select
                 value={breakType}
-                onChange={(e) => setBreakType(e.target.value)}
+                onChange={(e) => {
+                  setBreakType(e.target.value);
+                  setValidationError(null);
+                }}
                 className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select Break Type</option>
@@ -104,20 +170,16 @@ const TimeSlotDialog: React.FC<TimeSlotDialogProps> = ({ open, onClose, onAdd, l
         </div>
         
         <div className="flex justify-end mt-6 space-x-2">
-          <button 
+          <Button 
+            variant="outline"
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
           >
             Cancel
-          </button>
-          <button 
+          </Button>
+          <Button 
+            variant="primary"
             onClick={handleSubmit}
-            disabled={!startTime || !endTime || (isBreak && !breakType) || loading}
-            className={`px-4 py-2 rounded-md text-white ${
-              !startTime || !endTime || (isBreak && !breakType) || loading
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-[#292648] hover:bg-[#3b3664]'
-            }`}
+            disabled={loading}
           >
             {loading ? (
               <span className="flex items-center">
@@ -127,7 +189,7 @@ const TimeSlotDialog: React.FC<TimeSlotDialogProps> = ({ open, onClose, onAdd, l
             ) : (
               'Add Time Slot'
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
