@@ -49,6 +49,15 @@ interface ApiResponseData {
   success: boolean;
 }
 
+// Add interface for login response
+interface LoginResponse {
+  status: string;
+  token: string;
+  data: {
+    user: User;
+  }
+}
+
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
@@ -88,7 +97,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const response = await authAPI.refreshToken();
           console.log('Refresh token response:', response.data);
           
-          const responseData = response.data as ApiResponseData;
+          // Cast to unknown first to avoid type errors
+          const responseData = response.data as unknown as ApiResponseData;
           const actualToken = responseData.data.token;
           const actualUser = responseData.data.data.user;
           
@@ -131,24 +141,77 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await authAPI.login(email, password);
       console.log('Login response:', response.data);
       
-      const responseData = response.data as ApiResponseData;
-      const actualToken = responseData.data.token;
-      const actualUser = responseData.data.data.user;
+      // Cast to unknown first to safely handle different response formats
+      const responseData = response.data as unknown;
       
-      // Normalize the role
-      actualUser.role = normalizeRole(actualUser.role);
+      if (typeof responseData === 'object' && responseData !== null) {
+        const typedResponse = responseData as { 
+          statusCode?: number; 
+          success?: boolean; 
+          data?: {
+            token: string;
+            data?: {
+              user: User;
+            };
+          }; 
+          status?: string;
+          token?: string;
+          message?: string;
+        };
+        
+        if (typedResponse.statusCode && typedResponse.success !== undefined) {
+          // Using the ApiResponse wrapper format
+          if (typedResponse.success && typedResponse.data) {
+            const token = typedResponse.data.token;
+            const userData = typedResponse.data.data?.user;
+            
+            if (!userData) {
+              throw new Error('User data not found in response');
+            }
+            
+            // Normalize the role
+            userData.role = normalizeRole(userData.role);
+            
+            localStorage.setItem('token', token);
+            localStorage.setItem('user', JSON.stringify(userData));
+            setUser(userData);
+          } else {
+            throw new Error(typedResponse.message || 'Login failed');
+          }
+        } else if (typedResponse.status === 'success') {
+          // Using the direct format from controller
+          const loginData = responseData as LoginResponse;
+          const token = loginData.token;
+          const userData = loginData.data?.user;
+          
+          if (!token || !userData) {
+            throw new Error('Invalid response format: missing token or user data');
+          }
+          
+          // Normalize the role
+          userData.role = normalizeRole(userData.role);
+          
+          localStorage.setItem('token', token);
+          localStorage.setItem('user', JSON.stringify(userData));
+          setUser(userData);
+        } else {
+          throw new Error('Invalid response format');
+        }
+      } else {
+        throw new Error('Invalid response data: not an object');
+      }
       
-      console.log('Setting token:', actualToken);
-      console.log('Setting user with normalized role:', actualUser);
-      
-      localStorage.setItem('token', actualToken);
-      localStorage.setItem('user', JSON.stringify(actualUser));
-      setUser(actualUser);
       setLoading(false);
     } catch (error) {
       console.error('Login failed:', error);
       setLoading(false);
-      throw error;
+      
+      // Rethrow for handling in the Login component
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Unknown login error');
+      }
     }
   };
 

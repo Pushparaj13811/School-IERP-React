@@ -36,6 +36,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     
     { icon: 'bi-file-earmark-text', label: 'Academics', isGroup: true },
     { icon: 'bi-key', label: 'Manage Results', path: '/manage-results' },
+    { icon: 'bi-calendar2-week', label: 'Manage Timetable', path: '/manage-timetable' },
     { icon: 'bi-clipboard-data', label: 'Report', path: '/report' },
     { icon: 'bi-calendar-check', label: 'Leave Application', path: '/leave' },
     
@@ -72,6 +73,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     
     { icon: 'bi-book', label: 'Academics', isGroup: true },
     { icon: 'bi-calendar-check', label: 'Attendance', path: '/attendance' },
+    { icon: 'bi-calendar2-week', label: 'Timetable', path: '/time-table' },
     
     { icon: 'bi-file-earmark-text', label: 'Exam', isGroup: true },
     { icon: 'bi-clipboard-data', label: 'Result', path: '/result' },
@@ -81,6 +83,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     { icon: 'bi-calendar-event', label: 'Holidays', path: '/holiday' },
     { icon: 'bi-chat-dots', label: 'Feedback', path: '/feedback' },
     { icon: 'bi-bell', label: 'View Announcements', path: '/announcements' },
+    { icon: 'bi-plus-circle', label: 'Create Announcement', path: '/announcements/create' },
     { icon: 'bi-box-arrow-right', label: 'Logout', path: '/logout' },
   ];
   
