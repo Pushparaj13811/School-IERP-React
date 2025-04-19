@@ -14,7 +14,8 @@
     "seed:admin": "node src/seeds/adminSeeder.js",
     "seed:designations": "node src/scripts/seed-designations.js",
     "seed:subjects": "node src/scripts/seed-subjects.js",
-    "seed-leave-types": "node --experimental-json-modules src/scripts/seed-leave-types.js"
+    "seed-leave-types": "node --experimental-json-modules src/scripts/seed-leave-types.js",
+    "seed:teachers": "node src/scripts/seed-teachers.js"
   },
   "repository": {
     "type": "git",
