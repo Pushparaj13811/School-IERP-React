@@ -3,6 +3,7 @@ import { format, isAfter, parseISO } from 'date-fns';
 import { attendanceAPI, userAPI, teacherAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { Student as ApiStudent } from '../../types/api';
+import Button from '../../components/ui/Button';
 
 interface Student {
   id: number;
@@ -88,9 +89,7 @@ const Attendance: React.FC = () => {
         }
 
         // Fetch the class teacher assignments for this teacher
-        const assignmentsRes = await teacherAPI.getClassTeacherAssignments({ 
-          teacherId: user.teacher.id 
-        });
+        const assignmentsRes = await teacherAPI.getClassTeacherAssignments();
 
         if (assignmentsRes.data?.status !== 'success' || !assignmentsRes.data?.data?.assignments?.length) {
           setError('You are not assigned as class teacher to any class');
@@ -445,17 +444,18 @@ const Attendance: React.FC = () => {
           </div>
           
           <div>
-            <button
+            <Button
+              variant="primary"
               onClick={saveAttendance}
               disabled={saving || students.length === 0 || isHoliday || isAfter(parseISO(selectedDate), new Date())}
               className={`px-4 py-2 rounded-md text-white flex items-center gap-2 ${
                 saving || students.length === 0 || isHoliday || isAfter(parseISO(selectedDate), new Date())
                   ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-primary hover:bg-primary/90'
-              }`}
+                  : 'bg-[#292648] hover:bg-[#3b3664]'
+              }`}   
             >
               {saving ? 'Saving...' : 'Save All Attendance'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -520,8 +520,9 @@ const Attendance: React.FC = () => {
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex flex-wrap gap-2">
                                 {['PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'EXCUSED'].map((status) => (
-                                  <button
+                                  <Button
                                     key={status}
+                                    variant="primary"
                                     onClick={() => handleStatusChange(student.id, status as 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'EXCUSED')}
                                     className={`px-3 py-1 text-xs rounded-full border ${
                                       record?.status === status
@@ -530,17 +531,17 @@ const Attendance: React.FC = () => {
                                     }`}
                                   >
                                     {status}
-                                  </button>
+                                  </Button>
                                 ))}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <button 
+                              <Button 
+                                variant="primary"
                                 onClick={() => openRemarkDialog(student.id)}
-                                className="text-sm px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-100 text-blue-50"
                               >
                                 {record?.remarks ? 'Edit Remark' : 'Add Remark'}
-                              </button>
+                              </Button>
                             </td>
                           </tr>
                         );
@@ -577,18 +578,18 @@ const Attendance: React.FC = () => {
               className="w-full p-2 border rounded-md mb-4"
             />
             <div className="flex justify-end gap-2">
-              <button 
+              <Button 
+                variant="danger"
                 onClick={() => setDialogOpen(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100"
               >
                 Cancel
-              </button>
-              <button 
+              </Button>
+              <Button 
+                variant="primary"
                 onClick={saveRemark}
-                className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90"
               >
                 Save
-              </button>
+              </Button>
             </div>
           </div>
         </div>
