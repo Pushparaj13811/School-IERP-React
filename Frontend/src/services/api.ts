@@ -457,20 +457,20 @@ export const dashboardAPI = {
 // Add to the teacherAPI object
 export const teacherAPI = {
   getAll: (params?: Record<string, unknown>) => 
-    api.get<ApiResponse<{ teachers: Teacher[] }>>('/teachers', { params }),
+    api.get<ApiResponse<{ teachers: Teacher[] }>>('/users/teachers', { params }),
   getById: (id: number) => 
-    api.get<ApiResponse<{ teacher: Teacher }>>(`/teachers/${id}`),
+    api.get<ApiResponse<{ teacher: Teacher }>>(`/users/teachers/${id}`),
   create: (data: TeacherFormData) => 
-    api.post<ApiResponse<{ teacher: Teacher }>>('/teachers', data),
+    api.post<ApiResponse<{ teacher: Teacher }>>('/users/teachers', data),
   update: (id: number, data: Partial<TeacherFormData>) => 
-    api.patch<ApiResponse<{ teacher: Teacher }>>(`/teachers/${id}`, data),
+    api.patch<ApiResponse<{ teacher: Teacher }>>(`/users/teachers/${id}`, data),
   delete: (id: number) => 
-    api.delete<ApiResponse<{ message: string }>>(`/teachers/${id}`),
+    api.delete<ApiResponse<{ message: string }>>(`/users/teachers/${id}`),
   // Class teacher assignment endpoints
   assignClassTeacher: (data: { teacherId: number; classId: number; sectionId: number }) => 
     api.post<ApiResponse<{ assignment: ClassTeacherAssignment }>>('/teachers/class-teacher', data),
-  getClassTeacherAssignments: (params?: { classId?: number; sectionId?: number; teacherId?: number }) => 
-    api.get<ApiResponse<{ assignments: ClassTeacherAssignment[] }>>('/teachers/class-teacher/assignments', { params }),
+  getClassTeacherAssignments: () => 
+    api.get<ApiResponse<{ assignments: ClassTeacherAssignment[] }>>(`/teachers/class-teacher/assignments`),
   removeClassTeacherAssignment: (id: number) => 
     api.delete<ApiResponse<{ message: string }>>(`/teachers/class-teacher/assignments/${id}`),
 };
@@ -484,6 +484,10 @@ export const timetableAPI = {
   // Add a new time slot
   addTimeSlot: (data: { startTime: string; endTime: string; isBreak: boolean; breakType: string | null }) => 
     api.post<ApiResponse<TimeSlot>>('/timetables/timeslots', data),
+  
+  // Delete a time slot
+  deleteTimeSlot: (id: number) => 
+    api.delete<ApiResponse<{ message: string }>>(`/timetables/timeslots/${id}`),
   
   // Get timetable by query parameters
   getTimetable: (params: { classId: number; sectionId: number; academicYear: string; term: string }) => 
