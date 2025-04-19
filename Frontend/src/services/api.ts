@@ -245,6 +245,42 @@ interface Timetable {
   periods?: Period[];
 }
 
+// Holiday Interfaces
+interface Holiday {
+  id: number;
+  name: string;
+  description: string | null;
+  fromDate: string;
+  toDate: string;
+  holidayTypeId: number;
+  isRecurring: boolean;
+  recurrencePattern: string | null;
+  holidayType: {
+    id: number;
+    name: string;
+  };
+}
+
+interface HolidayType {
+  id: number;
+  name: string;
+  description: string | null;
+}
+
+interface UpcomingHoliday {
+  id: number;
+  title: string;
+  description: string | null;
+  date: string;
+  toDate: string;
+  holidayType: {
+    id: number;
+    name: string;
+  };
+  isRecurring: boolean;
+  recurrencePattern: string | null;
+}
+
 // Create axios instance with default config
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1', // Update this with your backend URL
@@ -739,4 +775,64 @@ export const timetableAPI = {
       : api.get<ApiResponse<TeacherTimetable>>('/timetables/teacher')
 };
 
-export default api; 
+export interface HolidayListResponse {
+  holidays: Holiday[];
+  pagination: {
+    totalCount: number;
+    totalPages: number;
+    currentPage: number;
+    hasNextPage: boolean;
+    hasPrevPage: boolean;
+  };
+}
+
+export interface HolidayTypeListResponse {
+  holidayTypes: HolidayType[];
+}
+
+// Holiday API functions
+export const holidayApi = {
+  getHolidays: (params?: { 
+    year?: string; 
+    month?: string; 
+    holidayTypeId?: string; 
+    isRecurring?: string;
+    page?: number;
+    limit?: number;
+  }) => 
+    api.get<ApiResponse<{ 
+      holidays: Holiday[], 
+      pagination: { 
+        totalCount: number; 
+        totalPages: number; 
+        currentPage: number; 
+        hasNextPage: boolean; 
+        hasPrevPage: boolean;
+      } 
+    }>>('/holidays', { params }),
+
+  getHolidayById: (id: number) => 
+    api.get<ApiResponse<{ holiday: Holiday }>>(`/holidays/${id}`),
+
+  createHoliday: (holidayData: Omit<Holiday, 'id' | 'holidayType'>) => 
+    api.post<ApiResponse<{ holiday: Holiday }>>('/holidays', holidayData),
+
+  updateHoliday: (id: number, holidayData: Partial<Omit<Holiday, 'id' | 'holidayType'>>) => 
+    api.put<ApiResponse<{ holiday: Holiday }>>(`/holidays/${id}`, holidayData),
+
+  deleteHoliday: (id: number) => 
+    api.delete<ApiResponse<null>>(`/holidays/${id}`),
+
+  getHolidayTypes: () => 
+    api.get<ApiResponse<{ holidayTypes: HolidayType[] }>>('/holidays/types'),
+
+  createHolidayType: (data: { name: string; description?: string }) => 
+    api.post<ApiResponse<{ holidayType: HolidayType }>>('/holidays/types', data),
+
+  getUpcomingHolidays: (days?: number) => 
+    api.get<ApiResponse<{ holidays: UpcomingHoliday[] }>>('/holidays/upcoming', { 
+      params: { days } 
+    }),
+};
+
+export default api;

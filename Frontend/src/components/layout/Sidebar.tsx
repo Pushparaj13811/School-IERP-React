@@ -37,6 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     { icon: 'bi-file-earmark-text', label: 'Academics', isGroup: true },
     { icon: 'bi-key', label: 'Manage Results', path: '/manage-results' },
     { icon: 'bi-calendar2-week', label: 'Manage Timetable', path: '/manage-timetable' },
+    { icon: 'bi-calendar-event', label: 'Holiday Management', path: '/holiday-management' },
     { icon: 'bi-clipboard-data', label: 'Report', path: '/report' },
     { icon: 'bi-calendar-check', label: 'Leave Application', path: '/leave' },
     
