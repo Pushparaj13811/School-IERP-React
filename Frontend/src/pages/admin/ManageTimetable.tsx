@@ -58,39 +58,76 @@ const ManageTimetable: React.FC = () => {
 
   // Loading states
   const [loading, setLoading] = useState<boolean>(false);
+  const [isCreatingTimetable, setIsCreatingTimetable] = useState<boolean>(false);
+  const [isAddingTimeSlot, setIsAddingTimeSlot] = useState<boolean>(false);
+  const [isAddingPeriod, setIsAddingPeriod] = useState<boolean>(false);
+  const [initialLoading, setInitialLoading] = useState<boolean>(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Fetch initial data
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        setLoading(true);
+        setInitialLoading(true);
+        setFetchError(null);
 
-        // Load all needed data in parallel
-        const [classesData, subjectsData, teachersData, timeSlotsData] = await Promise.all([
-          timetableService.getClasses(),
-          timetableService.getSubjects(),
-          timetableService.getTeachers(),
-          timetableService.getTimeSlots()
-        ]);
+        let classesData: Class[] = [];
+        let subjectsData: Subject[] = [];
+        let teachersData: Teacher[] = [];
+        let timeSlotsData: TimeSlot[] = [];
 
-        setClasses(classesData);
-        setSubjects(subjectsData);
-        setTeachers(teachersData);
-        setTimeSlots(timeSlotsData);
+        // Fetch each data type separately to better isolate any issues
+        try {
+          classesData = await timetableService.getClasses();
+          setClasses(classesData || []);
+        } catch (classError) {
+          console.error('Error fetching classes:', classError);
+          setFetchError('Failed to load classes');
+        }
 
-        setLoading(false);
+        try {
+          subjectsData = await timetableService.getSubjects();
+          setSubjects(subjectsData || []);
+        } catch (subjectError) {
+          console.error('Error fetching subjects:', subjectError);
+        }
+
+        try {
+          teachersData = await timetableService.getTeachers();
+          setTeachers(teachersData || []);
+        } catch (teacherError) {
+          console.error('Error fetching teachers:', teacherError);
+        }
+
+        try {
+          timeSlotsData = await timetableService.getTimeSlots();
+          setTimeSlots(timeSlotsData || []);
+        } catch (timeSlotError) {
+          console.error('Error fetching time slots:', timeSlotError);
+        }
+
+        // Ensure we set initialLoading to false regardless of individual fetch results
+        setInitialLoading(false);
       } catch (error) {
-        console.error('Error fetching initial data:', error);
+        console.error('Error in fetchInitialData:', error);
         setAlert({
           open: true,
           message: 'Error fetching data. Please try again.',
           severity: 'error',
         });
-        setLoading(false);
+        setInitialLoading(false);
+        setFetchError('Failed to load data');
       }
     };
 
     fetchInitialData();
+
+    // Add a safety timeout to ensure initialLoading is set to false after 5 seconds
+    const safetyTimer = setTimeout(() => {
+      setInitialLoading(false);
+    }, 5000);
+
+    return () => clearTimeout(safetyTimer);
   }, []);
 
   // Fetch sections when class is selected
@@ -98,8 +135,10 @@ const ManageTimetable: React.FC = () => {
     const fetchSections = async () => {
       if (selectedClass) {
         try {
+          setLoading(true);
           const sectionsData = await timetableService.getSections(Number(selectedClass));
-          setSections(sectionsData);
+          setSections(sectionsData || []);
+          setLoading(false);
         } catch (error) {
           console.error('Error fetching sections:', error);
           setAlert({
@@ -107,6 +146,7 @@ const ManageTimetable: React.FC = () => {
             message: 'Error fetching sections. Please try again.',
             severity: 'error',
           });
+          setLoading(false);
         }
       } else {
         setSections([]);
@@ -128,11 +168,21 @@ const ManageTimetable: React.FC = () => {
             academicYear,
             term
           );
+          console.log('Timetable data received:', timetableData);
           setSelectedTimetable(timetableData);
           setLoading(false);
         } catch (error) {
-          console.error('Error fetching timetable:', error);
+            console.error('Error fetching timetable:', error);
           setLoading(false);
+          // Show an alert when we get a 500 error, but allow creation
+          const apiError = error as { response?: { status: number } };
+          if (apiError.response && apiError.response.status === 500) {
+            setAlert({
+              open: true,
+              message: 'Could not find existing timetable. You can create a new one.',
+              severity: 'error',
+            });
+          }
         }
       }
     };
@@ -141,6 +191,13 @@ const ManageTimetable: React.FC = () => {
       fetchTimetable();
     }
   }, [selectedClass, selectedSection, academicYear, term]);
+
+  // Force update component when classes are loaded
+  useEffect(() => {
+    if (classes.length > 0 && initialLoading) {
+      setInitialLoading(false);
+    }
+  }, [classes, initialLoading]);
 
   const handleTabChange = (newValue: number) => {
     setTabValue(newValue);
@@ -175,33 +232,36 @@ const ManageTimetable: React.FC = () => {
     }
 
     try {
-      setLoading(true);
+      setIsCreatingTimetable(true);
 
       const timetableData = await timetableService.createTimetable(
         Number(selectedClass),
         Number(selectedSection),
-        academicYear,
+          academicYear,
         term
       );
 
       if (timetableData) {
-        setSelectedTimetable(timetableData);
-        setAlert({
-          open: true,
-          message: 'Timetable created successfully',
-          severity: 'success',
-        });
-      }
-
-      setLoading(false);
-    } catch (error) {
-      console.error('Error creating timetable:', error);
+      setSelectedTimetable(timetableData);
       setAlert({
         open: true,
-        message: 'Error creating timetable. Please try again.',
+        message: 'Timetable created successfully',
+        severity: 'success',
+      });
+      }
+
+      setIsCreatingTimetable(false);
+    } catch (error) {
+      console.error('Error creating timetable:', error);
+      
+      // More descriptive error message
+      const errorMessage = error instanceof Error ? error.message : 'Error creating timetable. Please try again.';
+      setAlert({
+        open: true,
+        message: errorMessage,
         severity: 'error',
       });
-      setLoading(false);
+      setIsCreatingTimetable(false);
     }
   };
 
@@ -237,7 +297,7 @@ const ManageTimetable: React.FC = () => {
     }
 
     try {
-      setLoading(true);
+      setIsAddingPeriod(true);
 
       const success = await timetableService.addPeriod(
         selectedTimetable.id,
@@ -250,7 +310,7 @@ const ManageTimetable: React.FC = () => {
       );
 
       if (success && selectedTimetable) {
-        // Refresh timetable data
+      // Refresh timetable data
         const updatedTimetable = await timetableService.getTimetableById(selectedTimetable.id);
         if (updatedTimetable) {
           setSelectedTimetable(updatedTimetable);
@@ -258,7 +318,7 @@ const ManageTimetable: React.FC = () => {
       }
 
       handleClosePeriodDialog();
-      setLoading(false);
+      setIsAddingPeriod(false);
     } catch (error) {
       console.error('Error adding period:', error);
       setAlert({
@@ -266,7 +326,7 @@ const ManageTimetable: React.FC = () => {
         message: 'Error adding period. Please try again.',
         severity: 'error',
       });
-      setLoading(false);
+      setIsAddingPeriod(false);
     }
   };
 
@@ -274,45 +334,84 @@ const ManageTimetable: React.FC = () => {
     startTime: string,
     endTime: string,
     isBreak: boolean,
-    breakType: string
+    breakType: string | null
   ) => {
     try {
-      setLoading(true);
+      setIsAddingTimeSlot(true);
+
+      // Validate inputs
+    if (!startTime || !endTime) {
+      setAlert({
+        open: true,
+          message: 'Please provide both start and end times',
+        severity: 'error',
+      });
+        setIsAddingTimeSlot(false);
+      return;
+    }
+
+      // Validate time format (optional)
+      const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+      if (!timeRegex.test(startTime) || !timeRegex.test(endTime)) {
+        setAlert({
+          open: true,
+          message: 'Please enter valid times in HH:MM format',
+          severity: 'error',
+        });
+        setIsAddingTimeSlot(false);
+        return;
+      }
+
+      // Validate break type if it's a break
+      if (isBreak && !breakType) {
+        setAlert({
+          open: true,
+          message: 'Please provide a break type',
+          severity: 'error',
+        });
+        setIsAddingTimeSlot(false);
+        return;
+      }
 
       const success = await timetableService.addTimeSlot(
-        startTime,
-        endTime,
-        isBreak,
-        isBreak ? breakType : null
+          startTime,
+          endTime,
+          isBreak,
+        breakType
       );
 
       if (success) {
-        // Refresh time slots
+      // Refresh time slots
         const timeSlotsData = await timetableService.getTimeSlots();
-        setTimeSlots(timeSlotsData);
+      setTimeSlots(timeSlotsData);
+      setAlert({
+        open: true,
+          message: `Time slot ${startTime}-${endTime} added successfully`,
+        severity: 'success',
+      });
       }
 
       handleCloseTimeSlotDialog();
-      setLoading(false);
+      setIsAddingTimeSlot(false);
     } catch (error) {
       console.error('Error adding time slot:', error);
       setAlert({
         open: true,
-        message: 'Error adding time slot. Please try again.',
+        message: 'Failed to add time slot. Please check your inputs and try again.',
         severity: 'error',
       });
-      setLoading(false);
+      setIsAddingTimeSlot(false);
     }
   };
 
   const handleDeletePeriod = async (periodId: number) => {
     try {
       setLoading(true);
-
+      
       const success = await timetableService.deletePeriod(periodId);
-
+      
       if (success && selectedTimetable) {
-        // Refresh timetable data
+      // Refresh timetable data
         const updatedTimetable = await timetableService.getTimetableById(selectedTimetable.id);
         if (updatedTimetable) {
           setSelectedTimetable(updatedTimetable);
@@ -354,6 +453,11 @@ const ManageTimetable: React.FC = () => {
       <TabPanel value={tabValue} index={0}>
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-lg font-bold mb-4">Create or Edit Timetable</h2>
+          {fetchError && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
+              {fetchError}. Please try refreshing the page.
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Class</label>
@@ -361,6 +465,7 @@ const ManageTimetable: React.FC = () => {
                 value={selectedClass}
                 onChange={handleClassChange}
                 className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={initialLoading && classes.length === 0}
               >
                 <option value="">Select Class</option>
                 {classes.map((cls) => (
@@ -369,22 +474,32 @@ const ManageTimetable: React.FC = () => {
                   </option>
                 ))}
               </select>
+              {initialLoading && classes.length === 0 ? (
+                <div className="text-sm text-gray-500 mt-1">Loading classes...</div>
+              ) : classes.length === 0 ? (
+                <div className="text-sm text-red-500 mt-1">No classes available</div>
+              ) : (
+                <div className="text-sm text-green-500 mt-1">{classes.length} classes loaded</div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
               <select
                 value={selectedSection}
                 onChange={handleSectionChange}
-                disabled={!selectedClass}
-                className={`w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${!selectedClass ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                disabled={!selectedClass || loading}
+                className={`w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${(!selectedClass || loading) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               >
                 <option value="">Select Section</option>
-                {sections.map((section) => (
+                {sections && sections.map((section) => (
                   <option key={section.id} value={section.id}>
                     {section.name}
                   </option>
                 ))}
               </select>
+              {loading && selectedClass && (
+                <div className="text-sm text-gray-500 mt-1">Loading sections...</div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
@@ -410,12 +525,12 @@ const ManageTimetable: React.FC = () => {
               </select>
             </div>
             <div className="md:col-span-4">
-              <button
+              <button 
                 onClick={createTimetable}
-                disabled={!selectedClass || !selectedSection || loading}
-                className={`px-4 py-2 rounded-md text-white ${!selectedClass || !selectedSection || loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#292648] hover:bg-[#3b3664]'}`}
+                disabled={!selectedClass || !selectedSection || isCreatingTimetable}
+                className={`px-4 py-2 rounded-md text-white ${!selectedClass || !selectedSection || isCreatingTimetable ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#292648] hover:bg-[#3b3664]'}`}
               >
-                {loading ? (
+                {isCreatingTimetable ? (
                   <span className="flex items-center">
                     <span className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></span>
                     {selectedTimetable ? 'Updating...' : 'Creating...'}
@@ -462,7 +577,35 @@ const ManageTimetable: React.FC = () => {
             </button>
           </div>
 
-          <TimeSlotList timeSlots={timeSlots} />
+          <TimeSlotList 
+            timeSlots={timeSlots} 
+            isAdmin={true} 
+            onDelete={async (timeSlotId) => {
+              try {
+                setLoading(true);
+                const success = await timetableService.deleteTimeSlot(timeSlotId);
+                if (success) {
+                  // Refresh time slots
+                  const timeSlotsData = await timetableService.getTimeSlots();
+                  setTimeSlots(timeSlotsData);
+                  setAlert({
+                    open: true,
+                    message: 'Time slot deleted successfully',
+                    severity: 'success',
+                  });
+                }
+                setLoading(false);
+              } catch (error) {
+                console.error('Error deleting time slot:', error);
+                setAlert({
+                  open: true,
+                  message: 'Failed to delete time slot',
+                  severity: 'error',
+                });
+                setLoading(false);
+              }
+            }}
+          />
         </div>
       </TabPanel>
 
@@ -471,7 +614,7 @@ const ManageTimetable: React.FC = () => {
         open={periodDialogOpen}
         onClose={handleClosePeriodDialog}
         onAdd={handleAddPeriod}
-        loading={loading}
+        loading={isAddingPeriod}
         timeSlots={timeSlots}
         subjects={subjects}
         teachers={teachers}
@@ -482,16 +625,16 @@ const ManageTimetable: React.FC = () => {
         open={timeSlotDialogOpen}
         onClose={handleCloseTimeSlotDialog}
         onAdd={handleAddTimeSlot}
-        loading={loading}
+        loading={isAddingTimeSlot}
       />
 
       {/* Alert notification */}
       {alert.open && (
         <div className={`fixed bottom-4 right-4 p-4 rounded-md shadow-lg ${alert.severity === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-          }`}>
+        }`}>
           <div className="flex justify-between items-center">
             <span>{alert.message}</span>
-            <button
+            <button 
               onClick={() => setAlert({ ...alert, open: false })}
               className="ml-4 text-gray-500 hover:text-gray-700"
             >
