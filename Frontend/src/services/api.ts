@@ -91,6 +91,77 @@ interface OverallResult {
   classTeacherId: number;
 }
 
+interface LeaveApplication {
+  id: number;
+  applicantId: number;
+  applicantType: 'STUDENT' | 'TEACHER' | 'ADMIN';
+  leaveTypeId: number;
+  subject: string;
+  fromDate: string;
+  toDate: string;
+  description: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  createdAt: string;
+  updatedAt: string;
+  leaveType?: {
+    id: number;
+    name: string;
+    description?: string;
+  };
+  student?: {
+    id: number;
+    name: string;
+    class?: {
+      id: number;
+      name: string;
+    };
+    section?: {
+      id: number;
+      name: string;
+    };
+  };
+  teacher?: {
+    id: number;
+    name: string;
+    designation?: {
+      id: number;
+      name: string;
+    };
+  };
+}
+
+interface LeaveType {
+  id: number;
+  name: string;
+  description?: string;
+}
+
+// Add these interfaces
+interface ClassTeacherAssignment {
+  id: number;
+  teacherId: number;
+  classId: number;
+  sectionId: number;
+  createdAt: string;
+  updatedAt: string;
+  teacher: {
+    id: number;
+    name: string;
+    email: string;
+    designation?: {
+      name: string;
+    };
+  };
+  class: {
+    id: number;
+    name: string;
+  };
+  section: {
+    id: number;
+    name: string;
+  };
+}
+
 // Create axios instance with default config
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1', // Update this with your backend URL
@@ -231,9 +302,29 @@ export const announcementAPI = {
 
 // Attendance API
 export const attendanceAPI = {
-    getAttendance: (params: Record<string, unknown>) => api.get<ApiResponse<{ attendance: Attendance[] }>>('/attendance', { params }),
+    // For backward compatibility
+    getAttendance: (params?: Record<string, unknown>) => api.get<ApiResponse<{ attendance: Attendance[] }>>('/attendance', { params }),
     markAttendance: (data: Record<string, unknown>) => api.post<ApiResponse<{ attendance: Attendance }>>('/attendance', data),
     updateAttendance: (id: string, data: Record<string, unknown>) => api.put<ApiResponse<{ attendance: Attendance }>>(`/attendance/${id}`, data),
+    
+    // New endpoints for daily attendance
+    getDailyAttendance: (params?: Record<string, unknown>) => api.get<ApiResponse<{ attendance: any[] }>>('/attendance/daily', { params }),
+    markDailyAttendance: (data: { 
+      date: string; 
+      classId: number | string; 
+      sectionId: number | string; 
+      attendanceData: Array<{
+        studentId: number;
+        status: 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'EXCUSED';
+        remarks?: string;
+      }>;
+    }) => api.post<ApiResponse<{ success: boolean }>>('/attendance/daily', data),
+    
+    // Monthly attendance summary
+    getMonthlyAttendance: (params?: Record<string, unknown>) => api.get<ApiResponse<any>>('/attendance/monthly', { params }),
+    
+    // Statistics
+    getAttendanceStats: (params?: Record<string, unknown>) => api.get<ApiResponse<any>>('/attendance/stats', { params }),
 };
 
 // Result API
@@ -248,9 +339,14 @@ export const resultAPI = {
 
 // Leave API
 export const leaveAPI = {
-    getLeaves: (params: Record<string, unknown>) => api.get<ApiResponse<{ leaves: Leave[] }>>('/leaves', { params }),
-    createLeave: (data: Record<string, unknown>) => api.post<ApiResponse<{ leave: Leave }>>('/leaves', data),
-    updateLeave: (id: string, data: Record<string, unknown>) => api.put<ApiResponse<{ leave: Leave }>>(`/leaves/${id}`, data),
+    getLeaves: (params: Record<string, unknown>) => api.get<ApiResponse<{ leaveApplications: LeaveApplication[] }>>('/leaves', { params }),
+    getLeaveById: (id: number) => api.get<ApiResponse<{ leaveApplication: LeaveApplication }>>(`/leaves/${id}`),
+    createLeave: (data: Record<string, unknown>) => api.post<ApiResponse<{ leaveApplication: LeaveApplication }>>('/leaves', data),
+    updateLeaveStatus: (id: number, data: { status: 'APPROVED' | 'REJECTED' | 'CANCELLED', remarks?: string }) => 
+        api.patch<ApiResponse<{ leaveApplication: LeaveApplication }>>(`/leaves/${id}/status`, data),
+    getLeaveTypes: () => api.get<ApiResponse<{ leaveTypes: LeaveType[] }>>('/leaves/types'),
+    createLeaveType: (data: { name: string, description?: string }) => 
+        api.post<ApiResponse<{ leaveType: LeaveType }>>('/leaves/types', data),
 };
 
 // Dashboard API
@@ -268,6 +364,27 @@ export const dashboardAPI = {
     getTeacherDashboard: () => api.get<ApiResponse<Record<string, unknown>>>('/dashboard/teacher'),
     getParentDashboard: () => api.get<ApiResponse<Record<string, unknown>>>('/dashboard/parent'),
     getAdminDashboard: () => api.get<ApiResponse<Record<string, unknown>>>('/dashboard/admin'),
+};
+
+// Add to the teacherAPI object
+export const teacherAPI = {
+  getAll: (params?: Record<string, unknown>) => 
+    api.get<ApiResponse<{ teachers: Teacher[] }>>('/teachers', { params }),
+  getById: (id: number) => 
+    api.get<ApiResponse<{ teacher: Teacher }>>(`/teachers/${id}`),
+  create: (data: TeacherFormData) => 
+    api.post<ApiResponse<{ teacher: Teacher }>>('/teachers', data),
+  update: (id: number, data: Partial<TeacherFormData>) => 
+    api.patch<ApiResponse<{ teacher: Teacher }>>(`/teachers/${id}`, data),
+  delete: (id: number) => 
+    api.delete<ApiResponse<{ message: string }>>(`/teachers/${id}`),
+  // Class teacher assignment endpoints
+  assignClassTeacher: (data: { teacherId: number; classId: number; sectionId: number }) => 
+    api.post<ApiResponse<{ assignment: ClassTeacherAssignment }>>('/teachers/class-teacher', data),
+  getClassTeacherAssignments: (params?: { classId?: number; sectionId?: number; teacherId?: number }) => 
+    api.get<ApiResponse<{ assignments: ClassTeacherAssignment[] }>>('/teachers/class-teacher/assignments', { params }),
+  removeClassTeacherAssignment: (id: number) => 
+    api.delete<ApiResponse<{ message: string }>>(`/teachers/class-teacher/assignments/${id}`),
 };
 
 export default api; 
