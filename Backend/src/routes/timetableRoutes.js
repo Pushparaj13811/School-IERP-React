@@ -10,6 +10,7 @@ router.use(protect);
 // Time slots
 router.get('/timeslots', timetableController.getAllTimeSlots);
 router.post('/timeslots', restrictTo('ADMIN'), timetableController.createTimeSlot);
+router.delete('/timeslots/:id', restrictTo('ADMIN'), timetableController.deleteTimeSlot);
 
 // Timetable routes
 router.post('/', restrictTo('ADMIN'), timetableController.createTimetable);

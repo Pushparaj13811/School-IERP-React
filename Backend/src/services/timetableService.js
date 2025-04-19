@@ -75,14 +75,6 @@ class TimetableService {
                             timeSlot: true,
                             subject: true,
                             teacher: {
-                                include: {
-                                    user: {
-                                        select: {
-                                            name: true,
-                                            profilePicture: true
-                                        }
-                                    }
-                                }
                             }
                         }
                     }
@@ -105,10 +97,34 @@ class TimetableService {
      */
     async getTimetable(classId, sectionId, academicYear, term) {
         try {
+            // Validate and parse input parameters
+            if (!classId || !sectionId || !academicYear || !term) {
+                console.log('Missing required parameters');
+                return null;
+            }
+
+            // Safely parse integers with fallback
+            let parsedClassId, parsedSectionId;
+
+            try {
+                parsedClassId = parseInt(classId);
+                parsedSectionId = parseInt(sectionId);
+
+                if (isNaN(parsedClassId) || isNaN(parsedSectionId)) {
+                    console.log('Invalid class or section ID format');
+                    return null;
+                }
+            } catch (parseError) {
+                console.error('Error parsing IDs:', parseError);
+                return null;
+            }
+
+            console.log(`Searching for timetable with classId=${parsedClassId}, sectionId=${parsedSectionId}, academicYear=${academicYear}, term=${term}`);
+
             const timetable = await prisma.timetable.findFirst({
                 where: {
-                    classId: parseInt(classId),
-                    sectionId: parseInt(sectionId),
+                    classId: parsedClassId,
+                    sectionId: parsedSectionId,
                     academicYear,
                     term
                 },
@@ -120,28 +136,23 @@ class TimetableService {
                             timeSlot: true,
                             subject: true,
                             teacher: {
-                                include: {
-                                    user: {
-                                        select: {
-                                            name: true,
-                                            profilePicture: true
-                                        }
-                                    }
-                                }
                             }
                         }
                     }
                 }
             });
 
+            // Return null instead of throwing an error if timetable not found
             if (!timetable) {
-                throw new ApiError('Timetable not found', 404);
+                console.log(`Timetable not found for classId=${parsedClassId}, sectionId=${parsedSectionId}`);
+                return null;
             }
 
             return timetable;
         } catch (error) {
-            if (error instanceof ApiError) throw error;
-            throw new ApiError(error.message || 'Error retrieving timetable', 500);
+            console.error('Error in getTimetable:', error);
+            // Don't throw an API error here, instead return null
+            return null;
         }
     }
 
@@ -150,9 +161,22 @@ class TimetableService {
      */
     async getStudentTimetable(studentId) {
         try {
+            // Safely parse studentId
+            let parsedStudentId;
+            try {
+                parsedStudentId = parseInt(studentId);
+                if (isNaN(parsedStudentId)) {
+                    console.error('Invalid student ID format:', studentId);
+                    return null;
+                }
+            } catch (parseError) {
+                console.error('Error parsing student ID:', parseError);
+                return null;
+            }
+
             // Get student with class and section
             const student = await prisma.student.findUnique({
-                where: { id: parseInt(studentId) },
+                where: { id: parsedStudentId },
                 include: {
                     class: true,
                     section: true
@@ -160,13 +184,22 @@ class TimetableService {
             });
 
             if (!student) {
-                throw new ApiError('Student not found', 404);
+                console.log(`Student with ID ${parsedStudentId} not found`);
+                return null;
             }
 
-            // Get current academic year and term (this would be based on your system's logic)
-            // For now, we'll assume there's a current active academic year and term
+            console.log(`Found student in class ${student.class?.name || 'Unknown'}, section ${student.section?.name || 'Unknown'}`);
+
+            if (!student.classId || !student.sectionId) {
+                console.log(`Student with ID ${parsedStudentId} doesn't have a class or section assigned`);
+                return null;
+            }
+
+            // Get current academic year and term
             const currentAcademicYear = "2023-2024"; // This should be retrieved from your system
             const currentTerm = "First Term"; // This should be retrieved from your system
+
+            console.log(`Looking up timetable for classId=${student.classId}, sectionId=${student.sectionId}, year=${currentAcademicYear}, term=${currentTerm}`);
 
             // Get timetable
             const timetable = await prisma.timetable.findFirst({
@@ -177,19 +210,13 @@ class TimetableService {
                     term: currentTerm
                 },
                 include: {
+                    class: true,
+                    section: true,
                     periods: {
                         include: {
                             timeSlot: true,
                             subject: true,
                             teacher: {
-                                include: {
-                                    user: {
-                                        select: {
-                                            name: true,
-                                            profilePicture: true
-                                        }
-                                    }
-                                }
                             }
                         }
                     }
@@ -197,13 +224,11 @@ class TimetableService {
             });
 
             if (!timetable) {
-                throw new ApiError('Timetable not found for this student', 404);
+                return null;
             }
-
             return timetable;
         } catch (error) {
-            if (error instanceof ApiError) throw error;
-            throw new ApiError(error.message || 'Error retrieving student timetable', 500);
+            return null;
         }
     }
 
@@ -222,75 +247,127 @@ class TimetableService {
                 sectionId
             } = periodData;
 
+            // Parse all numeric inputs
+            const parsedDayOfWeek = parseInt(dayOfWeek);
+            const parsedTimeSlotId = parseInt(timeSlotId);
+            const parsedSubjectId = parseInt(subjectId);
+            const parsedTeacherId = parseInt(teacherId);
+            const parsedClassId = parseInt(classId);
+            const parsedSectionId = parseInt(sectionId);
+            const parsedTimetableId = parseInt(timetableId);
+
             // Check if timetable exists
             const timetable = await prisma.timetable.findUnique({
-                where: { id: parseInt(timetableId) }
+                where: { id: parsedTimetableId }
             });
 
             if (!timetable) {
                 throw new ApiError('Timetable not found', 404);
             }
 
-            // Check if period already exists for this day and time slot for this class and section
-            const existingPeriod = await prisma.period.findFirst({
+            // Check if time slot exists
+            const timeSlot = await prisma.timeSlot.findUnique({
+                where: { id: parsedTimeSlotId }
+            });
+
+            if (!timeSlot) {
+                throw new ApiError('Time slot not found', 404);
+            }
+
+            // Check if teacher exists
+            const teacher = await prisma.teacher.findUnique({
+                where: { id: parsedTeacherId }
+            });
+
+            if (!teacher) {
+                throw new ApiError('Teacher not found', 404);
+            }
+
+            // Check if subject exists
+            const subject = await prisma.subject.findUnique({
+                where: { id: parsedSubjectId }
+            });
+
+            if (!subject) {
+                throw new ApiError('Subject not found', 404);
+            }
+
+            // Check if teacher is already assigned to another class during the same time slot on the same day
+            const teacherConflict = await prisma.period.findFirst({
                 where: {
-                    dayOfWeek: parseInt(dayOfWeek),
-                    timeSlotId: parseInt(timeSlotId),
-                    classId: parseInt(classId),
-                    sectionId: parseInt(sectionId)
+                    dayOfWeek: parsedDayOfWeek,
+                    timeSlotId: parsedTimeSlotId,
+                    teacherId: parsedTeacherId,
+                    NOT: {
+                        AND: [
+                            { classId: parsedClassId },
+                            { sectionId: parsedSectionId }
+                        ]
+                    }
+                },
+                include: {
+                    class: true,
+                    section: true
                 }
             });
 
+            if (teacherConflict) {
+                throw new ApiError(`Teacher is already assigned to ${teacherConflict.class.name} - ${teacherConflict.section.name} during this time slot on this day`, 400);
+            }
+
+            // Check if period already exists for this day and time slot for this class and section
+            const existingPeriod = await prisma.period.findFirst({
+                where: {
+                    dayOfWeek: parsedDayOfWeek,
+                    timeSlotId: parsedTimeSlotId,
+                    classId: parsedClassId,
+                    sectionId: parsedSectionId
+                }
+            });
+
+            let result;
             if (existingPeriod) {
                 // Update existing period
-                return await prisma.period.update({
+                console.log(`Updating existing period ID ${existingPeriod.id}`);
+                result = await prisma.period.update({
                     where: { id: existingPeriod.id },
                     data: {
-                        subjectId: parseInt(subjectId),
-                        teacherId: parseInt(teacherId)
+                        subjectId: parsedSubjectId,
+                        teacherId: parsedTeacherId
                     },
                     include: {
                         timeSlot: true,
                         subject: true,
                         teacher: {
-                            include: {
-                                user: {
-                                    select: {
-                                        name: true
-                                    }
-                                }
-                            }
                         }
                     }
                 });
             } else {
                 // Create new period
-                return await prisma.period.create({
+                console.log('Creating new period');
+                result = await prisma.period.create({
                     data: {
-                        dayOfWeek: parseInt(dayOfWeek),
-                        timeSlotId: parseInt(timeSlotId),
-                        subjectId: parseInt(subjectId),
-                        teacherId: parseInt(teacherId),
-                        classId: parseInt(classId),
-                        sectionId: parseInt(sectionId),
-                        timetableId: parseInt(timetableId)
+                        dayOfWeek: parsedDayOfWeek,
+                        timeSlotId: parsedTimeSlotId,
+                        subjectId: parsedSubjectId,
+                        teacherId: parsedTeacherId,
+                        classId: parsedClassId,
+                        sectionId: parsedSectionId,
+                        timetableId: parsedTimetableId
                     },
                     include: {
                         timeSlot: true,
                         subject: true,
-                        teacher: {
-                            include: {
-                                user: {
-                                    select: {
-                                        name: true
-                                    }
-                                }
-                            }
+                        teacher: {  
                         }
                     }
                 });
             }
+
+            console.log(`Period ${existingPeriod ? 'updated' : 'created'} successfully:`, JSON.stringify(result, null, 2));
+            return result;
         } catch (error) {
+            console.error('Error in addPeriod:', error);
             if (error instanceof ApiError) throw error;
             throw new ApiError(error.message || 'Error adding period to timetable', 500);
         }
@@ -325,31 +402,44 @@ class TimetableService {
      */
     async createTimeSlot(timeSlotData) {
         try {
+            console.log('Creating time slot with data:', JSON.stringify(timeSlotData, null, 2));
+
             const { startTime, endTime, isBreak, breakType } = timeSlotData;
+
+            console.log(`Parsed values: startTime=${startTime}, endTime=${endTime}, isBreak=${isBreak}, breakType=${breakType}`);
 
             // Validate time format (HH:mm)
             const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
             if (!timeRegex.test(startTime) || !timeRegex.test(endTime)) {
+                console.error('Invalid time format:', { startTime, endTime });
                 throw new ApiError('Invalid time format. Use HH:mm format', 400);
             }
 
             // Check if start time is before end time
             if (startTime >= endTime) {
+                console.error('Start time is not before end time:', { startTime, endTime });
                 throw new ApiError('Start time must be before end time', 400);
             }
 
+            // Format data for database
+            const timeSlotToCreate = {
+                startTime,
+                endTime,
+                isBreak: isBreak === true || isBreak === 'true',
+                breakType: isBreak === true || isBreak === 'true' ? breakType : null
+            };
+
+            console.log('Creating time slot in database with:', JSON.stringify(timeSlotToCreate, null, 2));
+
             // Create time slot
             const timeSlot = await prisma.timeSlot.create({
-                data: {
-                    startTime,
-                    endTime,
-                    isBreak: isBreak || false,
-                    breakType: isBreak ? breakType : null
-                }
+                data: timeSlotToCreate
             });
 
+            console.log('Time slot created successfully:', JSON.stringify(timeSlot, null, 2));
             return timeSlot;
         } catch (error) {
+            console.error('Error in createTimeSlot:', error);
             if (error instanceof ApiError) throw error;
             throw new ApiError(error.message || 'Error creating time slot', 500);
         }
@@ -371,6 +461,42 @@ class TimetableService {
     }
 
     /**
+     * Delete a time slot
+     */
+    async deleteTimeSlot(timeSlotId) {
+        try {
+            console.log(`Attempting to delete time slot with id: ${timeSlotId}`);
+
+            // Check if the time slot exists
+            const timeSlot = await prisma.timeSlot.findUnique({
+                where: { id: parseInt(timeSlotId) },
+                include: { periods: true }
+            });
+
+            if (!timeSlot) {
+                throw new ApiError('Time slot not found', 404);
+            }
+
+            // Check if the time slot is being used in any periods
+            if (timeSlot.periods && timeSlot.periods.length > 0) {
+                throw new ApiError('Cannot delete time slot as it is being used in timetable periods', 400);
+            }
+
+            // Delete the time slot
+            await prisma.timeSlot.delete({
+                where: { id: parseInt(timeSlotId) }
+            });
+
+            console.log(`Time slot with id ${timeSlotId} deleted successfully`);
+            return { message: 'Time slot deleted successfully' };
+        } catch (error) {
+            console.error('Error in deleteTimeSlot:', error);
+            if (error instanceof ApiError) throw error;
+            throw new ApiError(error.message || 'Error deleting time slot', 500);
+        }
+    }
+
+    /**
      * Get teacher's timetable
      */
     async getTeacherTimetable(teacherId) {
@@ -380,7 +506,9 @@ class TimetableService {
                 include: {
                     user: {
                         select: {
-                            name: true
+                            firstName: true,
+                            lastName: true,
+                            profilePicture: true
                         }
                     }
                 }
@@ -412,7 +540,7 @@ class TimetableService {
             const timetable = {
                 teacher: {
                     id: teacher.id,
-                    name: teacher.user.name
+                    name: teacher.user.firstName + ' ' + teacher.user.lastName
                 },
                 schedule: {}
             };
