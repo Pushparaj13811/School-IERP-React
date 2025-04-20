@@ -577,6 +577,7 @@ model HolidayType {
   id          Int      @id @default(autoincrement())
   name        String   @unique // e.g., "Religious", "National", "School", "Saturday"
   description String?
+  color       String   @default("#C32232") // Add color field with a default value
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
