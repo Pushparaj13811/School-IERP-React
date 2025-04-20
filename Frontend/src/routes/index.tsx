@@ -111,6 +111,11 @@ export const routes: Route[] = [
     roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.PARENT],
   },
   {
+    path: '/attendance/:studentId',
+    component: Attendance,
+    roles: [UserRole.PARENT],
+  },
+  {
     path: '/holiday',
     component: Holiday,
     roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN, UserRole.PARENT],
@@ -136,6 +141,11 @@ export const routes: Route[] = [
     roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.PARENT],
   },
   {
+    path: '/result/:studentId',
+    component: Result,
+    roles: [UserRole.PARENT],
+  },
+  {
     path: '/leave',
     component: ({ user }: RouteComponentProps) => {
       switch (user?.role) {
@@ -148,6 +158,11 @@ export const routes: Route[] = [
       }
     },
     roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN],
+  },
+  {
+    path: '/leaves/:studentId',
+    component: StudentLeave,
+    roles: [UserRole.PARENT],
   },
   {
     path: '/leave/create',
