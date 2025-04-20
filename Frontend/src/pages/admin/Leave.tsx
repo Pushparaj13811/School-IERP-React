@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { leaveAPI } from "../../services/api";
 import { Tab } from '@headlessui/react';
 import { FaCheck, FaTimes } from 'react-icons/fa';
+import Button from '../../components/ui/Button';
 
 interface LeaveApplication {
   id: number;
@@ -216,12 +217,12 @@ const Leave: React.FC = () => {
         {getApplicantDetails(leave)}
         <p className="text-sm text-gray-600 line-clamp-2 mb-2">{leave.description}</p>
         <div className="flex justify-end mt-2">
-          <button 
+          <Button
+            variant='primary'
             onClick={() => handleViewDetails(leave)}
-            className="text-blue-500 text-sm bg-[#EBF4FF]"
           >
             View Details
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -277,36 +278,38 @@ const Leave: React.FC = () => {
           rows={3}
         />
         <div className="flex justify-end space-x-3">
-          <button
+          <Button
+            variant='danger'
             onClick={() => handleUpdateStatus(selectedLeave.id, 'REJECTED')}
             disabled={isUpdating}
             className="flex items-center bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:bg-red-300"
           >
             <FaTimes className="mr-2" /> Reject
-          </button>
-          <button
+          </Button>
+          <Button
+            variant='primary'
             onClick={() => handleUpdateStatus(selectedLeave.id, 'APPROVED')}
             disabled={isUpdating}
             className="flex items-center bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-green-300"
           >
             <FaCheck className="mr-2" /> Approve
-          </button>
+          </Button>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="p-4 bg-[#EEF5FF]">
+    <div className="p-4 bg-[#EEF5FF]">  
       <div className="p-6 bg-white rounded-lg shadow-sm">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-800">Leave Management</h2>
-          <button 
+          <Button
+            variant='primary'
             onClick={handleAddLeave}
-            className="bg-[#292648] text-white px-6 py-2 rounded-md"
           >
             Apply for Leave
-          </button>
+          </Button>
         </div>
 
         {isLoading ? (
@@ -325,8 +328,8 @@ const Leave: React.FC = () => {
                   `w-full py-2.5 text-sm font-medium leading-5 rounded-lg
                   ${
                     selected
-                      ? 'bg-[#292648] text-white shadow'
-                      : 'text-blue-50 hover:bg-[#D2E5FC]'
+                      ? 'bg-primary text-white shadow'
+                      : 'text-blue-50 hover:bg-primary/90'
                   }`
                 }
               >
@@ -337,8 +340,8 @@ const Leave: React.FC = () => {
                   `w-full py-2.5 text-sm font-medium leading-5 rounded-lg
                   ${
                     selected
-                      ? 'bg-[#292648] text-white shadow'
-                      : 'text-blue-50 hover:bg-[#D2E5FC]'
+                      ? 'bg-primary text-white shadow'
+                      : 'text-blue-50 hover:bg-primary/90'
                   }`
                 }
               >
@@ -349,8 +352,8 @@ const Leave: React.FC = () => {
                   `w-full py-2.5 text-sm font-medium leading-5 rounded-lg
                   ${
                     selected
-                      ? 'bg-[#292648] text-white shadow'
-                      : 'text-blue-50 hover:bg-[#D2E5FC]'
+                      ? 'bg-primary text-white shadow'
+                      : 'text-blue-50 hover:bg-primary/90'
                   }`
                 }
               >
@@ -361,8 +364,8 @@ const Leave: React.FC = () => {
                   `w-full py-2.5 text-sm font-medium leading-5 rounded-lg
                   ${
                     selected
-                      ? 'bg-[#292648] text-white shadow'
-                      : 'text-blue-50 hover:bg-[#D2E5FC]'
+                      ? 'bg-primary text-white shadow'
+                      : 'text-blue-50 hover:bg-primary/90'
                   }`
                 }
               >
@@ -430,12 +433,12 @@ const Leave: React.FC = () => {
                   {selectedLeave.status}
                 </span>
               </div>
-              <button 
+              <Button
                 onClick={handleCloseDetailModal}
-                className="bg-[#292648] text-white px-6 py-2 rounded-md"
+                variant='danger'
               >
                 Close
-              </button>
+              </Button>
             </div>
 
             <div className="mb-6">
