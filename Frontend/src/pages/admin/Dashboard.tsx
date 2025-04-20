@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dashboardService from '../../services/dashboardService';
 import { AdminDashboardData } from '../../services/api';
+import Button from '../../components/ui/Button';
 
 interface StatCardProps {
   title: string;
@@ -225,12 +226,12 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="mt-6 text-right">
-            <button 
-              className="bg-[#292648] text-white px-4 py-2 rounded text-sm"
+            <Button
+              variant='primary'
               onClick={() => navigate('/users')}
             >
               Manage Users
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -252,12 +253,12 @@ const Dashboard: React.FC = () => {
                 </div>
               ))}
               <div className="text-right">
-                <button 
-                  className="bg-[#292648] text-white px-4 py-2 rounded text-sm"
+                <Button
+                  variant='primary'
                   onClick={navigateToAnnouncementPage}
                 >
                   Manage Announcements
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
@@ -295,7 +296,7 @@ const Dashboard: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="p-4 text-center text-gray-500">
+              <div className="p-4 text-center text-gray-500">
               No recent activities to display.
             </div>
           )}
@@ -307,37 +308,37 @@ const Dashboard: React.FC = () => {
           <hr className="mb-4" />
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <button
-              onClick={() => navigate('/students/add')}
-              className="flex flex-col items-center justify-center p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100"
+            <Button
+              variant='outline'
+              onClick={() => navigate('/students/add-students')}
             >
-              <i className="bi bi-person-plus text-2xl text-blue-600"></i>
+              <i className="bi bi-person-plus text-2xl text-blue-600 px-2"></i>
               <span className="mt-2 text-sm font-medium text-gray-700">Add Student</span>
-            </button>
+            </Button>
 
-            <button
-              onClick={() => navigate('/teachers/add')}
-              className="flex flex-col items-center justify-center p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100"
+            <Button
+              variant='outline'
+              onClick={() => navigate('/teachers/add-teacher')}
             >
-              <i className="bi bi-person-badge text-2xl text-amber-600"></i>
+              <i className="bi bi-person-badge text-2xl text-amber-600 px-2"></i>
               <span className="mt-2 text-sm font-medium text-gray-700">Add Teacher</span>
-            </button>
+            </Button>
 
-            <button
-              onClick={() => navigate('/classes/add')}
-              className="flex flex-col items-center justify-center p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100"
+            <Button
+              variant='outline'
+              onClick={() => navigate('/classes/add-class')}
             >
-              <i className="bi bi-building-add text-2xl text-green-600"></i>
+              <i className="bi bi-building-add text-2xl text-green-600 px-2"></i>
               <span className="mt-2 text-sm font-medium text-gray-700">Add Class</span>
-            </button>
+            </Button>
 
-            <button
-              onClick={() => navigate('/announcements/create')}
-              className="flex flex-col items-center justify-center p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100"
+            <Button
+              variant='outline'
+              onClick={() => navigate('/announcements/create-announcement')}
             >
-              <i className="bi bi-megaphone text-2xl text-purple-600"></i>
-              <span className="mt-2 text-sm font-medium text-gray-700">New Announcement</span>
-            </button>
+              <i className="bi bi-megaphone text-2xl text-purple-600 px-2"></i>
+                <span className="mt-2 text-sm font-medium text-gray-700">New Announcement</span>
+            </Button>
           </div>
         </div>
       </div>
