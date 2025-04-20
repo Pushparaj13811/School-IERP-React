@@ -282,52 +282,70 @@ const CreateAnnouncement: React.FC = () => {
             // Convert from lowercase (e.g., 'student') to uppercase (e.g., 'STUDENT')
             const formattedRoles = selectedRoles.map(role => role.toUpperCase());
             
-            const announcementData = {
-                title,
-                content,
-                priority,
-                expiresAt: expiresAt || undefined,
-                targetClassIds: selectedClasses,
-                targetSectionIds: selectedSections,
-                targetRoles: formattedRoles,
-                attachments: attachments.map(attachment => ({
-                    name: attachment.name,
-                    url: attachment.url || URL.createObjectURL(attachment.file),
-                    type: attachment.type,
-                    size: attachment.size
-                }))
-            };
+            // Create FormData for multipart file upload
+            const formData = new FormData();
+            
+            // Add basic announcement data
+            formData.append('title', title);
+            formData.append('content', content);
+            formData.append('priority', priority);
+            
+            if (expiresAt) {
+                formData.append('expiresAt', expiresAt);
+            }
+            
+            // Add target classes and sections
+            selectedClasses.forEach(classId => {
+                formData.append('targetClassIds', classId.toString());
+            });
+            
+            selectedSections.forEach(sectionId => {
+                formData.append('targetSectionIds', sectionId.toString());
+            });
+            
+            // Add target roles
+            formattedRoles.forEach(role => {
+                formData.append('targetRoles', role);
+            });
+            
+            // Add attachments
+            attachments.forEach(attachment => {
+                // Only append new files (not existing ones with URLs)
+                if (!attachment.url || !attachment.url.startsWith('http')) {
+                    formData.append('attachments', attachment.file);
+                }
+            });
             
             let response;
             
             if (isEditMode && announcementId) {
                 // Update existing announcement
-                response = await announcementAPI.update(announcementId, announcementData);
+                response = await announcementAPI.update(announcementId, formData);
                 if (response.data?.status === 'success') {
                     toast.success('Announcement updated successfully!');
                 }
             } else {
                 // Create new announcement
-                response = await announcementAPI.create(announcementData);
+                response = await announcementAPI.create(formData);
                 if (response.data?.status === 'success') {
                     toast.success('Announcement published successfully!');
                 }
             }
             
             if (response?.data?.status === 'success') {
-            // Reset form
-            setTitle('');
-            setContent('');
-            setPriority('NORMAL');
-            setExpiresAt('');
-            setSelectedClasses([]);
-            setSelectedSections([]);
-            setSelectedRoles([]);
-            setAttachments([]);
+                // Reset form
+                setTitle('');
+                setContent('');
+                setPriority('NORMAL');
+                setExpiresAt('');
+                setSelectedClasses([]);
+                setSelectedSections([]);
+                setSelectedRoles([]);
+                setAttachments([]);
                 
-            // Navigate back to announcements page
+                // Navigate back to announcements page
                 setTimeout(() => {
-            navigate('/announcements');
+                    navigate('/announcements');
                 }, 2000);
             } else {
                 throw new Error(isEditMode ? 'Failed to update announcement' : 'Failed to publish announcement');
