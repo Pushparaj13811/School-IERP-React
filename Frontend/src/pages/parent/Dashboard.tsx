@@ -133,7 +133,7 @@ const ParentDashboard: React.FC = () => {
             </div>
             
             <div className="grid grid-cols-2 gap-4 mt-4">
-              <div className="p-4 rounded-lg cursor-pointer bg-blue-50" onClick={() => handleNavigation('/attendance')}>
+              <div className="p-4 rounded-lg cursor-pointer bg-blue-50" onClick={() => handleNavigation(`/attendance/${childData.student.id}`)}>
                 <div className="flex items-center">
                   <FaUserGraduate className="text-blue-600" />
                   <div className="ml-3">
@@ -143,7 +143,7 @@ const ParentDashboard: React.FC = () => {
                 </div>
               </div>
               
-              <div className="p-4 rounded-lg cursor-pointer bg-green-50" onClick={() => handleNavigation('/result')}>
+              <div className="p-4 rounded-lg cursor-pointer bg-green-50" onClick={() => handleNavigation(`/result/${childData.student.id}`)}>
                 <div className="flex items-center">
                   <FaBookOpen className="text-green-600" />
                   <div className="ml-3">
@@ -153,7 +153,7 @@ const ParentDashboard: React.FC = () => {
                 </div>
               </div>
               
-              <div className="p-4 rounded-lg cursor-pointer bg-yellow-50" onClick={() => handleNavigation('/leaves')}>
+              <div className="p-4 rounded-lg cursor-pointer bg-yellow-50" onClick={() => handleNavigation(`/leaves/${childData.student.id}`)}>
                 <div className="flex items-center">
                   <FaFileAlt className="text-yellow-600" />
                   <div className="ml-3">
@@ -177,9 +177,9 @@ const ParentDashboard: React.FC = () => {
             {childData.recentResults.length > 0 && (
               <div className="mt-4">
                 <h3 className="font-medium mb-2">Recent Results</h3>
-                <div className="space-y-2">
+                <div className="space-y-2 cursor-pointer" onClick={() => handleNavigation(`/result/${childData.student.id}`)}>
                   {childData.recentResults.slice(0, 3).map((result, idx: number) => (
-                    <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                    <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 rounded hover:bg-gray-100">
                       <div>
                         <p className="font-medium">{result.subject}</p>
                         <p className="text-xs text-gray-500">
