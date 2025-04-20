@@ -1,4 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
+import { PrismaClient } from '@prisma/client';
+
 const prisma = new PrismaClient();
 
 async function main() {
@@ -159,9 +160,10 @@ async function main() {
   for (const holiday of holidays) {
     await prisma.holiday.upsert({
       where: { 
-        name_fromDate: {
-          name: holiday.name,
-          fromDate: holiday.fromDate
+        fromDate_toDate_name: {
+          fromDate: holiday.fromDate,
+          toDate: holiday.toDate,
+          name: holiday.name
         }
       },
       update: {},
