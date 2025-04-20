@@ -94,10 +94,10 @@ const Dashboard: React.FC = () => {
   const teacherDetails = generateTeacherDetails();
   
   if (isLoading) {
-    return (
+  return (
       <div className="flex justify-center items-center h-64 bg-[#EEF5FF] p-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
+            </div>
     );
   }
   
@@ -107,8 +107,8 @@ const Dashboard: React.FC = () => {
         <div className="p-6 bg-red-100 rounded-lg text-red-800">
           <h3 className="text-xl font-semibold mb-2">Error Loading Dashboard</h3>
           <p>{error}</p>
-        </div>
-      </div>
+            </div>
+          </div>
     );
   }
 
@@ -119,7 +119,7 @@ const Dashboard: React.FC = () => {
           <h3 className="text-xl font-semibold mb-2">No Dashboard Data</h3>
           <p>No teacher dashboard data available.</p>
         </div>
-      </div>
+            </div>
     );
   }
 
@@ -130,7 +130,7 @@ const Dashboard: React.FC = () => {
         <h2 className="text-2xl font-bold text-gray-800">
           {dashboardData.teacher?.name || 'Teacher'} <span className="font-normal">Welcome</span>
         </h2>
-      </div>
+            </div>
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-2 md:grid-cols-4">
@@ -162,7 +162,7 @@ const Dashboard: React.FC = () => {
           color="bg-[#5E479B]"
           onClick={() => navigate('/leave')}
         />
-      </div>
+        </div>
 
       {/* Teacher details and today's timetable */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-12 mb-6">
@@ -291,9 +291,9 @@ const Dashboard: React.FC = () => {
           ) : (
             <div className="p-4 text-center text-gray-500">
               No classes or subjects assigned.
-            </div>
+          </div>
           )}
-        </div>
+                  </div>
 
         {/* Announcements */}
         <div className="p-6 bg-white rounded-lg shadow-sm md:col-span-5">
@@ -324,10 +324,10 @@ const Dashboard: React.FC = () => {
           ) : (
             <div className="p-4 text-center text-gray-500">
               No announcements available.
-            </div>
+          </div>
           )}
         </div>
-      </div>
+          </div>
 
       {/* Pending Leave Applications */}
       {dashboardData.pendingLeaveRequests > 0 && dashboardData.pendingLeaveApplications?.length > 0 && (
