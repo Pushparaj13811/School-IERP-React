@@ -720,9 +720,7 @@ export const getParentDashboardData = async (parentId) => {
           },
           {
             targetRoles: {
-              some: {
-                role: 'ALL'
-              }
+              none: {}
             }
           }
         ]
