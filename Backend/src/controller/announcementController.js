@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { ApiError } from '../utils/apiError.js';
+import { ApiResponse } from '../utils/apiResponse.js';
 
 const prisma = new PrismaClient();
 
@@ -7,7 +8,7 @@ const prisma = new PrismaClient();
 export const getAllAnnouncements = async (req, res, next) => {
     try {
         const { role } = req.user;
-        
+
         // Build the query based on roles and filters
         const query = {
             where: {},
@@ -31,7 +32,7 @@ export const getAllAnnouncements = async (req, res, next) => {
                 createdAt: 'desc'
             }
         };
-        
+
         // Apply filters if provided
         if (req.query.isActive) {
             if (req.query.isActive === 'true') {
@@ -40,7 +41,7 @@ export const getAllAnnouncements = async (req, res, next) => {
                 query.where.isActive = false;
             }
         }
-        
+
         // Apply role-based filtering (optional)
         if (role !== 'ADMIN') {
             // For non-admin users, show announcements targeted to their role
@@ -49,21 +50,21 @@ export const getAllAnnouncements = async (req, res, next) => {
                 { targetRoles: { none: {} } } // Announcements with no specific role targets
             ];
         }
-        
+
         const announcements = await prisma.announcement.findMany(query);
-        
+
         // Format data for response
         const formattedAnnouncements = announcements.map(announcement => {
             // Get creator name and role
             let creatorName = "Unknown";
             let creatorRole = announcement.createdByRole;
-            
+
             if (announcement.teacher) {
                 creatorName = announcement.teacher.name;
             } else if (announcement.admin) {
                 creatorName = announcement.admin.fullName;
             }
-            
+
             return {
                 id: announcement.id,
                 title: announcement.title,
@@ -89,13 +90,16 @@ export const getAllAnnouncements = async (req, res, next) => {
                 }))
             };
         });
-        
-        res.status(200).json({
-            status: 'success',
-            data: {
-                announcements: formattedAnnouncements
-            }
-        });
+
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    formattedAnnouncements,
+                    'Announcements fetched successfully'
+                )
+            );
     } catch (error) {
         next(error);
     }
@@ -105,12 +109,12 @@ export const getAllAnnouncements = async (req, res, next) => {
 export const getAnnouncementById = async (req, res, next) => {
     try {
         const { id } = req.params;
-        
+
         // Check if the ID is valid
         if (!id || isNaN(Number(id))) {
             return next(new ApiError(400, 'Invalid announcement ID'));
         }
-        
+
         const announcement = await prisma.announcement.findUnique({
             where: { id: Number(id) },
             include: {
@@ -130,21 +134,21 @@ export const getAnnouncementById = async (req, res, next) => {
                 attachments: true
             }
         });
-        
+
         if (!announcement) {
             return next(new ApiError(404, 'Announcement not found'));
         }
-        
+
         // Get creator name and role
         let creatorName = "Unknown";
         let creatorRole = announcement.createdByRole;
-        
+
         if (announcement.teacher) {
             creatorName = announcement.teacher.name;
         } else if (announcement.admin) {
             creatorName = announcement.admin.fullName;
         }
-        
+
         // Format the announcement for response
         const formattedAnnouncement = {
             id: announcement.id,
@@ -176,13 +180,16 @@ export const getAnnouncementById = async (req, res, next) => {
                 size: attachment.fileSize
             }))
         };
-        
-        res.status(200).json({
-            status: 'success',
-            data: {
-                announcement: formattedAnnouncement
-            }
-        });
+
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    formattedAnnouncement,
+                    'Announcement fetched successfully'
+                )
+            );
     } catch (error) {
         next(error);
     }
@@ -191,23 +198,38 @@ export const getAnnouncementById = async (req, res, next) => {
 // Create a new announcement
 export const createAnnouncement = async (req, res, next) => {
     try {
-        const { 
-            title, 
-            content, 
-            priority = 'NORMAL', 
+        const {
+            title,
+            content,
+            priority = 'NORMAL',
             expiresAt = null,
             targetClassIds = [],
             targetSectionIds = [],
             targetRoles = [],
-            attachments = []
         } = req.body;
-        
+
+        const attachments = req.files;
+
         const { id: userId, role: userRole } = req.user;
+
+        if (attachments) {
+            for (const attachment of attachments) {
+                const host = req.headers.host;
+                const protocol = req.secure ? 'https' : 'http';
+                const fileUrl = `${protocol}://${host}/uploads/announcements/${attachment.filename}`;
+                attachments.push({
+                    fileName: attachment.originalname,
+                    fileUrl,
+                    fileType: attachment.mimetype,
+                    fileSize: attachment.size
+                });
+            }
+        }
 
         // Get creator IDs based on role
         let teacherId = null;
         let adminId = null;
-        
+
         if (userRole === 'TEACHER') {
             const teacher = await prisma.teacher.findFirst({
                 where: {
@@ -216,11 +238,11 @@ export const createAnnouncement = async (req, res, next) => {
                     }
                 }
             });
-            
+
             if (!teacher) {
                 return next(new ApiError(404, 'Teacher profile not found'));
             }
-            
+
             teacherId = teacher.id;
         } else if (userRole === 'ADMIN') {
             const admin = await prisma.admin.findFirst({
@@ -230,16 +252,16 @@ export const createAnnouncement = async (req, res, next) => {
                     }
                 }
             });
-            
+
             if (!admin) {
                 return next(new ApiError(404, 'Admin profile not found'));
             }
-            
+
             adminId = admin.id;
         } else {
             return next(new ApiError(403, 'Only teachers and admins can create announcements'));
         }
-        
+
         // Create the announcement
         const announcement = await prisma.announcement.create({
             data: {
@@ -297,7 +319,7 @@ export const createAnnouncement = async (req, res, next) => {
                 attachments: true
             }
         });
-        
+
         // Format for response
         const formattedAnnouncement = {
             id: announcement.id,
@@ -329,14 +351,16 @@ export const createAnnouncement = async (req, res, next) => {
                 size: attachment.fileSize
             }))
         };
-        
-        res.status(201).json({
-            status: 'success',
-            message: 'Announcement created successfully',
-            data: {
-                announcement: formattedAnnouncement
-            }
-        });
+
+        return res
+            .status(201)
+            .json(
+                new ApiResponse(
+                    201,
+                    formattedAnnouncement,
+                    'Announcement created successfully'
+                )
+            );
     } catch (error) {
         console.error('Error creating announcement:', error);
         next(error);
@@ -347,9 +371,9 @@ export const createAnnouncement = async (req, res, next) => {
 export const updateAnnouncement = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { 
-            title, 
-            content, 
+        const {
+            title,
+            content,
             priority,
             expiresAt,
             isActive,
@@ -358,26 +382,26 @@ export const updateAnnouncement = async (req, res, next) => {
             targetRoles = [],
             attachments = []
         } = req.body;
-        
+
         // Check if the announcement exists
         const announcementExists = await prisma.announcement.findUnique({
             where: { id: Number(id) }
         });
-        
+
         if (!announcementExists) {
             return next(new ApiError(404, 'Announcement not found'));
         }
-        
+
         // Check if the user has permission to update this announcement
         const { role: userRole, id: userId } = req.user;
-        
+
         if (userRole !== 'ADMIN') {
             // For non-admin users, check if they created the announcement
             if (announcementExists.createdById !== userId) {
                 return next(new ApiError(403, 'You do not have permission to update this announcement'));
             }
         }
-        
+
         // Prepare update data
         const updateData = {
             ...(title && { title }),
@@ -387,7 +411,7 @@ export const updateAnnouncement = async (req, res, next) => {
             ...(isActive !== undefined && { isActive }),
             updatedAt: new Date()
         };
-        
+
         // Perform the update using a transaction to handle relations
         const updated = await prisma.$transaction(async (tx) => {
             // Update the announcement itself
@@ -395,17 +419,17 @@ export const updateAnnouncement = async (req, res, next) => {
                 where: { id: Number(id) },
                 data: updateData
             });
-            
+
             // If targetClassIds is provided, update class relations
             if (targetClassIds.length >= 0) {
                 // Delete existing relations
                 await tx.announcementClass.deleteMany({
                     where: { announcementId: Number(id) }
                 });
-                
+
                 // Create new relations
                 if (targetClassIds.length > 0) {
-                    await Promise.all(targetClassIds.map(classId => 
+                    await Promise.all(targetClassIds.map(classId =>
                         tx.announcementClass.create({
                             data: {
                                 announcementId: Number(id),
@@ -415,17 +439,17 @@ export const updateAnnouncement = async (req, res, next) => {
                     ));
                 }
             }
-            
+
             // If targetSectionIds is provided, update section relations
             if (targetSectionIds.length >= 0) {
                 // Delete existing relations
                 await tx.announcementSection.deleteMany({
                     where: { announcementId: Number(id) }
                 });
-                
+
                 // Create new relations
                 if (targetSectionIds.length > 0) {
-                    await Promise.all(targetSectionIds.map(sectionId => 
+                    await Promise.all(targetSectionIds.map(sectionId =>
                         tx.announcementSection.create({
                             data: {
                                 announcementId: Number(id),
@@ -435,17 +459,17 @@ export const updateAnnouncement = async (req, res, next) => {
                     ));
                 }
             }
-            
+
             // If targetRoles is provided, update role relations
             if (targetRoles.length >= 0) {
                 // Delete existing relations
                 await tx.announcementRole.deleteMany({
                     where: { announcementId: Number(id) }
                 });
-                
+
                 // Create new relations
                 if (targetRoles.length > 0) {
-                    await Promise.all(targetRoles.map(role => 
+                    await Promise.all(targetRoles.map(role =>
                         tx.announcementRole.create({
                             data: {
                                 announcementId: Number(id),
@@ -455,10 +479,10 @@ export const updateAnnouncement = async (req, res, next) => {
                     ));
                 }
             }
-            
+
             return updatedAnnouncement;
         });
-        
+
         // Fetch the updated announcement with all relations
         const updatedAnnouncement = await prisma.announcement.findUnique({
             where: { id: Number(id) },
@@ -479,7 +503,7 @@ export const updateAnnouncement = async (req, res, next) => {
                 attachments: true
             }
         });
-        
+
         // Format for response
         const formattedAnnouncement = {
             id: updatedAnnouncement.id,
@@ -511,14 +535,16 @@ export const updateAnnouncement = async (req, res, next) => {
                 size: attachment.fileSize
             }))
         };
-        
-        res.status(200).json({
-            status: 'success',
-            message: 'Announcement updated successfully',
-            data: {
-                announcement: formattedAnnouncement
-            }
-        });
+
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    formattedAnnouncement,
+                    'Announcement updated successfully'
+                )
+            );
     } catch (error) {
         console.error('Error updating announcement:', error);
         next(error);
@@ -529,26 +555,26 @@ export const updateAnnouncement = async (req, res, next) => {
 export const deleteAnnouncement = async (req, res, next) => {
     try {
         const { id } = req.params;
-        
+
         // Check if the announcement exists
         const announcementExists = await prisma.announcement.findUnique({
             where: { id: Number(id) }
         });
-        
+
         if (!announcementExists) {
             return next(new ApiError(404, 'Announcement not found'));
         }
-        
+
         // Check if the user has permission to delete this announcement
         const { role: userRole, id: userId } = req.user;
-        
+
         if (userRole !== 'ADMIN') {
             // For non-admin users, check if they created the announcement
             if (announcementExists.createdById !== userId) {
                 return next(new ApiError(403, 'You do not have permission to delete this announcement'));
             }
         }
-        
+
         // Delete related records
         await prisma.$transaction([
             prisma.announcementClass.deleteMany({
@@ -567,11 +593,15 @@ export const deleteAnnouncement = async (req, res, next) => {
                 where: { id: Number(id) }
             })
         ]);
-        
-        res.status(200).json({
-            status: 'success',
-            message: 'Announcement deleted successfully'
-        });
+
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    'Announcement deleted successfully'
+                )
+            );
     } catch (error) {
         console.error('Error deleting announcement:', error);
         next(error);
