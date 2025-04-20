@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import LeaveDetailModal from "../../components/common/LeaveDetailModal";
-import { leaveAPI } from "../../services/api";
+import { leaveAPI, userAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
+import { UserRole } from "../../utils/roles";
 
 interface LeaveApplication {
   id: number;
@@ -20,30 +22,64 @@ interface LeaveApplication {
 
 const Leave: React.FC = () => {
   const [leaveApplications, setLeaveApplications] = useState<LeaveApplication[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState<LeaveApplication | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [studentInfo, setStudentInfo] = useState<{ name: string, class: string, section: string } | null>(null);
+  
   const navigate = useNavigate();
-
+  const { user } = useAuth();
+  const { studentId } = useParams<{ studentId?: string }>();
+  
   useEffect(() => {
     fetchLeaveApplications();
-  }, []);
-
+  }, [studentId]);
+  
   const fetchLeaveApplications = async () => {
     setIsLoading(true);
     setError(null);
+    
     try {
-      const response = await leaveAPI.getLeaves({});
-      if (response.data.status === 'success') {
-        setLeaveApplications(response.data.data.leaveApplications as LeaveApplication[]);
+      // Determine which student ID to use
+      const targetStudentId = studentId ? parseInt(studentId) : user?.student?.id;
+      
+      if (!targetStudentId) {
+        setError("Student information not available");
+        setIsLoading(false);
+        return;
+      }
+      
+      // If viewing as parent with studentId param, fetch student details
+      if (studentId && user?.role === UserRole.PARENT) {
+        try {
+          const studentResponse = await userAPI.getStudentById(parseInt(studentId));
+          if (studentResponse.data?.status === 'success' && studentResponse.data?.data?.student) {
+            const student = studentResponse.data.data.student;
+            setStudentInfo({
+              name: student.name,
+              class: student.class?.name || '',
+              section: student.section?.name || ''
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching student info:', err);
+        }
+      }
+      
+      const response = await leaveAPI.getLeaves({
+        studentId: targetStudentId
+      });
+      
+      if (response.data?.status === 'success' && Array.isArray(response.data?.data?.leaveApplications)) {
+        setLeaveApplications(response.data?.data?.leaveApplications as LeaveApplication[]);
       } else {
-        setError("Failed to fetch leave applications");
+        setLeaveApplications([]);
       }
     } catch (err) {
       console.error("Error fetching leave applications:", err);
-      setError("An error occurred while fetching leave applications");
-      toast.error("Failed to load leave applications");
+      toast.error("Failed to fetch leave applications");
+      setError("Failed to load leave applications. Please try again later.");
     } finally {
       setIsLoading(false);
     }
@@ -59,10 +95,6 @@ const Leave: React.FC = () => {
     setSelectedLeave(null);
   };
 
-  const handleAddLeave = () => {
-    navigate('/leave/create');
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'APPROVED': return 'bg-green-100 text-green-800';
@@ -74,16 +106,26 @@ const Leave: React.FC = () => {
   };
 
   return (
-    <div className="p-4 bg-[#EEF5FF]">
-      <div className="p-6 bg-white rounded-lg shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">Leave Applications</h2>
-          <button 
-            onClick={handleAddLeave}
-            className="bg-[#292648] text-white px-6 py-2 rounded-md"
-          >
-            Add Leave
-          </button>
+    <div className="w-full p-4 bg-[#EEF5FF]">
+      <div className="w-full p-6 bg-white rounded-lg shadow-sm">
+        <div className="flex justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-1">Leave Applications</h2>
+            {studentInfo && (
+              <p className="text-gray-600">
+                {studentInfo.name} - {studentInfo.class} {studentInfo.section}
+              </p>
+            )}
+          </div>
+          
+          {!studentId && (
+            <button
+              className="px-4 py-2 bg-[#292648] text-white rounded-lg hover:bg-blue-700 transition"
+              onClick={() => navigate('/leave/create')}
+            >
+              Apply for Leave
+            </button>
+          )}
         </div>
 
         {isLoading && (

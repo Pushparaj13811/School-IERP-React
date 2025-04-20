@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import Table from '../../components/ui/Table';
-import { attendanceAPI } from '../../services/api';
+import { attendanceAPI, userAPI } from '../../services/api';
 import { toast } from 'react-toastify';
 import { format } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
+import { useParams } from 'react-router-dom';
+import { UserRole } from '../../utils/roles';
 
 interface DailyAttendance {
   id: number;
@@ -28,21 +30,33 @@ interface CalendarDay {
   isHoliday: boolean;
 }
 
+interface MonthlyAttendanceResponse {
+  attendance: {
+    month: string;
+    year: number;
+    presentCount: number;
+    absentCount: number;
+    percentage: number;
+  }
+}
+
 const Attendance: React.FC = () => {
   const [recentAttendance, setRecentAttendance] = useState<DailyAttendance[]>([]);
   const [monthlyAttendance, setMonthlyAttendance] = useState<MonthlyAttendance[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [studentInfo, setStudentInfo] = useState<{ name: string, class: string, section: string } | null>(null);
   
   // For calendar
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   
   const { user } = useAuth();
+  const { studentId } = useParams<{ studentId?: string }>();
   
   useEffect(() => {
     fetchAttendanceData();
-  }, []);
+  }, [studentId]);
   
   useEffect(() => {
     generateCalendarDays(currentMonth);
@@ -56,28 +70,67 @@ const Attendance: React.FC = () => {
       // Get current date and first day of this month
       const today = new Date();
       
+      // Determine which student ID to use
+      const targetStudentId = studentId ? parseInt(studentId) : user?.student?.id;
+      
+      if (!targetStudentId) {
+        throw new Error('No student ID available');
+      }
+      
+      // If viewing as parent with studentId param, fetch student details
+      if (studentId && user?.role === UserRole.PARENT) {
+        try {
+          const studentResponse = await userAPI.getStudentById(parseInt(studentId));
+          if (studentResponse.data?.status === 'success' && studentResponse.data?.data?.student) {
+            const student = studentResponse.data.data.student;
+            setStudentInfo({
+              name: student.name,
+              class: student.class?.name || '',
+              section: student.section?.name || ''
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching student info:', err);
+        }
+      }
+      
       // Fetch current month's attendance
       try {
         const monthlyResponse = await attendanceAPI.getMonthlyAttendance({
           month: today.getMonth() + 1,
           year: today.getFullYear(),
-          studentId: user?.student?.id // Ensure we're sending the student ID
+          studentId: targetStudentId
         });
         
-        if (monthlyResponse.data?.status === 'success' && monthlyResponse.data?.data?.attendance) {
-          // Format monthly data
-          const data = monthlyResponse.data.data.attendance;
-          setMonthlyAttendance([
-            {
-              month: format(new Date(data.month), 'MMMM yyyy'),
-              year: data.year,
-              presentCount: data.presentCount || 0,
-              absentCount: data.absentCount || 0,
-              percentage: data.percentage || 0
-            }
-          ]);
+        if (monthlyResponse.data?.status === 'success') {
+          // Type assertion to tell TypeScript about the correct structure
+          const responseData = monthlyResponse.data.data as unknown as MonthlyAttendanceResponse;
+          if (responseData.attendance) {
+            // Format monthly data
+            const data = responseData.attendance;
+            setMonthlyAttendance([
+              {
+                month: format(new Date(data.month), 'MMMM yyyy'),
+                year: data.year,
+                presentCount: data.presentCount || 0,
+                absentCount: data.absentCount || 0,
+                percentage: data.percentage || 0
+              }
+            ]);
+          } else {  
+            // Set default values if no data
+            setMonthlyAttendance([
+              {
+                month: format(today, 'MMMM yyyy'),
+                year: today.getFullYear(),
+                presentCount: 0,
+                absentCount: 0,
+                percentage: 0
+              }
+            ]);
+          }
         } else {
-          // Set default values if no data
+          // Continue with daily attendance even if monthly fails
           setMonthlyAttendance([
             {
               month: format(today, 'MMMM yyyy'),
@@ -110,7 +163,7 @@ const Attendance: React.FC = () => {
         const dailyResponse = await attendanceAPI.getDailyAttendance({
           startDate: format(thirtyDaysAgo, 'yyyy-MM-dd'),
           endDate: format(today, 'yyyy-MM-dd'),
-          studentId: user?.student?.id
+          studentId: targetStudentId
         });
         
         if (dailyResponse.data?.status === 'success' && Array.isArray(dailyResponse.data?.data?.attendance)) {
@@ -279,7 +332,36 @@ const Attendance: React.FC = () => {
   return (
     <div className="w-full p-4 bg-[#EEF5FF]">
       <div className="w-full bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Attendance</h2>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">Attendance Record</h2>
+            {studentInfo && (
+              <p className="text-gray-600">
+                {studentInfo.name} - {studentInfo.class} {studentInfo.section}
+              </p>
+            )}
+          </div>
+          
+          {/* Stats */}
+          <div className="flex space-x-4">
+            {monthlyAttendance[0] && (
+              <>
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">Present</p>
+                  <p className="text-xl font-bold text-green-600">{monthlyAttendance[0].presentCount}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">Absent</p>
+                  <p className="text-xl font-bold text-red-600">{monthlyAttendance[0].absentCount}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">Percentage</p>
+                  <p className="text-xl font-bold text-blue-600">{monthlyAttendance[0].percentage.toFixed(1)}%</p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
         
         {isLoading ? (
           <div className="text-center py-8">Loading attendance data...</div>
