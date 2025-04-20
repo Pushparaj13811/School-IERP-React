@@ -172,6 +172,28 @@ const createHolidayType = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * @desc    Delete a holiday type
+ * @route   DELETE /api/v1/holidays/types/:id
+ * @access  Admin
+ */
+const deleteHolidayType = asyncHandler(async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await holidayService.deleteHolidayType(id);
+    
+    return res.status(200).json(
+      new ApiResponse(200, null, "Holiday type deleted successfully")
+    );
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, "Error deleting holiday type", error);
+  }
+});
+
 export {
   getAllHolidays,
   getHolidayById,
@@ -180,5 +202,6 @@ export {
   deleteHoliday,
   getHolidayTypes,
   createHolidayType,
+  deleteHolidayType,
   getUpcomingHolidays
 }; 

@@ -7,7 +7,8 @@ import {
   deleteHoliday,
   getHolidayTypes,
   createHolidayType,
-  getUpcomingHolidays
+  getUpcomingHolidays,
+  deleteHolidayType
 } from '../controller/holidayController.js';
 import { protect,restrictTo } from '../middlewares/authMiddleware.js';
 
@@ -27,5 +28,6 @@ router.post('/', restrictTo('ADMIN'), createHoliday);
 router.put('/:id', restrictTo('ADMIN'), updateHoliday);
 router.delete('/:id', restrictTo('ADMIN'), deleteHoliday);
 router.post('/types', restrictTo('ADMIN'), createHolidayType);
+router.delete('/types/:id', restrictTo('ADMIN'), deleteHolidayType);
 
 export default router; 

@@ -317,6 +317,29 @@ class HolidayService {
             throw error;
         }
     }
+
+    /**
+     * Delete a holiday type
+     */
+    async deleteHolidayType(id) {
+
+        if(!id){
+            throw new ApiError(400, "Holiday type id is required");
+        }
+
+        try {
+            await prisma.holidayType.delete({
+                where: { id: parseInt(id) }
+            });
+
+            return true;
+        } catch (error) {
+            if (error.code === 'P2002') {
+                throw new ApiError(400, "Holiday type is still associated with holidays");
+            }   
+            throw error;
+        }
+    }
     
     /**
      * Get upcoming holidays
