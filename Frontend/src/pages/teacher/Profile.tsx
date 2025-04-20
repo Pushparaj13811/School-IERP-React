@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { userService, UserProfile } from '../../services/userService';
 import { userAPI } from '../../services/api';
 import { Teacher, Subject } from '../../types/api';
+import Button from '../../components/ui/Button';
 
 // Define interface for teacher profile data from API response
 interface TeacherWithAddress extends Teacher {
@@ -38,12 +39,12 @@ const TeacherProfile: React.FC = () => {
     const fetchTeacherData = async () => {
       try {
         setLoading(true);
-        
+
         // If id parameter exists, fetch specific teacher (admin view)
         if (id) {
           console.log(`Fetching teacher profile with ID: ${id}`);
           const response = await userAPI.getTeacherById(parseInt(id));
-          
+
           if (response.data?.status === 'success' && response.data?.data?.teacher) {
             console.log('Teacher data from API:', response.data.data.teacher);
             setTeacher(response.data.data.teacher as TeacherWithAddress);
@@ -51,12 +52,12 @@ const TeacherProfile: React.FC = () => {
           } else {
             throw new Error('Failed to load teacher profile data');
           }
-        } 
+        }
         // Otherwise, try to get logged-in user's profile (teacher view)
         else {
           console.log('Fetching own teacher profile');
           const profile = await userService.getUserProfile();
-          
+
           if (profile && profile.role === 'TEACHER') {
             console.log('Own teacher profile found:', profile);
             setTeacher(profile);
@@ -65,7 +66,7 @@ const TeacherProfile: React.FC = () => {
             throw new Error('Teacher profile not found or user is not a teacher');
           }
         }
-        
+
         setLoading(false);
       } catch (err) {
         console.error('Error fetching teacher data:', err);
@@ -102,16 +103,16 @@ const TeacherProfile: React.FC = () => {
   }
 
   // Extract teacher data based on whether we're viewing own profile or specific teacher
-  const teacherData = isOwnProfile 
-    ? (teacher as UserProfile).roleSpecificData as TeacherWithAddress 
+  const teacherData = isOwnProfile
+    ? (teacher as UserProfile).roleSpecificData as TeacherWithAddress
     : teacher as TeacherWithAddress;
-  
-  const displayName = isOwnProfile 
-    ? (teacher as UserProfile).name 
+
+  const displayName = isOwnProfile
+    ? (teacher as UserProfile).name
     : teacherData.name;
-  
-  const profilePicture = isOwnProfile 
-    ? (teacher as UserProfile).profilePicture 
+
+  const profilePicture = isOwnProfile
+    ? (teacher as UserProfile).profilePicture
     : teacherData.profilePicture;
 
   return (
@@ -127,7 +128,15 @@ const TeacherProfile: React.FC = () => {
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    target.src = "/default-teacher-avatar.png";
+                    // Use gender-specific fallback
+                    const gender = teacherData?.gender;
+                    if (gender === "Male") {
+                      target.src = "/assets/male.png";
+                    } else if (gender === "Female") {
+                      target.src = "/assets/female.png";
+                    } else {
+                      target.src = "/assets/male.png";
+                    }
                     console.error("Error loading profile image, using default");
                   }}
                 />
@@ -135,13 +144,20 @@ const TeacherProfile: React.FC = () => {
               <h2 className="text-xl font-semibold">{displayName}</h2>
               <p className="text-gray-600">{isOwnProfile ? userService.getRoleDisplayName((teacher as UserProfile).role) : 'Teacher'}</p>
               <div className="mt-4 space-y-2">
-                <button className="w-full bg-indigo-900 text-white px-4 py-2 rounded-md hover:bg-indigo-800">
+                <Button
+                  variant='primary'
+                  className='w-full'
+                >
                   Download Pdf
-                </button>
+                </Button>
                 {isOwnProfile && (
-                  <button className="w-full border border-indigo-900 text-indigo-900 px-4 py-2 rounded-md hover:bg-indigo-50">
+                  <Button
+                    variant='outline'
+                    className='w-full'
+                  >
                     Edit Profile
-                  </button>
+                  </Button>
+
                 )}
               </div>
             </div>

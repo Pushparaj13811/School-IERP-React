@@ -29,12 +29,12 @@ const Profile: React.FC = () => {
     const fetchStudentData = async () => {
       try {
         setIsLoading(true);
-        
+
         // If id parameter exists, fetch specific student (admin view)
         if (isIdProvided) {
           console.log(`Fetching student profile with ID: ${id}`);
           const response = await userAPI.getStudentById(parseInt(id as string));
-          
+
           if (response.data?.status === 'success' && response.data?.data?.student) {
             console.log("Student data from API:", response.data.data.student);
             setStudent(response.data.data.student);
@@ -42,12 +42,12 @@ const Profile: React.FC = () => {
           } else {
             throw new Error('Failed to load student profile data');
           }
-        } 
+        }
         // Otherwise, try to get logged-in user's profile (student view)
         else {
           console.log('Fetching own student profile');
           const profile = await userService.getUserProfile();
-          
+
           if (profile && profile.role === 'STUDENT') {
             console.log('Own student profile found:', profile);
             setStudent(profile);
@@ -56,7 +56,7 @@ const Profile: React.FC = () => {
             throw new Error('Student profile not found or user is not a student');
           }
         }
-        
+
         setIsLoading(false);
       } catch (err) {
         console.error("Error fetching student data:", err);
@@ -101,18 +101,24 @@ const Profile: React.FC = () => {
   const getProfileImageUrl = () => {
     console.log("Getting profile image URL for:", student);
     const profileData = getProfileData();
-    if (!profileData) {
-      console.log("No student data available");
-      return "/default-student-avatar.png";
-    }
-    
     console.log("Profile data for image URL:", profileData);
-    if (!profileData.profilePicture) {
+    
+    if (!profileData?.profilePicture || profileData?.profilePicture === null) {
       console.log("No profile picture found in profile data");
-      return "/default-student-avatar.png";
+      
+      // Return gender-specific default avatar for students
+      if (profileData?.studentData?.gender === "Male") {
+        return "/assets/Student-male.jpg"; // Male student avatar
+      }
+      if (profileData?.studentData?.gender === "Female") {
+        return "/assets/student-female.jpg"; // Female student avatar
+      }
+      
+      // Fallback if gender is not specified
+      return "/assets/Student-male.jpg";
     }
     
-    return userService.getProfileImageUrl(profileData.profilePicture);
+    return userService.getProfileImageUrl(profileData?.profilePicture);
   };
 
   if (isLoading) {
@@ -141,7 +147,7 @@ const Profile: React.FC = () => {
   }
 
   const studentData = profileData.studentData;
-  
+
   const personalDetails = [
     { label: "Name", value: studentData.name || "N/A" },
     { label: "As Per Birth Certificate", value: studentData.nameAsPerBirth || "N/A" },
@@ -160,7 +166,7 @@ const Profile: React.FC = () => {
     { label: "Class", value: studentData.class?.name || "N/A" },
     { label: "Section", value: studentData.section?.name || "N/A" },
   ];
-  
+
   const addressDetails = studentData.address ? [
     { label: "Address Line 1", value: studentData.address.addressLine1 || "N/A" },
     { label: "Address Line 2", value: studentData.address.addressLine2 || "N/A" },
@@ -178,7 +184,7 @@ const Profile: React.FC = () => {
     <div className="w-full p-4 bg-[#EEF5FF]">
       <div className="w-full bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Student Profile</h2>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
           {/* Profile Picture & Download Button */}
           <div className="lg:col-span-3">
@@ -190,10 +196,18 @@ const Profile: React.FC = () => {
                   alt="Profile"
                   width={150}
                   height={150}
-                  crossOrigin="anonymous"
                   onError={(e) => {
-                    console.error('Profile image failed to load');
-                    (e.target as HTMLImageElement).src = "https://via.placeholder.com/150?text=Student";
+                    console.log("Profile image failed to load");
+                    // Use gender-specific fallback image
+                    const gender = profileData?.studentData?.gender;
+                    if (gender === "Male") {
+                      e.currentTarget.src = "/assets/@Student-male.jpg";
+                    } else if (gender === "Female") {
+                      e.currentTarget.src = "/assets/@student-female.jpg";
+                    } else {
+                      e.currentTarget.src = "/assets/@Student-male.jpg";
+                    }
+                    e.currentTarget.onerror = null; // Prevent infinite error loops
                   }}
                 />
                 {isOwnProfile && (
@@ -208,19 +222,19 @@ const Profile: React.FC = () => {
               <p className="text-sm text-gray-500 mb-4">
                 {studentData.class?.name} {studentData.section?.name}
               </p>
-              
+
               <div className="w-full">
-                <Button 
-                  variant="primary" 
+                <Button
+                  variant="primary"
                   className="w-full mb-2"
                   onClick={() => toast.info("Download feature coming soon")}
                 >
                   Download Profile
                 </Button>
-                
+
                 {isOwnProfile && (
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full"
                     onClick={() => toast.info("Edit feature coming soon")}
                   >
@@ -230,11 +244,11 @@ const Profile: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           {/* Personal Details & Address */}
           <div className="lg:col-span-9">
             <DetailsSection title="Personal Details" details={personalDetails} />
-            
+
             {addressDetails.length > 0 && (
               <div className="mt-6">
                 <DetailsSection title="Address Details" details={addressDetails} />

@@ -102,7 +102,15 @@ const ParentProfile: React.FC = () => {
     console.log("Parent component - profile picture:", profilePicture);
     if (!profilePicture) {
       console.log("No profile picture available for parent");
-      return "/default-parent-avatar.png";
+      // Return gender-specific default avatar based on parent's gender
+      const gender = parentData?.gender;
+      if (gender === "Male") {
+        return "/assets/male.png";
+      } else if (gender === "Female") {
+        return "/assets/female.png";
+      }
+      // Default fallback
+      return "/assets/male.png";
     }
     
     return userService.getProfileImageUrl(profilePicture);
@@ -121,7 +129,15 @@ const ParentProfile: React.FC = () => {
                   className="object-cover w-100 h-100"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    target.src = "/default-parent-avatar.png";
+                    // Use gender-specific fallback
+                    const gender = parentData?.gender;
+                    if (gender === "Male") {
+                      target.src = "/assets/@male.jpeg";
+                    } else if (gender === "Female") {
+                      target.src = "/assets/female.png";
+                    } else {
+                      target.src = "/assets/@male.jpeg";
+                    }
                     console.error("Error loading profile image, using default");
                   }}
                 />
@@ -167,9 +183,6 @@ const ParentProfile: React.FC = () => {
                         {parentData.children.map((child: Student) => (
                           <li key={child.id} className="font-medium">
                             {child.name} 
-                            {child.class && ` (${child.class.name}`}
-                            {child.section && child.class && ` - ${child.section.name}`}
-                            {child.class && ')'}
                           </li>
                         ))}
                       </ul>

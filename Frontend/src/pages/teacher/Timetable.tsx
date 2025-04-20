@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';  
 import timetableService, { 
   Subject, 
   Teacher, 
@@ -134,7 +134,7 @@ const TeacherTimetable: React.FC = () => {
           console.log("Teacher timetable response:", teacherTimetableData);
           
           if (teacherTimetableData) {
-            setTeacherTimetable(teacherTimetableData);
+        setTeacherTimetable(teacherTimetableData);
           } else {
             console.log("No timetable data returned");
           }
@@ -143,7 +143,7 @@ const TeacherTimetable: React.FC = () => {
         }
         
         if (teacherId) {
-          // Fetch class teacher assignments
+        // Fetch class teacher assignments
           console.log("Fetching class teacher timetable for teacherId:", teacherId);
           const assignments = await timetableService.getClassTeachers();
           console.log("Class teacher assignments:", assignments);
@@ -154,8 +154,8 @@ const TeacherTimetable: React.FC = () => {
           
           if (teacherAssignments.length > 0) {
             setSelectedAssignment(teacherAssignments[0]);
-            
-            // Fetch additional data for class teacher
+          
+          // Fetch additional data for class teacher
             const [subjectsList, teachersList, timeSlotsList] = await Promise.all([
               timetableService.getSubjects(),
               timetableService.getTeachers(),
@@ -165,13 +165,13 @@ const TeacherTimetable: React.FC = () => {
             setSubjects(subjectsList);
             setTeachers(teachersList);
             setTimeSlots(timeSlotsList);
-            
-            // Get current academic year and term (could be from a settings API)
-            const academicYear = "2023-2024";
-            const term = "First Term";
-            
-            // Try to fetch timetable for the assigned class/section
-            try {
+          
+          // Get current academic year and term (could be from a settings API)
+          const academicYear = "2023-2024";
+          const term = "First Term";
+          
+          // Try to fetch timetable for the assigned class/section
+          try {
               const timetableData = await timetableService.getTimetable(
                 teacherAssignments[0].classId,
                 teacherAssignments[0].sectionId,
@@ -179,12 +179,12 @@ const TeacherTimetable: React.FC = () => {
                 term
               );
               
-              if (timetableData) {
-                setTimetable(timetableData);
-              }
-            } catch (error) {
-              // Timetable might not exist yet, which is fine
-              console.error('No timetable found for this class/section:', error);
+            if (timetableData) {
+              setTimetable(timetableData);
+            }
+          } catch (error) {
+            // Timetable might not exist yet, which is fine
+            console.error('No timetable found for this class/section:', error);
             }
           }
         }
@@ -220,7 +220,7 @@ const TeacherTimetable: React.FC = () => {
         term
       );
       
-      setTimetable(timetableData);
+        setTimetable(timetableData);
       setLoading(false);
     } catch (error) {
       // Timetable might not exist yet
@@ -243,12 +243,12 @@ const TeacherTimetable: React.FC = () => {
       const timetableData = await timetableService.createTimetable(
         selectedAssignment.classId,
         selectedAssignment.sectionId,
-        academicYear,
+          academicYear,
         term
       );
       
       if (timetableData) {
-        setTimetable(timetableData);
+      setTimetable(timetableData);
         showNotification('Timetable created successfully', 'success');
       }
       
@@ -282,7 +282,7 @@ const TeacherTimetable: React.FC = () => {
       showNotification('Please fill all required fields', 'error');
       return;
     }
-
+    
     try {
       setLoading(true);
       
@@ -334,21 +334,21 @@ const TeacherTimetable: React.FC = () => {
       );
       
       if (success) {
-        // Refresh timetable data
+      // Refresh timetable data
         const updatedTimetable = await timetableService.getTimetableById(currentTimetable.id);
         if (updatedTimetable) {
           setTimetable(updatedTimetable);
         }
         showNotification('Period added successfully', 'success');
-        
-        // Also refresh teacher's own timetable view
+      
+      // Also refresh teacher's own timetable view
         const teacherTimetableData = await timetableService.getTeacherTimetable();
         if (teacherTimetableData) {
-          setTeacherTimetable(teacherTimetableData);
+      setTeacherTimetable(teacherTimetableData);
         }
-        
+      
         // Reset selected values
-        handleClosePeriodDialog();
+      handleClosePeriodDialog();
       }
     } catch (error) {
       const apiError = error as { message?: string };
@@ -385,8 +385,8 @@ const TeacherTimetable: React.FC = () => {
       const success = await timetableService.deletePeriod(periodId);
       
       if (success) {
-        // Refresh timetable data
-        if (timetable) {
+      // Refresh timetable data
+      if (timetable) {
           const updatedTimetable = await timetableService.getTimetableById(timetable.id);
           if (updatedTimetable) {
             setTimetable(updatedTimetable);
