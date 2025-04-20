@@ -420,8 +420,24 @@ export const academicAPI = {
 export const announcementAPI = {
     getAll: () => api.get<ApiResponse<{ announcements: Announcement[] }>>('/announcements'),
     getById: (id: string) => api.get<ApiResponse<{ announcement: Announcement }>>(`/announcements/${id}`),
-    create: (data: Record<string, unknown>) => api.post<ApiResponse<{ announcement: Announcement }>>('/announcements', data),
-    update: (id: string, data: Record<string, unknown>) => api.put<ApiResponse<{ announcement: Announcement }>>(`/announcements/${id}`, data),
+    create: (data: FormData | Record<string, unknown>) => {
+        // If data is FormData, set proper content type for multipart/form-data
+        const config = data instanceof FormData ? {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        } : {};
+        return api.post<ApiResponse<{ announcement: Announcement }>>('/announcements', data, config);
+    },
+    update: (id: string, data: FormData | Record<string, unknown>) => {
+        // If data is FormData, set proper content type for multipart/form-data
+        const config = data instanceof FormData ? {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        } : {};
+        return api.put<ApiResponse<{ announcement: Announcement }>>(`/announcements/${id}`, data, config);
+    },
     delete: (id: string) => api.delete<ApiResponse<object>>(`/announcements/${id}`),
 };
 

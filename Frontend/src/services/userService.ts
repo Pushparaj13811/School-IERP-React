@@ -147,11 +147,6 @@ class UserService {
   getProfileImageUrl(profilePicture?: string | { id: number; url: string } | null): string {
     console.log('getProfileImageUrl received:', profilePicture);
     
-    if (!profilePicture) {
-      console.log('No profile picture provided, returning default');
-      return "/default-avatar.png";
-    }
-    
     try {
       // Check if profilePicture is an object with url property
       if (typeof profilePicture === 'object' && profilePicture !== null) {
@@ -190,8 +185,7 @@ class UserService {
         console.log('Created full URL:', fullUrl);
         return fullUrl;
       }
-      
-      console.warn('Unable to process profile picture format:', profilePicture);
+
       return "/default-avatar.png";
     } catch (error) {
       console.error("Error processing profile picture:", error);
