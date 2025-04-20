@@ -15,13 +15,18 @@ const ParentProfile = lazy(() => import('../pages/parent/Profile'));
 const AdminProfile = lazy(() => import('../pages/admin/Profile'));
 
 const Attendance = lazy(() => import('../pages/student/Attendance'));
+const TeacherAttendance = lazy(() => import('../pages/teacher/Attendance'));
 const Holiday = lazy(() => import('../pages/student/Holiday'));
 const Achievement = lazy(() => import('../pages/student/Achievement'));
 const Result = lazy(() => import('../pages/student/Result'));
-const Leave = lazy(() => import('../pages/student/Leave'));
+const StudentLeave = lazy(() => import('../pages/student/Leave'));
+const TeacherLeave = lazy(() => import('../pages/teacher/Leave'));
+const AdminLeave = lazy(() => import('../pages/admin/Leave'));
 const LeaveApplicationCreate = lazy(() => import('../pages/student/LeaveApplicationCreate'));
 const Feedback = lazy(() => import('../pages/student/Feedback'));
 const TimeTable = lazy(() => import('../pages/student/TimeTable'));
+const TeacherTimetable = lazy(() => import('../pages/teacher/Timetable'));
+const ManageTimetable = lazy(() => import('../pages/admin/ManageTimetable'));
 const Announcements = lazy(() => import('../pages/shared/AnnouncementView'));
 const Logout = lazy(() => import('../pages/Logout'));
 
@@ -34,6 +39,8 @@ const Report = lazy(() => import('../pages/admin/Report'));
 const StudentsList = lazy(() => import('../pages/admin/StudentsList'));
 const TeachersList = lazy(() => import('../pages/admin/TeachersList'));
 const ParentsList = lazy(() => import('../pages/admin/ParentsList'));
+const ManageResults = lazy(() => import('../pages/admin/ManageResults'));
+const ClassTeacherAssignment = lazy(() => import('../pages/admin/ClassTeacherAssignment'));
 
 const ResultEntry = lazy(() => import('../pages/teacher/ResultEntry'));
 const CreateAnnouncementTeacher = lazy(() => import('../pages/teacher/CreateAnnouncement'));
@@ -41,6 +48,7 @@ const Contact = lazy(() => import('../pages/shared/Contact'));
 
 // Update the imports at the top
 const AdminAnnouncements = lazy(() => import('../pages/admin/Announcements'));
+const HolidayManagement = lazy(() => import('../pages/admin/HolidayManagement'));
 
 interface RouteComponentProps {
   user: { role: UserRole } | null;
@@ -92,8 +100,20 @@ export const routes: Route[] = [
   },
   {
     path: '/attendance',
-    component: Attendance,
+    component: ({user} : RouteComponentProps) => {
+      switch (user?.role) {
+        case UserRole.TEACHER:
+          return <TeacherAttendance />;
+        default:
+          return <Attendance />;
+      }
+    },
     roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.PARENT],
+  },
+  {
+    path: '/attendance/:studentId',
+    component: Attendance,
+    roles: [UserRole.PARENT],
   },
   {
     path: '/holiday',
@@ -121,14 +141,33 @@ export const routes: Route[] = [
     roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.PARENT],
   },
   {
+    path: '/result/:studentId',
+    component: Result,
+    roles: [UserRole.PARENT],
+  },
+  {
     path: '/leave',
-    component: Leave,
-    roles: [UserRole.STUDENT, UserRole.TEACHER],
+    component: ({ user }: RouteComponentProps) => {
+      switch (user?.role) {
+        case UserRole.ADMIN:
+          return <AdminLeave />;
+        case UserRole.TEACHER:
+          return <TeacherLeave />;
+        default:
+          return <StudentLeave />;
+      }
+    },
+    roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN],
+  },
+  {
+    path: '/leaves/:studentId',
+    component: StudentLeave,
+    roles: [UserRole.PARENT],
   },
   {
     path: '/leave/create',
     component: LeaveApplicationCreate,
-    roles: [UserRole.STUDENT, UserRole.TEACHER],
+    roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN],
   },
   {
     path: '/feedback',
@@ -137,7 +176,12 @@ export const routes: Route[] = [
   },
   {
     path: '/time-table',
-    component: TimeTable,
+    component: ({ user }: RouteComponentProps) => {
+      if (user?.role === UserRole.TEACHER) {
+        return <TeacherTimetable />;
+      }
+      return <TimeTable />;
+    },
     roles: [UserRole.STUDENT, UserRole.TEACHER],
   },
   {
@@ -169,6 +213,26 @@ export const routes: Route[] = [
   {
     path: '/parents',
     component: ParentsList,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: '/holiday-management',
+    component: HolidayManagement,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: '/manage-results',
+    component: ManageResults,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: '/manage-timetable',
+    component: ManageTimetable,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: '/class-teacher-assignment',
+    component: ClassTeacherAssignment,
     roles: [UserRole.ADMIN],
   },
   {
@@ -251,6 +315,15 @@ export const routeGroups = [
       '/students',
       '/teachers',
       '/parents'
+    ],
+  },
+  {
+    title: 'Admin Tools',
+    icon: 'bi-gear-fill',
+    routes: [
+      '/manage-results',
+      '/class-teacher-assignment',
+      '/report'
     ],
   },
 ]; 

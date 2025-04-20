@@ -4,46 +4,66 @@ import {
     getAllClasses,
     getClassById,
     updateClass,
-    deleteClass
+    deleteClass,
+    getSubjects,
+    getDesignations
 } from '../controller/classController.js';
-import {
-    createSection,
-    getAllSections,
-    getSectionById,
-    updateSection,
-    deleteSection,
-    getSectionsByClass
-} from '../controller/sectionController.js';
+import { getSectionsByClass } from '../controller/sectionController.js';
+import { getSubjectsByClassId } from '../controller/subjectController.js';
 import { protect, restrictTo } from '../middlewares/authMiddleware.js';
+import { PrismaClient } from '@prisma/client';
 
 const router = express.Router();
+const prisma = new PrismaClient();
+
+// Protect all routes
+router.use(protect);
 
 // Class Routes
 router
     .route('/classes')
-    .post(protect, restrictTo('ADMIN'), createClass)
-    .get(protect, getAllClasses);
+    .post(restrictTo('ADMIN'), createClass)
+    .get(getAllClasses);
 
 router
     .route('/classes/:id')
-    .get(protect, getClassById)
-    .patch(protect, restrictTo('ADMIN'), updateClass)
-    .delete(protect, restrictTo('ADMIN'), deleteClass);
+    .get(getClassById)
+    .patch(restrictTo('ADMIN'), updateClass)
+    .delete(restrictTo('ADMIN'), deleteClass);
 
-// Section Routes
-router
-    .route('/sections')
-    .post(protect, restrictTo('ADMIN'), createSection)
-    .get(protect, getAllSections);
+// Legacy routes for backward compatibility
+router.get('/classes/:classId/sections', getSectionsByClass);
 
-router
-    .route('/sections/:id')
-    .get(protect, getSectionById)
-    .patch(protect, restrictTo('ADMIN'), updateSection)
-    .delete(protect, restrictTo('ADMIN'), deleteSection);
-
-router
-    .route('/classes/:classId/sections')
-    .get(protect, getSectionsByClass);
+// Additional routes
+router.get('/sections', async (req, res, next) => {
+    // Get the classId from query parameters and pass it as path parameter
+    const { classId } = req.query;
+    if (classId) {
+        // Reuse the same controller but pass classId as a parameter
+        req.params.classId = classId;
+        return getSectionsByClass(req, res, next);
+    } else {
+        // If no classId is provided, get all sections
+        try {
+            const sections = await prisma.section.findMany({
+                orderBy: {
+                    name: 'asc'
+                }
+            });
+            return res.status(200).json({
+                status: 'success',
+                data: {
+                    sections
+                }
+            });
+        } catch (error) {
+            console.error('Error getting all sections:', error);
+            next(error);
+        }
+    }
+});
+router.get('/subjects', getSubjects);
+router.get('/subjects/class/:classId', getSubjectsByClassId);
+router.get('/designations', getDesignations);
 
 export default router; 

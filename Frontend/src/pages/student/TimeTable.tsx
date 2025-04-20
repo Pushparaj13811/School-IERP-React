@@ -1,147 +1,344 @@
-import React from "react";
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
+
+// Define API_URL directly since the config file can't be found
+const API_URL = 'http://localhost:3000'; // Updated to correct port
 
 interface TimeSlot {
-  time: string;
-  sunday: string;
-  monday: string;
-  tuesday: string;
-  wednesday: string;
-  thursday: string;
-  friday: string;
+  id: number;
+  startTime: string;
+  endTime: string;
+  isBreak: boolean;
+  breakType: string | null;
 }
 
-// Sample time table data
-const timeTableData: (TimeSlot | { breakType: string })[] = [
-  {
-    time: "10:00 - 10:45",
-    sunday: "Nepali",
-    monday: "Nepali",
-    tuesday: "Nepali",
-    wednesday: "Nepali",
-    thursday: "Nepali",
-    friday: "Nepali"
-  },
-  {
-    time: "10:45 - 11:50",
-    sunday: "English",
-    monday: "English",
-    tuesday: "English",
-    wednesday: "English",
-    thursday: "English",
-    friday: "English"
-  },
-  { breakType: "10 MINUTES BREAK" },
-  {
-    time: "12:00 - 12:45",
-    sunday: "Maths",
-    monday: "Maths",
-    tuesday: "Maths",
-    wednesday: "Maths",
-    thursday: "Maths",
-    friday: "Maths"
-  },
-  {
-    time: "12:45 - 01:30",
-    sunday: "Maths",
-    monday: "Maths",
-    tuesday: "Maths",
-    wednesday: "Maths",
-    thursday: "Maths",
-    friday: "Maths"
-  },
-  { breakType: "LUNCH BREAK" },
-  {
-    time: "02:00 - 02:45",
-    sunday: "Social",
-    monday: "Social",
-    tuesday: "Social",
-    wednesday: "Social",
-    thursday: "Social",
-    friday: "Social"
-  },
-  {
-    time: "02:45 - 03:30",
-    sunday: "Computer",
-    monday: "Computer",
-    tuesday: "Computer",
-    wednesday: "Computer",
-    thursday: "Computer",
-    friday: "Computer"
-  },
-  {
-    time: "03:30 - 04:15",
-    sunday: "H.P.E.",
-    monday: "H.P.E.",
-    tuesday: "H.P.E.",
-    wednesday: "H.P.E.",
-    thursday: "H.P.E.",
-    friday: "H.P.E."
-  }
-];
+interface Period {
+  id: number;
+  dayOfWeek: number;
+  timeSlotId: number;
+  subjectId: number;
+  teacherId: number;
+  classId: number;
+  sectionId: number;
+  timetableId: number;
+  timeSlot: TimeSlot;
+  subject: {
+    id: number;
+    name: string;
+    code: string;
+  };
+  teacher: {
+    id: number;
+    name: string;
+    user: {
+      name: string;
+      profilePicture?: {
+        url: string;
+      } | null;
+    };
+  };
+}
+
+interface Timetable {
+  id: number;
+  classId: number;
+  sectionId: number;
+  academicYear: string;
+  term: string;
+  class?: {
+    name: string;
+  };
+  section?: {
+    name: string;
+  };
+  periods: Period[];
+  breakTimeSlots?: TimeSlot[];
+}
+
+// Custom type for the grid row
+interface TimetableRow {
+  timeSlot: TimeSlot;
+  [key: string]: Period | TimeSlot | null;
+}
+
+// Define API response type
+interface ApiResponse {
+  status: string;
+  data: Timetable;
+  message?: string;
+}
+
+// Define API response type for TimeSlots
+interface TimeSlotApiResponse {
+  status: string;
+  data: TimeSlot[];
+  message?: string;
+}
 
 const TimeTable: React.FC = () => {
-  return (
-    <div className="w-full p-4 bg-[#EEF5FF]">
-      <div className="w-full bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Monthly Attendance</h2>
+  const { user } = useAuth();
+  const [timetable, setTimetable] = useState<Timetable | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-        <div className="overflow-x-auto w-full">
-          <table className="w-full">
-            <thead>
-              <tr>
-                <th className="bg-[#292648] text-white p-3 text-center border-r">
-                  Time \ Date
-                </th>
-                <th className="bg-[#292648] text-white p-3 text-center border-r">
-                  Sunday
-                </th>
-                <th className="bg-[#292648] text-white p-3 text-center border-r">
-                  Monday
-                </th>
-                <th className="bg-[#292648] text-white p-3 text-center border-r">
-                  Tuesday
-                </th>
-                <th className="bg-[#292648] text-white p-3 text-center border-r">
-                  Wednesday
-                </th>
-                <th className="bg-[#292648] text-white p-3 text-center border-r">
-                  Thursday
-                </th>
-                <th className="bg-[#292648] text-white p-3 text-center">
-                  Friday
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {timeTableData.map((slot, index) => {
-                // If this is a break row
-                if ('breakType' in slot) {
-                  return (
-                    <tr key={index}>
-                      <td colSpan={7} className="p-2 text-center font-semibold">
-                        {slot.breakType}
+  useEffect(() => {
+    const fetchTimetable = async () => {
+      try {
+        setLoading(true);
+        // Get token from localStorage instead of context
+        const token = localStorage.getItem('token');
+        
+        const response = await axios.get(`${API_URL}/api/v1/timetables/student`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        // Check if response has the expected structure
+        if (response.data && typeof response.data === 'object') {
+          const apiResponse = response.data as ApiResponse;
+          if (apiResponse.status === 'success' && apiResponse.data) {
+            // Get all timeSlots including breaks
+            const timeSlotResponse = await axios.get<TimeSlotApiResponse>(`${API_URL}/api/v1/timetables/timeslots`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            
+            // Add break time slots to the timetable
+            if (timeSlotResponse.data?.status === 'success') {
+              const breakTimeSlots = timeSlotResponse.data.data.filter((slot: TimeSlot) => slot.isBreak);
+              apiResponse.data.breakTimeSlots = breakTimeSlots;
+            }
+            
+            setTimetable(apiResponse.data);
+          } else {
+            setError('Invalid response format from server');
+          }
+        }
+        
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching timetable:', err);
+        setError('Could not load timetable. Please try again later.');
+        setLoading(false);
+      }
+    };
+
+    fetchTimetable();
+  }, [user]);
+
+  // Helper function to organize periods by day and time
+  const organizePeriodsForDisplay = () => {
+    if (!timetable || !timetable.periods || timetable.periods.length === 0) {
+      return null;
+    }
+
+    // Get unique time slots from periods
+    const periodTimeSlots = Array.from(
+      new Set(timetable.periods.map((period) => period.timeSlot.id))
+    ).map((id) => {
+      return timetable.periods.find((period) => period.timeSlot.id === id)?.timeSlot;
+    }).filter(Boolean) as TimeSlot[];
+
+    // Add any break time slots that might not be referenced by periods
+    const breakTimeSlots = timetable.breakTimeSlots || [];
+    
+    // Combine and deduplicate time slots
+    const allTimeSlots = [...periodTimeSlots];
+    breakTimeSlots.forEach(breakSlot => {
+      if (!allTimeSlots.some(slot => slot.id === breakSlot.id)) {
+        allTimeSlots.push(breakSlot);
+      }
+    });
+
+    // Sort time slots by start time
+    allTimeSlots.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+    const daysOfWeek = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+
+    // Create a grid with time slots as rows and days as columns
+    const grid = allTimeSlots.map((timeSlot) => {
+      const row: TimetableRow = {
+        timeSlot: timeSlot,
+      };
+
+      // Initialize each day with null
+      daysOfWeek.forEach((day) => {
+        row[day] = null;
+      });
+
+      // Fill in periods where they exist
+      timetable.periods.forEach((period) => {
+        if (period.timeSlotId === timeSlot.id) {
+          const day = daysOfWeek[period.dayOfWeek === 0 ? 6 : period.dayOfWeek - 1]; // Adjust for Sunday being 0
+          row[day] = period;
+        }
+      });
+
+      return row;
+    });
+
+    return grid;
+  };
+
+  const periodGrid = organizePeriodsForDisplay();
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4">
+        <div className="p-4 bg-red-100 rounded-lg text-red-800">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
+  if (!timetable || !timetable.periods || timetable.periods.length === 0) {
+    return (
+      <div className="p-4">
+        <div className="p-4 bg-blue-100 rounded-lg text-blue-800">
+          Your timetable is not available yet. Please check back later or contact your class teacher.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 bg-[#EEF5FF]">
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold text-gray-800">My Timetable</h1>
+        
+        <h2 className="text-lg font-medium mt-2 text-gray-700">
+          Class: {timetable.class?.name} - {timetable.section?.name}
+        </h2>
+        
+        <p className="text-sm text-gray-500 mt-1">
+          {timetable.academicYear} • {timetable.term}
+        </p>
+      </div>
+
+      {periodGrid && periodGrid.length > 0 ? (
+        <div className="bg-white rounded-lg shadow-sm mt-4 overflow-auto">
+          <div className="min-w-[700px]">
+            <table className="w-full border-collapse">
+              <thead className="bg-[#292648] text-white">
+                <tr>
+                  <th className="p-3 text-left">Time</th>
+                  <th className="p-3 text-center">Monday</th>
+                  <th className="p-3 text-center">Tuesday</th>
+                  <th className="p-3 text-center">Wednesday</th>
+                  <th className="p-3 text-center">Thursday</th>
+                  <th className="p-3 text-center">Friday</th>
+                  <th className="p-3 text-center">Saturday</th>
+                  <th className="p-3 text-center">Sunday</th>
+                </tr>
+              </thead>
+              <tbody>
+                {periodGrid.map((row, index) => (
+                  <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                    <td className="p-3 border whitespace-nowrap">
+                      <div className="font-medium text-sm">
+                        {row.timeSlot.startTime} - {row.timeSlot.endTime}
+                      </div>
+                      {row.timeSlot.isBreak && (
+                        <div className="text-xs text-gray-500">
+                          {row.timeSlot.breakType || 'Break'}
+                        </div>
+                      )}
+                    </td>
+
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                      <td key={day} className="p-3 border text-center">
+                        {row[day] && 'subject' in row[day] ? (
+                          <div>
+                            <div className="font-bold text-sm">
+                              {(row[day] as Period).subject.name}
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              {(row[day] as Period).teacher.user?.name || (row[day] as Period).teacher.name}
+                            </div>
+                          </div>
+                        ) : row.timeSlot.isBreak ? (
+                          <span className="px-2 py-1 text-xs rounded-full border border-purple-300 text-purple-700 bg-purple-50">
+                            {row.timeSlot.breakType || 'Break'}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
                       </td>
-                    </tr>
-                  );
-                }
-                
-                // Regular time slot row
-                const timeSlot = slot as TimeSlot;
-                
-                return (
-                  <tr key={index}>
-                    <td className="p-3 border-r border-b bg-blue-100 text-center">{timeSlot.time}</td>
-                    <td className="p-3 border-r border-b bg-blue-50 text-center">{timeSlot.sunday}</td>
-                    <td className="p-3 border-r border-b bg-blue-50 text-center">{timeSlot.monday}</td>
-                    <td className="p-3 border-r border-b bg-blue-50 text-center">{timeSlot.tuesday}</td>
-                    <td className="p-3 border-r border-b bg-blue-50 text-center">{timeSlot.wednesday}</td>
-                    <td className="p-3 border-r border-b bg-blue-50 text-center">{timeSlot.thursday}</td>
-                    <td className="p-3 border-b bg-blue-50 text-center">{timeSlot.friday}</td>
+                    ))}
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="p-4 bg-blue-100 rounded-lg text-blue-800 mt-4">
+          No periods have been added to your timetable yet.
+        </div>
+      )}
+
+      {/* Weekly view with cards for each day */}
+      <div className="mt-8">
+        <h2 className="text-xl font-bold mb-4">Weekly Schedule</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, dayIndex) => {
+            // Find all periods for this day, sorted by time
+            const dayPeriods = timetable.periods
+              .filter(period => {
+                // Convert day index (0 = Sunday, 1 = Monday, etc.) to our format
+                const periodDay = period.dayOfWeek === 0 ? 6 : period.dayOfWeek - 1;
+                return periodDay === dayIndex;
+              })
+              .sort((a, b) => a.timeSlot.startTime.localeCompare(b.timeSlot.startTime));
+              
+            return (
+              <div key={day} className="bg-white p-4 rounded-lg shadow-sm">
+                <h3 className="text-lg font-medium mb-3">{day}</h3>
+                
+                {dayPeriods.length > 0 ? (
+                  <div className="space-y-2">
+                    {dayPeriods.map((period, index) => (
+                      <div 
+                        key={index} 
+                        className="p-2 mb-2 border-l-4 border-[#292648] bg-gray-50 rounded"
+                      >
+                        <div className="text-xs text-gray-500">
+                          {period.timeSlot.startTime} - {period.timeSlot.endTime}
+                        </div>
+                        <div className="font-bold text-sm">
+                          {period.subject.name}
+                        </div>
+                        <div className="text-xs">
+                          {period.teacher.user?.name || period.teacher.name}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">
+                    No classes scheduled
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

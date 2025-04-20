@@ -1,81 +1,241 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FaPaperPlane, FaTimes, FaUpload } from 'react-icons/fa';
 import Button from '../../components/ui/Button';
+import { toast } from 'react-toastify';
+import { academicAPI, announcementAPI } from '../../services/api';
+import { Class, Section } from '../../types/api';
 import { UserRole } from '../../utils/roles';
 
-interface Class {
-    id: number;
-    name: string;
-    sections: Section[];
+interface Attachment {
+  name: string;
+  file: File;
+  type: string;
+  size: number;
+  url?: string;
 }
 
-interface Section {
+interface AnnouncementData {
+    id: number;
+  title: string;
+  content: string;
+  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string | null;
+  isActive: boolean;
+  createdBy: {
+    name: string;
+    role: string;
+  };
+  targetClasses?: { id: number; name: string }[];
+  targetSections?: { id: number; name: string }[];
+  targetRoles?: string[];
+  attachments?: {
     id: number;
     name: string;
+    url: string;
+    type: string;
+    size: number;
+  }[];
 }
-
-// Dummy data for classes and sections
-const dummyClasses: Class[] = [
-    {
-        id: 1,
-        name: 'Class 9',
-        sections: [
-            { id: 1, name: 'A' },
-            { id: 2, name: 'B' },
-            { id: 3, name: 'C' },
-        ],
-    },
-    {
-        id: 2,
-        name: 'Class 10',
-        sections: [
-            { id: 4, name: 'A' },
-            { id: 5, name: 'B' },
-            { id: 6, name: 'C' },
-        ],
-    },
-];
 
 const CreateAnnouncement: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const queryParams = new URLSearchParams(location.search);
+    const announcementId = queryParams.get('id');
+    const isEditMode = !!announcementId;
+    
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [priority, setPriority] = useState<'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'>('NORMAL');
     const [expiresAt, setExpiresAt] = useState('');
-    const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
-    const [selectedSections, setSelectedSections] = useState<number[]>([]);
-    const [selectedRoles, setSelectedRoles] = useState<UserRole[]>([]);
-    const [attachments, setAttachments] = useState<File[]>([]);
+    const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submitStatus, setSubmitStatus] = useState<'success' | 'error' | null>(null);
-
+    const [isLoading, setIsLoading] = useState(isEditMode);
+    
+    // Target audience state
+    const [classes, setClasses] = useState<Class[]>([]);
+    const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
+    const [classesLoading, setClassesLoading] = useState(true);
+    
+    const [classSections, setClassSections] = useState<Record<number, Section[]>>({});
+    const [selectedSections, setSelectedSections] = useState<number[]>([]);
+    const [sectionsLoading, setSectionsLoading] = useState(false);
+    
+    const [selectedRoles, setSelectedRoles] = useState<UserRole[]>([]);
+    
+    // Fetch announcement data when in edit mode
+    useEffect(() => {
+        if (isEditMode && announcementId) {
+            const fetchAnnouncementData = async () => {
+                try {
+                    setIsLoading(true);
+                    const response = await announcementAPI.getById(announcementId);
+                    
+                    if (response.data?.status === 'success' && response.data?.data?.announcement) {
+                        // Convert to unknown first, then to AnnouncementData
+                        const announcement = response.data.data.announcement as unknown as AnnouncementData;
+                        
+                        // Set basic announcement data
+                        setTitle(announcement.title);
+                        setContent(announcement.content);
+                        setPriority(announcement.priority);
+                        
+                        // Format and set expiry date if it exists
+                        if (announcement.expiresAt) {
+                            // Format the date to YYYY-MM-DDThh:mm format for datetime-local input
+                            const date = new Date(announcement.expiresAt);
+                            const formattedDate = date.toISOString().slice(0, 16);
+                            setExpiresAt(formattedDate);
+                        }
+                        
+                        // Set target classes
+                        if (announcement.targetClasses && announcement.targetClasses.length > 0) {
+                            const classIds = announcement.targetClasses.map(cls => cls.id);
+                            setSelectedClasses(classIds);
+                            
+                            // Fetch sections for each selected class
+                            for (const classId of classIds) {
+                                fetchSectionsForClass(classId);
+                            }
+                        }
+                        
+                        // Set target sections
+                        if (announcement.targetSections && announcement.targetSections.length > 0) {
+                            setSelectedSections(announcement.targetSections.map(section => section.id));
+                        }
+                        
+                        // Set target roles if they exist
+                        if (announcement.targetRoles && announcement.targetRoles.length > 0) {
+                            const roles = announcement.targetRoles.map(role => {
+                                // Convert uppercase role (e.g., 'STUDENT') to UserRole enum value (e.g., UserRole.STUDENT)
+                                const normalizedRole = role.toLowerCase() as Lowercase<typeof role>;
+                                return UserRole[normalizedRole.toUpperCase() as keyof typeof UserRole];
+                            }).filter(Boolean);
+                            
+                            setSelectedRoles(roles);
+                        }
+                        
+                        // Handle attachments if they exist
+                        // Note: For existing attachments, we can't get the file object
+                        // but we can display them and allow for deleting them
+                        if (announcement.attachments && announcement.attachments.length > 0) {
+                            // We'll create a representation of existing attachments
+                            const existingAttachments: Attachment[] = announcement.attachments.map(
+                                attachment => ({
+                                    name: attachment.name,
+                                    type: attachment.type,
+                                    size: attachment.size,
+                                    url: attachment.url,
+                                    // This is a hack as we can't get the actual File object for existing attachments
+                                    file: new File([], attachment.name, { type: attachment.type }),
+                                })
+                            );
+                            setAttachments(existingAttachments);
+                        }
+                        
+                    } else {
+                        toast.error('Failed to load announcement data');
+                        // Navigate back on error
+                        navigate('/announcements');
+                    }
+                } catch (error) {
+                    console.error('Error fetching announcement data:', error);
+                    toast.error('Error loading announcement data');
+                    // Navigate back on error
+                    navigate('/announcements');
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            
+            fetchAnnouncementData();
+        }
+    }, [announcementId, isEditMode, navigate]);
+    
+    // Fetch classes when component mounts
+    useEffect(() => {
+        const fetchClasses = async () => {
+            try {
+                setClassesLoading(true);
+                const response = await academicAPI.getClasses();
+                
+                if (response.data?.status === 'success' && response.data?.data?.classes) {
+                    setClasses(response.data.data.classes);
+                } else {
+                    toast.error('Failed to load classes');
+                }
+            } catch (error) {
+                console.error('Error fetching classes:', error);
+                toast.error('Failed to load classes');
+            } finally {
+                setClassesLoading(false);
+            }
+        };
+        
+        fetchClasses();
+    }, []);
+    
+    // Fetch sections when a class is selected
+    const fetchSectionsForClass = async (classId: number) => {
+        try {
+            setSectionsLoading(true);
+            const response = await academicAPI.getSections(classId);
+            
+            if (response.data?.status === 'success' && response.data?.data?.sections) {
+                setClassSections(prev => ({
+                    ...prev,
+                    [classId]: response.data.data.sections
+                }));
+            } else {
+                toast.error(`Failed to load sections for class ID ${classId}`);
+            }
+        } catch (error) {
+            console.error(`Error fetching sections for class ID ${classId}:`, error);
+            toast.error('Failed to load sections');
+        } finally {
+            setSectionsLoading(false);
+        }
+    };
+    
+    // Handle class toggle
     const handleClassChange = (classId: number) => {
         setSelectedClasses(prev => {
-            if (prev.includes(classId)) {
-                return prev.filter(id => id !== classId);
+            const isSelected = prev.includes(classId);
+            const newSelectedClasses = isSelected 
+                ? prev.filter(id => id !== classId)
+                : [...prev, classId];
+            
+            // If we're adding a class, fetch its sections
+            if (!isSelected && !classSections[classId]) {
+                fetchSectionsForClass(classId);
             }
-            return [...prev, classId];
-        });
-        // Clear sections when class is deselected
+            
+            // If we're removing a class, also remove its sections
+            if (isSelected) {
         setSelectedSections(prev =>
             prev.filter(sectionId =>
-                dummyClasses.find(cls =>
-                    cls.sections.some(section => section.id === sectionId)
-                )?.id === classId
+                        !classSections[classId]?.some(section => section.id === sectionId)
             )
         );
-    };
-
-    const handleSectionChange = (sectionId: number) => {
-        setSelectedSections(prev => {
-            if (prev.includes(sectionId)) {
-                return prev.filter(id => id !== sectionId);
             }
-            return [...prev, sectionId];
+            
+            return newSelectedClasses;
         });
     };
 
+    // Handle section toggle
+    const handleSectionChange = (sectionId: number) => {
+        setSelectedSections(prev => 
+            prev.includes(sectionId)
+                ? prev.filter(id => id !== sectionId)
+                : [...prev, sectionId]
+        );
+    };
+    
+    // Handle role toggle
     const handleRoleChange = (role: UserRole) => {
         setSelectedRoles(prev => {
             if (prev.includes(role)) {
@@ -85,9 +245,20 @@ const CreateAnnouncement: React.FC = () => {
         });
     };
 
+    // Handle file upload
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            setAttachments(prev => [...prev, ...Array.from(e.target.files!)]);
+        if (e.target.files && e.target.files.length > 0) {
+            const newAttachments = Array.from(e.target.files).map(file => ({
+                name: file.name,
+                file,
+                type: file.type,
+                size: file.size
+            }));
+            
+            setAttachments(prev => [...prev, ...newAttachments]);
+            
+            // Clear the input value so the same file can be selected again
+            e.target.value = '';
         }
     };
 
@@ -98,23 +269,90 @@ const CreateAnnouncement: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
+        
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            setSubmitStatus('success');
-            // Reset form
-            setTitle('');
-            setContent('');
-            setPriority('NORMAL');
-            setExpiresAt('');
-            setSelectedClasses([]);
-            setSelectedSections([]);
-            setSelectedRoles([]);
-            setAttachments([]);
-            // Navigate back to announcements page
-            navigate('/announcements');
-        } catch {
-            setSubmitStatus('error');
+            // Validate form
+            if (selectedRoles.length === 0 && selectedClasses.length === 0) {
+                toast.error('Please select at least one target audience (roles or classes)');
+                setIsSubmitting(false);
+                return;
+            }
+            
+            // Prepare the targetRoles to match the backend's expected Role enum
+            // Convert from lowercase (e.g., 'student') to uppercase (e.g., 'STUDENT')
+            const formattedRoles = selectedRoles.map(role => role.toUpperCase());
+            
+            // Create FormData for multipart file upload
+            const formData = new FormData();
+            
+            // Add basic announcement data
+            formData.append('title', title);
+            formData.append('content', content);
+            formData.append('priority', priority);
+            
+            if (expiresAt) {
+                formData.append('expiresAt', expiresAt);
+            }
+            
+            // Add target classes and sections
+            selectedClasses.forEach(classId => {
+                formData.append('targetClassIds', classId.toString());
+            });
+            
+            selectedSections.forEach(sectionId => {
+                formData.append('targetSectionIds', sectionId.toString());
+            });
+            
+            // Add target roles
+            formattedRoles.forEach(role => {
+                formData.append('targetRoles', role);
+            });
+            
+            // Add attachments
+            attachments.forEach(attachment => {
+                // Only append new files (not existing ones with URLs)
+                if (!attachment.url || !attachment.url.startsWith('http')) {
+                    formData.append('attachments', attachment.file);
+                }
+            });
+            
+            let response;
+            
+            if (isEditMode && announcementId) {
+                // Update existing announcement
+                response = await announcementAPI.update(announcementId, formData);
+                if (response.data?.status === 'success') {
+                    toast.success('Announcement updated successfully!');
+                }
+            } else {
+                // Create new announcement
+                response = await announcementAPI.create(formData);
+                if (response.data?.status === 'success') {
+                    toast.success('Announcement published successfully!');
+                }
+            }
+            
+            if (response?.data?.status === 'success') {
+                // Reset form
+                setTitle('');
+                setContent('');
+                setPriority('NORMAL');
+                setExpiresAt('');
+                setSelectedClasses([]);
+                setSelectedSections([]);
+                setSelectedRoles([]);
+                setAttachments([]);
+                
+                // Navigate back to announcements page
+                setTimeout(() => {
+                    navigate('/announcements');
+                }, 2000);
+            } else {
+                throw new Error(isEditMode ? 'Failed to update announcement' : 'Failed to publish announcement');
+            }
+        } catch (error) {
+            console.error(isEditMode ? 'Error updating announcement:' : 'Error publishing announcement:', error);
+            toast.error(isEditMode ? 'Failed to update announcement. Please try again.' : 'Failed to publish announcement. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -122,8 +360,13 @@ const CreateAnnouncement: React.FC = () => {
 
     return (
         <div className="p-6">
-            <h1 className="text-2xl font-bold mb-6">Create Announcement</h1>
+            <h1 className="text-2xl font-bold mb-6">{isEditMode ? 'Edit Announcement' : 'Create Announcement'}</h1>
 
+            {isLoading ? (
+                <div className="flex justify-center items-center h-40">
+                    <p className="text-gray-500">Loading announcement data...</p>
+                </div>
+            ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -157,7 +400,7 @@ const CreateAnnouncement: React.FC = () => {
                         </label>
                         <select
                             value={priority}
-                            onChange={(e) => setPriority(e.target.value as typeof priority)}
+                                onChange={(e) => setPriority(e.target.value as 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT')}
                             className="w-full p-2 border rounded-md"
                         >
                             <option value="LOW">Low</option>
@@ -189,7 +432,7 @@ const CreateAnnouncement: React.FC = () => {
                         <div className="border rounded-md p-4">
                             <h3 className="font-medium mb-2">Select Roles</h3>
                             <div className="space-y-2">
-                                {Object.values(UserRole).map(role => (
+                                    {Object.values(UserRole).map((role) => (
                                     <label key={role} className="flex items-center gap-2">
                                         <input
                                             type="checkbox"
@@ -197,7 +440,7 @@ const CreateAnnouncement: React.FC = () => {
                                             onChange={() => handleRoleChange(role)}
                                             className="rounded"
                                         />
-                                        <span>{role.charAt(0) + role.slice(1).toLowerCase()}</span>
+                                            <span>{role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()}</span>
                                     </label>
                                 ))}
                             </div>
@@ -206,8 +449,11 @@ const CreateAnnouncement: React.FC = () => {
                         {/* Class and Section targeting */}
                         <div className="border rounded-md p-4">
                             <h3 className="font-medium mb-2">Select Classes and Sections</h3>
+                                {classesLoading ? (
+                                    <p className="text-gray-500">Loading classes...</p>
+                                ) : (
                             <div className="space-y-4">
-                                {dummyClasses.map(cls => (
+                                        {classes.map(cls => (
                                     <div key={cls.id} className="border rounded-md p-4">
                                         <label className="flex items-center gap-2">
                                             <input
@@ -220,7 +466,10 @@ const CreateAnnouncement: React.FC = () => {
                                         </label>
                                         {selectedClasses.includes(cls.id) && (
                                             <div className="ml-6 mt-2 space-y-2">
-                                                {cls.sections.map(section => (
+                                                        {sectionsLoading && !classSections[cls.id] ? (
+                                                            <p className="text-gray-500">Loading sections...</p>
+                                                        ) : (
+                                                            classSections[cls.id]?.map(section => (
                                                     <label key={section.id} className="flex items-center gap-2">
                                                         <input
                                                             type="checkbox"
@@ -230,12 +479,14 @@ const CreateAnnouncement: React.FC = () => {
                                                         />
                                                         <span>Section {section.name}</span>
                                                     </label>
-                                                ))}
+                                                            ))
+                                                        )}
                                             </div>
                                         )}
                                     </div>
                                 ))}
-                            </div>
+                                    </div>
+                                )}
                         </div>
                     </div>
                 </div>
@@ -257,17 +508,17 @@ const CreateAnnouncement: React.FC = () => {
                         </label>
                     </div>
                     {attachments.length > 0 && (
-                        <div className="mt-2 space-y-2">
+                            <div className="mt-4 space-y-2">
                             {attachments.map((file, index) => (
-                                <div key={index} className="flex items-center gap-2 text-sm">
-                                    <span>{file.name}</span>
-                                    <Button
-                                        variant="secondary"
+                                    <div key={index} className="flex items-center justify-between border rounded-md p-2 pr-4">
+                                        <span className="truncate">{file.name}</span>
+                                        <button
+                                            type="button"
                                         onClick={() => removeFile(index)}
-                                        className="text-red-600 hover:text-red-800"
+                                            className="text-red-500 hover:text-red-700"
                                     >
                                         <FaTimes />
-                                    </Button>
+                                        </button>
                                 </div>
                             ))}
                         </div>
@@ -276,25 +527,18 @@ const CreateAnnouncement: React.FC = () => {
 
                 <div className="flex justify-end">
                     <Button
-                        variant="primary"
                         type="submit"
                         disabled={isSubmitting}
+                            className="flex items-center gap-2"
                     >
                         <FaPaperPlane />
-                        {isSubmitting ? 'Publishing...' : 'Publish Announcement'}
+                            {isSubmitting 
+                                ? (isEditMode ? 'Updating...' : 'Publishing...') 
+                                : (isEditMode ? 'Update Announcement' : 'Publish Announcement')
+                            }
                     </Button>
                 </div>
             </form>
-
-            {submitStatus === 'success' && (
-                <div className="mt-4 p-4 bg-green-100 text-green-700 rounded-md">
-                    Announcement published successfully!
-                </div>
-            )}
-            {submitStatus === 'error' && (
-                <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-md">
-                    Error publishing announcement. Please try again.
-                </div>
             )}
         </div>
     );

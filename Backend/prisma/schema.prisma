@@ -9,8 +9,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  // Uncomment if you've set up Prisma Accelerate
+  // extensions = [pgbouncer]
 }
 
 model User {
@@ -53,7 +56,7 @@ model Student {
   userId           Int  @unique
   classId          Int
   sectionId        Int
-  parentId         Int
+  parentId         Int? // Make parent optional
   addressId        Int  @unique
   profilePictureId Int? @unique
 
@@ -61,11 +64,11 @@ model Student {
   user              User                @relation(fields: [userId], references: [id])
   class             Class               @relation(fields: [classId], references: [id])
   section           Section             @relation(fields: [sectionId], references: [id])
-  parent            Parent              @relation(fields: [parentId], references: [id])
+  parent            Parent?             @relation(fields: [parentId], references: [id]) // Make relation optional
   address           Address             @relation(fields: [addressId], references: [id])
   profilePicture    ProfilePicture?     @relation(fields: [profilePictureId], references: [id])
-  subjectAttendance SubjectAttendance[]
   monthlyAttendance MonthlyAttendance[]
+  dailyAttendance   DailyAttendance[]
   subjectResults    SubjectResult[]
   overallResults    OverallResult[]
   leaveApplications LeaveApplication[]  @relation("StudentLeaveApplications")
@@ -95,18 +98,21 @@ model Teacher {
   profilePictureId Int? @unique
 
   // Relations
-  user              User               @relation(fields: [userId], references: [id])
-  designation       Designation        @relation(fields: [designationId], references: [id])
-  address           Address            @relation(fields: [addressId], references: [id])
-  profilePicture    ProfilePicture?    @relation(fields: [profilePictureId], references: [id])
-  subjects          TeacherSubject[]
-  classes           TeacherClass[]
-  periods           Period[]
-  classResults      OverallResult[] // For class teacher role
-  leaveApplications LeaveApplication[] @relation("TeacherLeaveApplications")
-  achievements      Achievement[]
-  Feedback          Feedback[]
-  announcements     Announcement[]     @relation("TeacherAnnouncements")
+  user                   User                     @relation(fields: [userId], references: [id])
+  designation            Designation              @relation(fields: [designationId], references: [id])
+  address                Address                  @relation(fields: [addressId], references: [id])
+  profilePicture         ProfilePicture?          @relation(fields: [profilePictureId], references: [id])
+  subjects               TeacherSubject[]
+  classes                TeacherClass[]
+  sections               TeacherSection[]
+  periods                Period[]
+  classResults           OverallResult[] // For class teacher role
+  markedAttendances      DailyAttendance[]        @relation("TeacherAttendanceMarking")
+  leaveApplications      LeaveApplication[]       @relation("TeacherLeaveApplications")
+  achievements           Achievement[]
+  Feedback               Feedback[]
+  announcements          Announcement[]           @relation("TeacherAnnouncements")
+  classTeacherAssignments ClassTeacherAssignment[]
 
   @@map("teachers")
 }
@@ -142,28 +148,33 @@ model Class {
   updatedAt DateTime @updatedAt
 
   // Relations
-  students       Student[]
-  sections       Section[]
-  teacherClasses TeacherClass[]
-  timetables     Timetable[]
-  periods        Period[]
-  SubjectResult  SubjectResult[]
-  announcements  AnnouncementClass[]
+  students               Student[]
+  sections               Section[]
+  teacherClasses         TeacherClass[]
+  timetables             Timetable[]
+  periods                Period[]
+  dailyAttendances       DailyAttendance[]
+  monthlyAttendances     MonthlyAttendance[]
+  announcements          AnnouncementClass[]
+  subjects               ClassSubject[]
+  classTeacherAssignments ClassTeacherAssignment[]
 
   @@map("classes")
 }
 
 model Subject {
-  id        Int      @id @default(autoincrement())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          Int      @id @default(autoincrement())
+  name        String
+  code        String   @unique
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  teacherSubjects   TeacherSubject[]
-  subjectAttendance SubjectAttendance[]
-  periods           Period[]
-  subjectResults    SubjectResult[]
+  teacherSubjects TeacherSubject[]
+  periods         Period[]
+  subjectResults  SubjectResult[]
+  classes         ClassSubject[]
 
   @@map("subjects")
 }
@@ -266,6 +277,23 @@ model TeacherClass {
   @@map("teacher_classes")
 }
 
+// After the TeacherClass model, add the new TeacherSection model
+// Junction table for Teacher-Section many-to-many relationship
+model TeacherSection {
+  id        Int      @id @default(autoincrement())
+  teacherId Int
+  sectionId Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+  section Section @relation(fields: [sectionId], references: [id])
+
+  @@unique([teacherId, sectionId])
+  @@map("teacher_sections")
+}
+
 model Section {
   id        Int      @id @default(autoincrement())
   name      String // e.g., "A", "B", "C"
@@ -276,11 +304,15 @@ model Section {
   classId Int
 
   // Relations
-  class      Class       @relation(fields: [classId], references: [id])
-  students   Student[]
-  timetables Timetable[]
-  periods    Period[]
-  announcements AnnouncementSection[]
+  class                  Class                 @relation(fields: [classId], references: [id])
+  students               Student[]
+  timetables             Timetable[]
+  periods                Period[]
+  dailyAttendances       DailyAttendance[]
+  monthlyAttendances     MonthlyAttendance[]
+  teacherSections        TeacherSection[]
+  announcements          AnnouncementSection[]
+  classTeacherAssignments ClassTeacherAssignment[]
 
   @@unique([classId, name])
   @@map("sections")
@@ -301,40 +333,49 @@ model ProfilePicture {
   @@map("profile_pictures")
 }
 
-// Subject-wise attendance tracking
-model SubjectAttendance {
-  id               Int      @id @default(autoincrement())
-  studentId        Int
-  subjectId        Int
-  lectureConducted Int
-  presentCount     Int
-  absentCount      Int
-  attendanceDate   DateTime @default(now())
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+// Daily attendance tracking
+model DailyAttendance {
+  id         Int              @id @default(autoincrement())
+  studentId  Int
+  classId    Int
+  sectionId  Int
+  date       DateTime         @default(now())
+  status     AttendanceStatus @default(PRESENT)
+  remarks    String?
+  markedById Int // Teacher who marked attendance
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   // Relations
-  student Student @relation(fields: [studentId], references: [id])
-  subject Subject @relation(fields: [subjectId], references: [id])
+  student  Student @relation(fields: [studentId], references: [id])
+  class    Class   @relation(fields: [classId], references: [id])
+  section  Section @relation(fields: [sectionId], references: [id])
+  markedBy Teacher @relation("TeacherAttendanceMarking", fields: [markedById], references: [id])
 
-  @@unique([studentId, subjectId, attendanceDate])
-  @@map("subject_attendance")
+  @@unique([studentId, date])
+  @@map("daily_attendance")
 }
 
 // Monthly attendance summary
 model MonthlyAttendance {
   id           Int      @id @default(autoincrement())
   studentId    Int
+  classId      Int
+  sectionId    Int
   month        DateTime // Store as first day of the month
+  year         Int // Store year separately for easier querying
   presentCount Int
   absentCount  Int
+  percentage   Float // Store attendance percentage for easy retrieval
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   // Relations
   student Student @relation(fields: [studentId], references: [id])
+  class   Class   @relation(fields: [classId], references: [id])
+  section Section @relation(fields: [sectionId], references: [id])
 
-  @@unique([studentId, month])
+  @@unique([studentId, month, year])
   @@map("monthly_attendance")
 }
 
@@ -404,6 +445,9 @@ model GradeDefinition {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Relations
+  subjectResults SubjectResult[]
+
   @@map("grade_definitions")
 }
 
@@ -420,14 +464,15 @@ model SubjectResult {
   totalMarks     Float
   gradeId        Int
   isAbsent       Boolean  @default(false)
+  isLocked       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   // Relations
-  student         Student        @relation(fields: [studentId], references: [id])
-  subject         Subject        @relation(fields: [subjectId], references: [id])
-  grade           Class          @relation(fields: [gradeId], references: [id])
-  OverallResult   OverallResult? @relation(fields: [overallResultId], references: [id])
+  student         Student         @relation(fields: [studentId], references: [id])
+  subject         Subject         @relation(fields: [subjectId], references: [id])
+  grade           GradeDefinition @relation(fields: [gradeId], references: [id])
+  OverallResult   OverallResult?  @relation(fields: [overallResultId], references: [id])
   overallResultId Int?
 
   @@unique([studentId, subjectId, academicYear, term])
@@ -472,7 +517,6 @@ model LeaveType {
 
 model LeaveApplication {
   id            Int           @id @default(autoincrement())
-  applicantId   Int // ID of the person applying (student/teacher)
   applicantType ApplicantType
   leaveTypeId   Int
   subject       String
@@ -483,11 +527,16 @@ model LeaveApplication {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
+  // Separate nullable foreign keys for each type
+  studentId Int?
+  teacherId Int?
+  adminId   Int?
+
   // Relations
   leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
-  student   Student?  @relation("StudentLeaveApplications", fields: [applicantId], references: [id], map: "leave_applications_student_fkey")
-  teacher   Teacher?  @relation("TeacherLeaveApplications", fields: [applicantId], references: [id], map: "leave_applications_teacher_fkey")
-  admin     Admin?    @relation("AdminLeaveApplications", fields: [applicantId], references: [id], map: "leave_applications_admin_fkey")
+  student   Student?  @relation("StudentLeaveApplications", fields: [studentId], references: [id])
+  teacher   Teacher?  @relation("TeacherLeaveApplications", fields: [teacherId], references: [id])
+  admin     Admin?    @relation("AdminLeaveApplications", fields: [adminId], references: [id])
 
   @@map("leave_applications")
 }
@@ -528,6 +577,7 @@ model HolidayType {
   id          Int      @id @default(autoincrement())
   name        String   @unique // e.g., "Religious", "National", "School", "Saturday"
   description String?
+  color       String   @default("#C32232") // Add color field with a default value
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -634,84 +684,84 @@ model Feedback {
 }
 
 model Announcement {
-  id          Int      @id @default(autoincrement())
-  title       String
-  content     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  expiresAt   DateTime?
-  isActive    Boolean  @default(true)
-  priority    Priority @default(NORMAL)
-  
+  id        Int       @id @default(autoincrement())
+  title     String
+  content   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expiresAt DateTime?
+  isActive  Boolean   @default(true)
+  priority  Priority  @default(NORMAL)
+
   // Foreign keys
-  createdById Int
+  createdById   Int
   createdByRole Role
-  teacherId   Int?
-  adminId     Int?
+  teacherId     Int?
+  adminId       Int?
 
   // Relations
-  targetClasses    AnnouncementClass[]
-  targetSections   AnnouncementSection[]
-  targetRoles      AnnouncementRole[]
-  attachments      AnnouncementAttachment[]
-  teacher          Teacher?    @relation("TeacherAnnouncements", fields: [teacherId], references: [id])
-  admin            Admin?      @relation("AdminAnnouncements", fields: [adminId], references: [id])
+  targetClasses  AnnouncementClass[]
+  targetSections AnnouncementSection[]
+  targetRoles    AnnouncementRole[]
+  attachments    AnnouncementAttachment[]
+  teacher        Teacher?                 @relation("TeacherAnnouncements", fields: [teacherId], references: [id])
+  admin          Admin?                   @relation("AdminAnnouncements", fields: [adminId], references: [id])
 
   @@map("announcements")
 }
 
 model AnnouncementClass {
-  id             Int          @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   announcementId Int
   classId        Int
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime @default(now())
 
   // Relations
-  announcement   Announcement @relation(fields: [announcementId], references: [id])
-  class          Class        @relation(fields: [classId], references: [id])
+  announcement Announcement @relation(fields: [announcementId], references: [id])
+  class        Class        @relation(fields: [classId], references: [id])
 
   @@unique([announcementId, classId])
   @@map("announcement_classes")
 }
 
 model AnnouncementSection {
-  id             Int          @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   announcementId Int
   sectionId      Int
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime @default(now())
 
   // Relations
-  announcement   Announcement @relation(fields: [announcementId], references: [id])
-  section        Section      @relation(fields: [sectionId], references: [id])
+  announcement Announcement @relation(fields: [announcementId], references: [id])
+  section      Section      @relation(fields: [sectionId], references: [id])
 
   @@unique([announcementId, sectionId])
   @@map("announcement_sections")
 }
 
 model AnnouncementRole {
-  id             Int          @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   announcementId Int
   role           Role
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime @default(now())
 
   // Relations
-  announcement   Announcement @relation(fields: [announcementId], references: [id])
+  announcement Announcement @relation(fields: [announcementId], references: [id])
 
   @@unique([announcementId, role])
   @@map("announcement_roles")
 }
 
 model AnnouncementAttachment {
-  id             Int          @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   announcementId Int
   fileName       String
   fileUrl        String
   fileType       String
   fileSize       Int
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime @default(now())
 
   // Relations
-  announcement   Announcement @relation(fields: [announcementId], references: [id])
+  announcement Announcement @relation(fields: [announcementId], references: [id])
 
   @@map("announcement_attachments")
 }
@@ -721,4 +771,47 @@ enum Priority {
   NORMAL
   HIGH
   URGENT
+}
+
+// Junction table for Class-Subject many-to-many relationship
+model ClassSubject {
+  id        Int      @id @default(autoincrement())
+  classId   Int
+  subjectId Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  class   Class   @relation(fields: [classId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([classId, subjectId])
+  @@map("class_subjects")
+}
+
+// Add this enum for attendance status
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  EXCUSED
+}
+
+// Add this new model for class teacher assignments
+model ClassTeacherAssignment {
+  id        Int      @id @default(autoincrement())
+  teacherId Int
+  classId   Int
+  sectionId Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+  class   Class   @relation(fields: [classId], references: [id])
+  section Section @relation(fields: [sectionId], references: [id])
+
+  @@unique([classId, sectionId])
+  @@map("class_teacher_assignments")
 }

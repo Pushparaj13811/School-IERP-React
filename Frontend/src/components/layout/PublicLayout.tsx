@@ -4,10 +4,10 @@ import { useAuth } from '../../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
 const PublicLayout: React.FC = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, loginInProgress } = useAuth();
 
-  // Show loading indicator
-  if (loading) {
+  // Only show loading indicator for initial auth check, not for login attempts
+  if (loading && !loginInProgress) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#292648]"></div>

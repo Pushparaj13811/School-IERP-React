@@ -8,7 +8,7 @@ import { config } from '../config/config.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-class EmailService {
+export class EmailService {
     constructor() {
         this.transporter = nodemailer.createTransport({
             host: config.email.host,
@@ -71,6 +71,20 @@ class EmailService {
                 name: user.name || user.email,
                 resetUrl,
                 validityDuration: '10 minutes'
+            }
+        );
+    }
+
+    async sendUserCredentials(email, password, role) {
+        await this.sendEmail(
+            email,
+            'Your School ERP Account Credentials',
+            'userCredentials',
+            {
+                email,
+                password,
+                role,
+                loginUrl: `${config.clientUrl}/login`
             }
         );
     }

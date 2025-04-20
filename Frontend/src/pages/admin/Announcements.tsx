@@ -1,7 +1,35 @@
-import React, { useState } from 'react';
-import { FaPlus, FaEdit, FaTrash, FaEye } from 'react-icons/fa';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import {  FaEdit, FaTrash, FaEye } from 'react-icons/fa';
+import { announcementAPI } from '../../services/api';
+import { toast } from 'react-toastify';
+import Button from '../../components/ui/Button';
+import { useNavigate } from 'react-router-dom';
 
+interface AnnouncementAttachment {
+  name: string;
+  url: string;
+  type: string;
+}
+
+// Interface for API response data structure
+interface AnnouncementData {
+  id: number;
+  title: string;
+  content: string;
+  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+  createdAt: string;
+  expiresAt: string | null;
+  isActive: boolean;
+  createdBy: {
+    name: string;
+    role: string;
+  };
+  targetClasses?: string[];
+  targetSections?: string[];
+  attachments?: AnnouncementAttachment[];
+}
+
+// Interface for the component's state
 interface Announcement {
   id: number;
   title: string;
@@ -16,55 +44,71 @@ interface Announcement {
   };
   targetClasses: string[];
   targetSections: string[];
+  attachments: AnnouncementAttachment[];
 }
 
-// Dummy data - replace with API calls
-const dummyAnnouncements: Announcement[] = [
-  {
-    id: 1,
-    title: 'Annual Day Celebration',
-    content: 'The school will be organizing its annual day celebration on December 15th.',
-    priority: 'HIGH',
-    createdAt: '2024-02-20T10:00:00',
-    expiresAt: '2024-12-15T23:59:59',
-    isActive: true,
-    createdBy: {
-      name: 'John Doe',
-      role: 'Admin'
-    },
-    targetClasses: ['Class 9', 'Class 10'],
-    targetSections: ['A', 'B']
-  },
-  {
-    id: 2,
-    title: 'Parent-Teacher Meeting',
-    content: 'Parent-teacher meeting for Class 10 students will be held on February 25th.',
-    priority: 'NORMAL',
-    createdAt: '2024-02-19T14:30:00',
-    expiresAt: '2024-02-25T17:00:00',
-    isActive: true,
-    createdBy: {
-      name: 'Jane Smith',
-      role: 'Teacher'
-    },
-    targetClasses: ['Class 10'],
-    targetSections: ['All']
-  }
-];
-
 const Announcements: React.FC = () => {
-  const [announcements, setAnnouncements] = useState<Announcement[]>(dummyAnnouncements);
+  const navigate = useNavigate();
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [filter, setFilter] = useState<'all' | 'active' | 'expired'>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchAnnouncements = async () => {
+      try {
+        setLoading(true);
+        const response = await announcementAPI.getAll();
+
+        if (response.data?.status === 'success' && response.data?.data) {
+          // Type as API response type first, then process into our component's Announcement type
+          const apiAnnouncements = response.data.data as unknown as AnnouncementData[];
+
+          const formattedAnnouncements: Announcement[] = [];
+
+          // Map the API data to our component's Announcement type
+          for (const announcement of apiAnnouncements) {
+            formattedAnnouncements.push({
+              id: announcement.id,
+              title: announcement.title,
+              content: announcement.content,
+              priority: announcement.priority,
+              createdAt: announcement.createdAt,
+              expiresAt: announcement.expiresAt,
+              isActive: announcement.isActive,
+              createdBy: announcement.createdBy,
+              targetClasses: announcement.targetClasses || [],
+              targetSections: announcement.targetSections || [],
+              attachments: announcement.attachments || []
+            });
+          }
+
+          setAnnouncements(formattedAnnouncements);
+        } else {
+          setError('Failed to load announcements');
+          toast.error('Failed to load announcements');
+        }
+      } catch (error) {
+        console.error('Error fetching announcements:', error);
+        setError('Error loading announcements. Please try again later.');
+        toast.error('Error loading announcements');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnnouncements();
+  }, []);
 
   const filteredAnnouncements = announcements.filter(announcement => {
-    const matchesFilter = filter === 'all' || 
+    const matchesFilter = filter === 'all' ||
       (filter === 'active' && announcement.isActive) ||
       (filter === 'expired' && !announcement.isActive);
-    
+
     const matchesPriority = priorityFilter === 'all' || announcement.priority === priorityFilter;
-    
+
     const matchesSearch = announcement.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       announcement.content.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -73,9 +117,24 @@ const Announcements: React.FC = () => {
 
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this announcement?')) {
-      // Simulate API call
-      setAnnouncements(announcements.filter(a => a.id !== id));
+      try {
+        const response = await announcementAPI.delete(id.toString());
+
+        if (response.data?.status === 'success') {
+          setAnnouncements(announcements.filter(a => a.id !== id));
+          toast.success('Announcement deleted successfully');
+        } else {
+          toast.error('Failed to delete announcement');
+        }
+      } catch (error) {
+        console.error('Error deleting announcement:', error);
+        toast.error('Error deleting announcement');
+      }
     }
+  };
+
+  const handleEdit = (id: number) => {
+    navigate(`/announcements/create-announcement?id=${id}`);
   };
 
   const getPriorityColor = (priority: string) => {
@@ -97,13 +156,13 @@ const Announcements: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Announcements</h1>
-        <Link
-          to="/announcements/create-announcement"
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+        <Button
+          variant="primary"
+          onClick={() => navigate('/announcements/create-announcement')}
         >
-          <FaPlus />
           Create Announcement
-        </Link>
+        </Button>
+
       </div>
 
       {/* Filters */}
@@ -158,87 +217,101 @@ const Announcements: React.FC = () => {
 
       {/* Announcements List */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Title
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Priority
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Created By
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Target
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredAnnouncements.map(announcement => (
-              <tr key={announcement.id}>
-                <td className="px-6 py-4">
-                  <div className="text-sm font-medium text-gray-900">{announcement.title}</div>
-                  <div className="text-sm text-gray-500">{announcement.content.substring(0, 50)}...</div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(announcement.priority)}`}>
-                    {announcement.priority}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm text-gray-900">{announcement.createdBy.name}</div>
-                  <div className="text-sm text-gray-500">{announcement.createdBy.role}</div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm text-gray-900">
-                    {announcement.targetClasses.join(', ')}
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Sections: {announcement.targetSections.join(', ')}
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    announcement.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {announcement.isActive ? 'Active' : 'Expired'}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="text-blue-600 hover:text-blue-800"
-                      title="View"
-                    >
-                      <FaEye />
-                    </button>
-                    <button
-                      className="text-yellow-600 hover:text-yellow-800"
-                      title="Edit"
-                    >
-                      <FaEdit />
-                    </button>
-                    <button
-                      className="text-red-600 hover:text-red-800"
-                      title="Delete"
-                      onClick={() => handleDelete(announcement.id)}
-                    >
-                      <FaTrash />
-                    </button>
-                  </div>
-                </td>
+        {loading ? (
+          <div className="flex justify-center items-center h-40">
+            <p className="text-gray-500">Loading announcements...</p>
+          </div>
+        ) : error ? (
+          <div className="p-6 bg-red-100 text-red-700">
+            {error}
+          </div>
+        ) : filteredAnnouncements.length === 0 ? (
+          <div className="p-6 text-center">
+            <p className="text-gray-500">No announcements found.</p>
+          </div>
+        ) : (
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Title
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Priority
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Created By
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Target
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredAnnouncements.map(announcement => (
+                <tr key={announcement.id}>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-medium text-gray-900">{announcement.title}</div>
+                    <div className="text-sm text-gray-500">{announcement.content.substring(0, 50)}...</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(announcement.priority)}`}>
+                      {announcement.priority}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-900">{announcement.createdBy.name}</div>
+                    <div className="text-sm text-gray-500">{announcement.createdBy.role}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-900">
+                      {announcement.targetClasses.join(', ')}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      Sections: {announcement.targetSections.join(', ')}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${announcement.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                      {announcement.isActive ? 'Active' : 'Expired'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="text-blue-600 hover:text-blue-800"
+                        title="View"
+                      >
+                        <FaEye />
+                      </button>
+                      <button
+                        className="text-yellow-600 hover:text-yellow-800"
+                        title="Edit"
+                        onClick={() => handleEdit(announcement.id)}
+                      >
+                        <FaEdit />
+                      </button>
+                      <button
+                        className="text-red-600 hover:text-red-800"
+                        title="Delete"
+                        onClick={() => handleDelete(announcement.id)}
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

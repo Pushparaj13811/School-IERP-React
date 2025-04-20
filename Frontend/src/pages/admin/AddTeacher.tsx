@@ -1,183 +1,1142 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { FaPaperPlane, FaUpload, } from 'react-icons/fa';
+import { toast } from 'react-toastify';
+import { userAPI, academicAPI } from '../../services/api';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Designation, Teacher, Class, Subject, Section } from '../../types/api';
+
+// Define the location state interface
+interface LocationState {
+  editMode?: boolean;
+  teacherData?: Teacher;
+}
 
 const AddTeacher: React.FC = () => {
-  const [category] = useState('Teacher');
-  const [employeeId, setEmployeeId] = useState('');
-  const [designation, setDesignation] = useState('');
-  const [employeeCode, setEmployeeCode] = useState('');
-  const [district, setDistrict] = useState('');
-  const [state, setState] = useState('');
-  const [wardNo, setWardNo] = useState('');
-  const [subjectAssigned, setSubjectAssigned] = useState('');
-  const [gradeAssigned, setGradeAssigned] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [designations, setDesignations] = useState<Designation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Teacher info
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [gender, setGender] = useState('MALE');
+  const [contactNo, setContactNo] = useState('');
   const [emergencyContact, setEmergencyContact] = useState('');
-  const [address, setAddress] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
+  const [joinDate, setJoinDate] = useState('');
+  const [designationId, setDesignationId] = useState<number | string>('');
+  const [bio, setBio] = useState('');
+  
+  // Classes and subjects assignments
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [classSubjects, setClassSubjects] = useState<Record<number, Subject[]>>({});
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [selectedClasses, setSelectedClasses] = useState<number[]>([]);
+  const [selectedSubjects, setSelectedSubjects] = useState<number[]>([]);
+  const [loadingClasses, setLoadingClasses] = useState(true);
+  const [loadingSubjects, setLoadingSubjects] = useState(true);
+  
+  // Sections handling
+  const [classSections, setClassSections] = useState<Record<number, Section[]>>({});
+  const [selectedSections, setSelectedSections] = useState<number[]>([]);
+  const [loadingSections, setLoadingSections] = useState(false);
+  
+  // Address info
+  const [addressLine1, setAddressLine1] = useState('');
+  const [addressLine2, setAddressLine2] = useState('');
+  const [street, setStreet] = useState('');
+  const [city, setCity] = useState('');
+  const [ward, setWard] = useState('');
+  const [municipality, setMunicipality] = useState('');
+  const [district, setDistrict] = useState('');
+  const [province, setProvince] = useState('');
+  const [country, setCountry] = useState('Nepal');
+  const [postalCode, setPostalCode] = useState('');
+
+  // File upload
+  const [profilePicture, setProfilePicture] = useState<File | null>(null);
+  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
+
+  // Add location state handling
+  const locationState = location.state as LocationState;
+  const isEditMode = locationState?.editMode || false;
+  const teacherToEdit = locationState?.teacherData;
+  
+  // Fetch classes and subjects from backend
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        setLoadingClasses(true);
+        
+        // Fetch classes
+        const classesResponse = await academicAPI.getClasses();
+        if (classesResponse.data.status === 'success' && classesResponse.data.data.classes) {
+          setClasses(classesResponse.data.data.classes);
+        } else {
+          toast.error('Failed to load classes data');
+          setClasses([]);
+        }
+        
+        // We'll no longer fetch all subjects here; they'll be fetched after class selection
+      } catch (error) {
+        console.error('Error fetching classes:', error);
+        toast.error('Failed to load classes data');
+      } finally {
+        setLoadingClasses(false);
+      }
+    };
+    
+    fetchClasses();
+  }, []);
+
+  // Update available subjects when selected classes change
+  useEffect(() => {
+    const fetchClassSpecificSubjects = async () => {
+      if (selectedClasses.length === 0) {
+        // If no classes selected, show empty subjects list
+        setSubjects([]);
+        setSelectedSubjects([]);
+        return;
+      }
+
+      setLoadingSubjects(true);
+      try {
+        // Create a set to store unique subjects
+        const uniqueSubjectsMap = new Map<number, Subject>();
+        
+        // Fetch subjects for each selected class
+        for (const classId of selectedClasses) {
+          // Check if we already have subjects for this class
+          if (!classSubjects[classId]) {
+            try {
+              const response = await academicAPI.getSubjectsByClass(classId);
+              if (response.data?.success && response.data?.data) {
+                const fetchedSubjects = response.data.data;
+                // Store subjects for this class
+                setClassSubjects(prev => ({
+                  ...prev,
+                  [classId]: fetchedSubjects
+                }));
+                
+                // Add to unique subjects map
+                fetchedSubjects.forEach((subject: Subject) => {
+                  uniqueSubjectsMap.set(subject.id, subject);
+                });
+              }
+            } catch (error) {
+              console.error(`Error fetching subjects for class ${classId}:`, error);
+              toast.error(`Failed to load subjects for class ${classId}`);
+            }
+          } else {
+            // Use cached subjects for this class
+            classSubjects[classId].forEach(subject => {
+              uniqueSubjectsMap.set(subject.id, subject);
+            });
+          }
+        }
+        
+        // Convert map to array
+        const combinedSubjects = Array.from(uniqueSubjectsMap.values());
+        setSubjects(combinedSubjects);
+        
+        // Update selected subjects to only include those available for the selected classes
+        setSelectedSubjects(prev => 
+          prev.filter(subjectId => 
+            combinedSubjects.some(subject => subject.id === subjectId)
+          )
+        );
+      } catch (error) {
+        console.error('Error updating subjects based on classes:', error);
+        toast.error('Failed to update subjects for selected classes');
+      } finally {
+        setLoadingSubjects(false);
+      }
+    };
+
+    fetchClassSpecificSubjects();
+  }, [selectedClasses, classSubjects]);
+  
+  // Fetch designations from backend
+  useEffect(() => {
+    const fetchDesignations = async () => {
+      try {
+        const response = await academicAPI.getDesignations();
+        
+        if (response.data.status === 'success' && response.data.data.designations) {
+          setDesignations(response.data.data.designations);
+        } else {
+          // Fallback to default designations if API doesn't return expected data
+          setDesignations([
+            { id: 1, name: 'Principal' },
+            { id: 2, name: 'Vice Principal' },
+            { id: 3, name: 'Head of Department' },
+            { id: 4, name: 'Senior Teacher' },
+            { id: 5, name: 'Teacher' },
+          ]);
+        }
+      } catch (error) {
+        console.error('Error fetching designations:', error);
+        toast.error('Failed to load designations data');
+        // Fallback to default designations
+        setDesignations([
+          { id: 1, name: 'Principal' },
+          { id: 2, name: 'Vice Principal' },
+          { id: 3, name: 'Head of Department' },
+          { id: 4, name: 'Senior Teacher' },
+          { id: 5, name: 'Teacher' },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDesignations();
+    
+    // Fill form with teacher data if in edit mode
+    if (isEditMode && teacherToEdit) {
+      // Set basic info
+      setName(teacherToEdit.name || '');
+      setEmail(teacherToEdit.email || '');
+      setGender(teacherToEdit.gender || 'MALE');
+      setContactNo(teacherToEdit.contactNo || '');
+      
+      // Set initial values for date fields and emergency contact if available
+      setEmergencyContact(teacherToEdit.emergencyContact || '');
+      setBio(teacherToEdit.bio || '');
+      
+      // Format dates if they exist
+      if (teacherToEdit.dateOfBirth) {
+        // Ensure it's properly formatted for input[type=date] (YYYY-MM-DD)
+        try {
+          let dateStr = teacherToEdit.dateOfBirth;
+          if (typeof dateStr === 'string') {
+            dateStr = dateStr.substring(0, 10); // Extract YYYY-MM-DD part
+          }
+          setDateOfBirth(dateStr);
+          console.log("Setting DOB:", dateStr);
+        } catch (err) {
+          console.error("Error formatting DOB:", err);
+        }
+      }
+      
+      if (teacherToEdit.joinDate) {
+        // Ensure it's properly formatted for input[type=date] (YYYY-MM-DD)
+        try {
+          let dateStr = teacherToEdit.joinDate;
+          if (typeof dateStr === 'string') {
+            dateStr = dateStr.substring(0, 10); // Extract YYYY-MM-DD part
+          }
+          setJoinDate(dateStr);
+          console.log("Setting join date:", dateStr);
+        } catch (err) {
+          console.error("Error formatting join date:", err);
+        }
+      }
+      
+      // Set professional info if available
+      if (teacherToEdit.designation?.id) {
+        setDesignationId(teacherToEdit.designation.id);
+      }
+      
+      // Set classes and subjects if available
+      if (teacherToEdit.classes && Array.isArray(teacherToEdit.classes)) {
+        // Handle different potential class data structures with proper null checks
+        const classIds = teacherToEdit.classes.map(c => {
+          // Handle potential structure: { class: { id: number } }
+          if (c && typeof c === 'object' && 'class' in c && c.class && typeof c.class === 'object' && 'id' in c.class) {
+            return c.class.id;
+          }
+          // Handle potential structure: { id: number }
+          else if (c && typeof c === 'object' && 'id' in c) {
+            return c.id;
+          }
+          return null;
+        }).filter(Boolean) as number[]; // Filter out null/undefined values and assert type
+        
+        if (classIds.length > 0) {
+          setSelectedClasses(classIds);
+          
+          // Fetch sections for each class
+          classIds.forEach(classId => {
+            if (classId) {
+              fetchSectionsForClass(classId);
+            }
+          });
+        }
+        
+        // Note: We don't need to fetch subjects here as it will be triggered by the
+        // useEffect that watches selectedClasses
+      }
+      
+      // Set sections if available
+      if (teacherToEdit.sections && Array.isArray(teacherToEdit.sections)) {
+        // Handle different potential section data structures with proper null checks
+        const sectionIds = teacherToEdit.sections.map(s => {
+          // Handle potential structure: { section: { id: number } }
+          if (s && typeof s === 'object' && 'section' in s && s.section && typeof s.section === 'object' && 'id' in s.section) {
+            return s.section.id;
+          }
+          // Handle potential structure: { id: number }
+          else if (s && typeof s === 'object' && 'id' in s) {
+            return s.id;
+          }
+          return null;
+        }).filter(Boolean) as number[]; // Filter out null/undefined values and assert type
+        
+        if (sectionIds.length > 0) {
+          setSelectedSections(sectionIds);
+          console.log("Setting selected sections:", sectionIds);
+        }
+      }
+      
+      if (teacherToEdit.subjects && Array.isArray(teacherToEdit.subjects)) {
+        // Handle different potential subject data structures with proper null checks
+        const subjectIds = teacherToEdit.subjects.map(s => {
+          if (s && typeof s === 'object' && 'id' in s) {
+            return s.id;
+          }
+          return null;
+        }).filter(Boolean) as number[]; // Filter out null/undefined values and assert type
+        
+        if (subjectIds.length > 0) {
+          setSelectedSubjects(subjectIds);
+        }
+      }
+      
+      // Set profile picture preview if available
+      if (teacherToEdit.profilePicture) {
+        setProfilePicturePreview(teacherToEdit.profilePicture);
+      }
+      
+      // Fetch additional teacher details if needed
+      if (teacherToEdit.id) {
+        fetchTeacherDetails(teacherToEdit.id);
+      } else {
+        console.warn('Teacher ID is undefined, cannot fetch additional details');
+      }
+    }
+  }, [isEditMode, teacherToEdit]);
+
+  // Function to fetch additional teacher details
+  const fetchTeacherDetails = async (teacherId: number) => {
+    try {
+      console.log(`Fetching detailed information for teacher ID: ${teacherId}`);
+      const response = await userAPI.getTeacherById(teacherId);
+      
+      if (response.data?.status === 'success' && response.data?.data?.teacher) {
+        const teacher = response.data.data.teacher;
+        console.log("Complete teacher details from API:", JSON.stringify(teacher, null, 2));
+        
+        // Utility function to format ISO date string to YYYY-MM-DD for form inputs
+        const formatDateForForm = (isoDateString: string | null | undefined) => {
+          if (!isoDateString) return '';
+          try {
+            // Extract just the YYYY-MM-DD part for date inputs
+            if (typeof isoDateString === 'string') {
+              return isoDateString.substring(0, 10);
+            }
+            return '';
+          } catch (error) {
+            console.error('Error formatting date:', error);
+            return '';
+          }
+        };
+        
+        // Set additional teacher details with robust null checking
+        if (teacher.emergencyContact) {
+          setEmergencyContact(teacher.emergencyContact);
+          console.log("Setting emergency contact from API:", teacher.emergencyContact);
+        }
+        
+        if (teacher.dateOfBirth) {
+          const formattedDOB = formatDateForForm(teacher.dateOfBirth);
+          setDateOfBirth(formattedDOB);
+          console.log("Setting DOB from API:", formattedDOB);
+        }
+        
+        if (teacher.joinDate) {
+          const formattedJoinDate = formatDateForForm(teacher.joinDate);
+          setJoinDate(formattedJoinDate);
+          console.log("Setting join date from API:", formattedJoinDate);
+        }
+        
+        setBio(teacher.bio || '');
+        
+        // If sections weren't set from the teacher data passed in location.state,
+        // try to get them from the detailed teacher data
+        if (selectedSections.length === 0 && teacher.sections && Array.isArray(teacher.sections)) {
+          const sectionIds = teacher.sections.map(s => {
+            if (s && typeof s === 'object' && 'section' in s && s.section) {
+              return s.section.id;
+            } else if (s && typeof s === 'object' && 'id' in s) {
+              return s.id;
+            }
+            return null;
+          }).filter(Boolean) as number[];
+          
+          if (sectionIds.length > 0) {
+            setSelectedSections(sectionIds);
+            console.log("Setting selected sections from teacher details:", sectionIds);
+          }
+        }
+        
+        // Set address information if available
+        if (teacher.address) {
+          setAddressLine1(teacher.address.addressLine1 || '');
+          setAddressLine2(teacher.address.addressLine2 || '');
+          setStreet(teacher.address.street || '');
+          setCity(teacher.address.city || '');
+          setWard(teacher.address.ward || '');
+          setMunicipality(teacher.address.municipality || '');
+          setDistrict(teacher.address.district || '');
+          setProvince(teacher.address.province || '');
+          setCountry(teacher.address.country || 'Nepal');
+          setPostalCode(teacher.address.postalCode || '');
+        }
+      } else {
+        console.error('Invalid response format from teacher API:', response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching teacher details:', error);
+      toast.error('Failed to load complete teacher data');
+    }
+  };
+
+  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      setProfilePicture(file);
+      
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setProfilePicturePreview(previewUrl);
+    }
+  };
+
+  // Handle class selection
+  const handleClassToggle = (classId: number) => {
+    setSelectedClasses(prev => {
+      const newSelectedClasses = prev.includes(classId)
+        ? prev.filter(id => id !== classId)
+        : [...prev, classId];
+      
+      // If we're removing a class, also remove its sections
+      if (prev.includes(classId)) {
+        setSelectedSections(sections => 
+          sections.filter(sectionId => 
+            !classSections[classId]?.some(section => section.id === sectionId)
+          )
+        );
+      } else {
+        // If we're adding a class, fetch sections and subjects for this class
+        if (!classSections[classId]) {
+          fetchSectionsForClass(classId);
+        }
+      }
+      
+      return newSelectedClasses;
+    });
+  };
+  
+  // Fetch sections for a specific class
+  const fetchSectionsForClass = async (classId: number) => {
+    try {
+      setLoadingSections(true);
+      console.log(`Fetching sections for class ID: ${classId}`);
+      const response = await academicAPI.getSections(classId);
+      
+      if (response.data.status === 'success' && response.data.data.sections) {
+        const classSectionList = response.data.data.sections;
+        console.log(`Found ${classSectionList.length} sections for class ${classId}:`, classSectionList);
+        
+        setClassSections(prev => ({
+          ...prev,
+          [classId]: classSectionList
+        }));
+      } else {
+        console.error('Failed response from sections API:', response.data);
+        toast.error(`Failed to load sections for class ID ${classId}`);
+      }
+    } catch (error) {
+      console.error(`Error fetching sections for class ID ${classId}:`, error);
+      toast.error(`Failed to load sections for the selected class`);
+    } finally {
+      setLoadingSections(false);
+    }
+  };
+  
+  // Handle subject selection
+  const handleSubjectToggle = (subjectId: number) => {
+    setSelectedSubjects(prev => {
+      if (prev.includes(subjectId)) {
+        return prev.filter(id => id !== subjectId);
+      } else {
+        return [...prev, subjectId];
+      }
+    });
+  };
+  
+  // Handle section selection
+  const handleSectionToggle = (sectionId: number) => {
+    setSelectedSections(prev => {
+      if (prev.includes(sectionId)) {
+        return prev.filter(id => id !== sectionId);
+      } else {
+        return [...prev, sectionId];
+      }
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    try {
+      // Prepare address data
+      const addressData = {
+        addressLine1,
+        addressLine2: addressLine2 || undefined,
+        street,
+        city,
+        ward,
+        municipality,
+        district,
+        province,
+        country,
+        postalCode: postalCode || undefined
+      };
+      
+      // Format dates properly for ISO-8601 DateTime format
+      // If the date is just YYYY-MM-DD, we need to add time component
+      const formatDateForAPI = (dateString: string) => {
+        if (!dateString) return dateString;
+        // Check if it's already a complete ISO string
+        if (dateString.includes('T')) return dateString;
+        // Add the time component to make it a valid ISO-8601 DateTime
+        return `${dateString}T00:00:00.000Z`;
+      };
+      
+      // Prepare teacher data with properly formatted dates
+      const teacherData = {
+        name,
+        gender,
+        contactNo,
+        emergencyContact,
+        dateOfBirth: formatDateForAPI(dateOfBirth),
+        joinDate: formatDateForAPI(joinDate),
+        designation: {
+          connect: {
+            id: Number(designationId)
+          }
+        },
+        bio: bio || undefined,
+        classes: selectedClasses.length > 0 ? selectedClasses : undefined,
+        subjects: selectedSubjects.length > 0 ? selectedSubjects : undefined,
+        sections: selectedSections.length > 0 ? selectedSections : undefined,
+        address: addressData
+      };
+      
+      // Remove the comment about not sending sections to API
+      console.log("Selected section IDs:", selectedSections);
+      
+      let response;
+      
+      if (isEditMode && teacherToEdit) {
+        try {
+          // Update existing teacher - core teacher data only
+          console.log("Updating teacher data:", teacherToEdit.id);
+          console.log("Updating teacher with data:", {
+            name,
+            gender,
+            contactNo,
+            emergencyContact,
+            dateOfBirth: formatDateForAPI(dateOfBirth),
+            joinDate: formatDateForAPI(joinDate),
+            designation: {
+              connect: {
+                id: Number(designationId)
+              }
+            },
+            bio: bio || undefined
+          });
+          console.log("Selected class IDs:", selectedClasses);
+          console.log("Selected subject IDs:", selectedSubjects);
+          console.log("Selected section IDs:", selectedSections);
+          
+          response = await userAPI.updateTeacher(teacherToEdit.id, teacherData);
+          console.log("Teacher data updated successfully");
+          
+          // Handle profile picture upload separately
+          if (profilePicture) {
+            try {
+              console.log("Uploading profile picture for existing teacher");
+              await userAPI.uploadTeacherProfilePicture(teacherToEdit.id, profilePicture);
+              console.log("Profile picture updated successfully");
+            } catch (pictureError) {
+              console.error("Error uploading profile picture:", pictureError);
+              toast.error("Teacher data updated but failed to update profile picture.");
+            }
+          }
+          
+          toast.success('Teacher updated successfully');
+        } catch (updateError) {
+          console.error('Error updating teacher:', updateError);
+          toast.error('Failed to update teacher. Please try again.');
+          return;
+        }
+      } else {
+        try {
+          // Create new teacher
+          console.log("Creating teacher with data:", {
+            name,
+            email,
+            gender,
+            contactNo,
+            emergencyContact,
+            dateOfBirth: formatDateForAPI(dateOfBirth),
+            joinDate: formatDateForAPI(joinDate),
+            designation: {
+              connect: {
+                id: Number(designationId)
+              }
+            },
+            bio: bio || undefined
+          });
+          console.log("Selected class IDs:", selectedClasses);
+          console.log("Selected subject IDs:", selectedSubjects);
+          console.log("Selected section IDs:", selectedSections);
+          
+          response = await userAPI.createTeacher({
+            email,
+            ...teacherData
+          });
+          console.log("Teacher created successfully");
+          
+          // Handle profile picture upload if present - in a separate try/catch
+          if (profilePicture && response.data?.data?.teacher?.id) {
+            try {
+              const teacherId = response.data.data.teacher.id;
+              await userAPI.uploadTeacherProfilePicture(teacherId, profilePicture);
+              console.log("Profile picture uploaded successfully");
+            } catch (pictureError) {
+              console.error("Error uploading profile picture:", pictureError);
+              toast.error("Teacher created but failed to upload profile picture.");
+            }
+          }
+          
+          toast.success('Teacher created successfully');
+        } catch (createError) {
+          console.error('Error creating teacher:', createError);
+          toast.error('Failed to create teacher. Please try again.');
+          return;
+        }
+      }
+      
+      // Navigate only if everything succeeded
+      navigate('/teachers');
+    } catch (error) {
+      console.error('Error processing teacher:', error);
+      toast.error(isEditMode 
+        ? 'Failed to update teacher. Please try again.' 
+        : 'Failed to create teacher. Please try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    // Debug sections and classes data
+    if (selectedSections.length > 0) {
+      console.log("Currently selected sections:", selectedSections);
+    }
+    
+    if (Object.keys(classSections).length > 0) {
+      console.log("Available sections by class:", classSections);
+    }
+  }, [selectedSections, classSections]);
+
+  // Track loaded sections and apply teacher section selections after sections are loaded
+  useEffect(() => {
+    // Only run in edit mode when we have the teacher data and classes have been selected
+    if (isEditMode && teacherToEdit && selectedClasses.length > 0) {
+      // Check if all selected classes have their sections loaded
+      const allSectionsLoaded = selectedClasses.every(classId => 
+        classSections[classId] !== undefined
+      );
+      
+      // If we have all sections loaded and the teacher has sections, select them
+      if (allSectionsLoaded && teacherToEdit.sections && Array.isArray(teacherToEdit.sections)) {
+        const sectionIds = teacherToEdit.sections.map(s => {
+          if (s && typeof s === 'object' && 'section' in s && s.section && typeof s.section === 'object' && 'id' in s.section) {
+            return s.section.id;
+          } else if (s && typeof s === 'object' && 'id' in s) {
+            return s.id;
+          }
+          return null;
+        }).filter(Boolean) as number[];
+        
+        if (sectionIds.length > 0) {
+          // Instead of directly setting, check if the sections exist in our available sections
+          const availableSectionIds = Object.values(classSections).flat().map(s => s.id);
+          const validSectionIds = sectionIds.filter(id => availableSectionIds.includes(id));
+          
+          if (validSectionIds.length > 0 && validSectionIds.length !== selectedSections.length) {
+            setSelectedSections(validSectionIds);
+            console.log("Setting validated sections after loading:", validSectionIds);
+          }
+        }
+      }
+    }
+  }, [isEditMode, teacherToEdit, selectedClasses, classSections]);
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-64">Loading...</div>;
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">
       <div className="p-4 border-b border-gray-200 font-bold text-lg">
-        Add Teacher
+        {isEditMode ? 'Edit Teacher' : 'Add Teacher'}
       </div>
       
-      <div className="p-6 bg-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <form onSubmit={handleSubmit} className="p-6">
+        <div className="space-y-6">
+          {/* Personal Information Section */}
           <div>
-            <label className="block font-medium mb-1">CATEGORY</label>
+            <h2 className="text-lg font-medium mb-4">Personal Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
             <input
               type="text"
-              value={category}
-              readOnly
-              className="w-full p-3 bg-[#fffff0] border border-gray-200 rounded"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Gender <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
+                >
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Designation <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={designationId}
+                  onChange={(e) => setDesignationId(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
+                >
+                  <option value="">Select Designation</option>
+                  {designations.map(designation => (
+                    <option key={designation.id} value={designation.id}>
+                      {designation.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contact Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={contactNo}
+                  onChange={(e) => setContactNo(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Emergency Contact <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={emergencyContact}
+                  onChange={(e) => setEmergencyContact(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
             />
           </div>
           
           <div>
-            <label className="block font-medium mb-1">Employee Id</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date of Birth <span className="text-red-500">*</span>
+                </label>
             <input
-              type="text"
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              className="w-full p-3 bg-[#fffff0] border border-gray-200 rounded"
-              placeholder="Enter employee id"
+                  type="date"
+                  value={dateOfBirth}
+                  onChange={(e) => setDateOfBirth(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
             />
           </div>
           
           <div>
-            <label className="block font-medium mb-1">Designation/Role</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Join Date <span className="text-red-500">*</span>
+                </label>
             <input
-              type="text"
-              value={designation}
-              onChange={(e) => setDesignation(e.target.value)}
-              className="w-full p-3 bg-[#fffff0] border border-gray-200 rounded"
-              placeholder="Enter designation/role"
-            />
+                  type="date"
+                  value={joinDate}
+                  onChange={(e) => setJoinDate(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
+                />
+              </div>
+            </div>
           </div>
           
+          {/* Classes and Subjects Section */}
           <div>
-            <label className="block font-medium mb-1">Employee Id</label>
-            <input
-              type="text"
-              value={employeeCode}
-              onChange={(e) => setEmployeeCode(e.target.value)}
-              className="w-full p-3 bg-[#fffff0] border border-gray-200 rounded"
-              placeholder="Enter employee code"
-            />
-          </div>
-          
-          <div>
-            <label className="block font-medium mb-1">District</label>
-            <select
-              value={district}
-              onChange={(e) => setDistrict(e.target.value)}
-              className="w-full p-3 bg-[#fffff0] border border-gray-200 rounded"
-            >
-              <option value="">Select district</option>
-              <option value="mustang">Mustang</option>
-              <option value="kaski">Kaski</option>
-              <option value="myagdi">Myagdi</option>
-            </select>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
+            <h2 className="text-lg font-medium mb-4">Classes and Subjects</h2>
+            
+            {/* Classes Selection */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Assigned Classes
+              </label>
+              {loadingClasses ? (
+                <div className="text-gray-500">Loading classes...</div>
+              ) : classes.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {classes.map(cls => (
+                    <div key={cls.id} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`class-${cls.id}`}
+                        checked={selectedClasses.includes(cls.id)}
+                        onChange={() => handleClassToggle(cls.id)}
+                        className="mr-2"
+                      />
+                      <label htmlFor={`class-${cls.id}`} className="text-sm">
+                        {cls.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-yellow-600 text-sm">
+                  No classes available. Please add classes first.
+                </div>
+              )}
+            </div>
+            
+            {/* Sections Selection */}
+            {selectedClasses.length > 0 && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Assigned Sections
+                </label>
+                <div className="space-y-3">
+                  {selectedClasses.map(classId => {
+                    const classData = classes.find(c => c.id === classId);
+                    const availableSections = classSections[classId] || [];
+                    
+                    return (
+                      <div key={`sections-${classId}`} className="border p-3 rounded-md">
+                        <h3 className="font-medium text-sm mb-2">{classData?.name} Sections:</h3>
+                        {loadingSections && !classSections[classId] ? (
+                          <div className="text-gray-500 text-sm">Loading sections...</div>
+                        ) : availableSections.length > 0 ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                            {availableSections.map(section => (
+                              <div key={section.id} className="flex items-center">
+                                <input
+                                  type="checkbox"
+                                  id={`section-${section.id}`}
+                                  checked={selectedSections.includes(section.id)}
+                                  onChange={() => handleSectionToggle(section.id)}
+                                  className="mr-2"
+                                />
+                                <label htmlFor={`section-${section.id}`} className="text-sm">
+                                  {section.name}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-yellow-600 text-sm">
+                            No sections available for this class.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {/* Subjects Selection */}
             <div>
-              <label className="block font-medium mb-1">State/Province</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Assigned Subjects
+                {selectedClasses.length > 0 ? ' (Filtered by selected classes)' : ' (Please select a class first)'}
+              </label>
+              {loadingSubjects ? (
+                <div className="text-gray-500">Loading subjects...</div>
+              ) : subjects.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {subjects.map(subject => (
+                    <div key={subject.id} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`subject-${subject.id}`}
+                        checked={selectedSubjects.includes(subject.id)}
+                        onChange={() => handleSubjectToggle(subject.id)}
+                        className="mr-2"
+                      />
+                      <label htmlFor={`subject-${subject.id}`} className="text-sm">
+                        {subject.name} ({subject.code})
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-yellow-600 text-sm">
+                  {selectedClasses.length > 0 
+                    ? 'No subjects available for the selected classes. Please assign subjects to these classes first.'
+                    : 'Please select a class to view available subjects.'}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Bio Section */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Bio
+            </label>
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              className="w-full p-2 border rounded-md h-24"
+              placeholder="Enter teacher's bio or description"
+            />
+          </div>
+          
+          {/* Profile Picture Section */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Profile Picture
+            </label>
+            <div className="flex items-center space-x-4">
+              <div className="relative w-24 h-24 border rounded-md overflow-hidden bg-gray-100">
+                {profilePicturePreview ? (
+                  <img
+                    src={profilePicturePreview}
+                    alt="Profile Preview"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">No image</div>
+                )}
+              </div>
+              <label className="px-4 py-2 bg-primary text-white rounded-md cursor-pointer hover:bg-primary/90 flex items-center gap-2">
+                <FaUpload />
+                Upload Picture
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/jpg"
+                  ref={fileInputRef}
+                  onChange={handleProfilePictureChange}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          </div>
+          
+          {/* Address Information */}
+          <div>
+            <h2 className="text-lg font-medium mb-4">Address Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address Line 1 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={addressLine1}
+                  onChange={(e) => setAddressLine1(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
+                />
+              </div>
+              
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address Line 2
+                </label>
+                <input
+                  type="text"
+                  value={addressLine2}
+                  onChange={(e) => setAddressLine2(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Street <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
+                />
+              </div>
+              
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  City <span className="text-red-500">*</span>
+                </label>
               <input
                 type="text"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-                className="w-full p-3 bg-[#fffff0] border border-gray-200 rounded"
-                placeholder="Enter state/province"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
               />
             </div>
             
             <div>
-              <label className="block font-medium mb-1">Ward No</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Ward <span className="text-red-500">*</span>
+                </label>
               <input
                 type="text"
-                value={wardNo}
-                onChange={(e) => setWardNo(e.target.value)}
-                className="w-full p-3 bg-[#fffff0] border border-gray-200 rounded"
-                placeholder="Enter ward no"
+                  value={ward}
+                  onChange={(e) => setWard(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
               />
+            </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Municipality <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={municipality}
+                  onChange={(e) => setMunicipality(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
+                />
+          </div>
+          
+          <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  District <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={district}
+                  onChange={(e) => setDistrict(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
+                />
+          </div>
+          
+          <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Province <span className="text-red-500">*</span>
+                </label>
+            <input
+              type="text"
+                  value={province}
+                  onChange={(e) => setProvince(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                  required
+            />
+          </div>
+          
+          <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Country
+                </label>
+            <input
+                  type="text"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+            />
+          </div>
+          
+          <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Postal Code
+                </label>
+                <input
+                  type="text"
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
+                  className="w-full p-2 border rounded-md"
+                />
+              </div>
             </div>
           </div>
           
-          <div>
-            <label className="block font-medium mb-1">Subject Assigned</label>
-            <select
-              value={subjectAssigned}
-              onChange={(e) => setSubjectAssigned(e.target.value)}
-              className="w-full p-3 bg-[#fffff0] border border-gray-200 rounded"
-            >
-              <option value="">Select subject</option>
-              <option value="mathematics">Mathematics</option>
-              <option value="science">Science</option>
-              <option value="english">English</option>
-              <option value="social">Social Studies</option>
-              <option value="nepali">Nepali</option>
-            </select>
-          </div>
-          
-          <div>
-            <label className="block font-medium mb-1">Grade Assigned</label>
-            <input
-              type="text"
-              value={gradeAssigned}
-              onChange={(e) => setGradeAssigned(e.target.value)}
-              className="w-full p-3 bg-[#fffff0] border border-gray-200 rounded"
-              placeholder="Enter assigned grades"
-            />
-          </div>
-          
-          <div>
-            <label className="block font-medium mb-1">Emergency Contact No</label>
-            <input
-              type="tel"
-              value={emergencyContact}
-              onChange={(e) => setEmergencyContact(e.target.value)}
-              className="w-full p-3 bg-[#fffff0] border border-gray-200 rounded"
-              placeholder="Enter emergency contact"
-            />
-          </div>
-          
-          <div>
-            <label className="block font-medium mb-1">Upload a Password size Photograph</label>
+          {/* Form Actions */}
+          <div className="flex justify-between pt-4">
             <button
               type="button"
-              className="w-full p-3 bg-[#fffff0] border border-gray-200 rounded text-gray-500 text-left"
+              onClick={() => navigate(-1)}
+              className="px-6 py-2 bg-gray-300 text-gray-700 font-medium rounded-md"
             >
-              Select a photo
+              Cancel
+            </button>
+            
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-6 py-2 bg-primary text-white font-medium rounded-md flex items-center gap-2"
+            >
+              <FaPaperPlane />
+              {isSubmitting ? 'Processing...' : 'Submit'}
             </button>
           </div>
         </div>
-        
-        <div className="mt-5">
-          <label className="block font-medium mb-1">Address (Municipal-Ward No/City/District)</label>
-          <input
-            type="text"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            className="w-full p-3 bg-[#fffff0] border border-gray-200 rounded"
-            placeholder="Enter full address"
-          />
-        </div>
-        
-        <div className="flex justify-between mt-8">
-          <button
-            type="button"
-            className="px-12 py-2 bg-gray-300 text-gray-700 font-medium rounded"
-          >
-            Back
-          </button>
-          
-          <button
-            type="button"
-            className="px-12 py-2 bg-[#1e1c39] text-white font-medium rounded"
-          >
-            Save
-          </button>
-        </div>
-      </div>
+      </form>
     </div>
   );
 };

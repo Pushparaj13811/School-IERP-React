@@ -8,38 +8,64 @@ interface LocationState {
   };
 }
 
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+  message?: string;
+}
+
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, loginInProgress } = useAuth();
   
   // Get the previous location or default to home
   const { from } = (location.state as LocationState) || { from: { pathname: '/' } };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    // Ensure form doesn't refresh the page
     e.preventDefault();
+    
+    // Clear previous error
     setError('');
-    setIsLoading(true);
+    
+    // Validate input
+    if (!email || !password) {
+      setError('Please enter both email and password');
+      return;
+    }
     
     try {
+      // Login - loginInProgress state is managed in AuthContext now
       await login(email, password);
-      // Use optional chaining and provide a default path
+      
+      // Only navigate on successful login
       navigate(from?.pathname || '/', { replace: true });
-    } catch (err: unknown) {
+    } catch (err) {
       console.error('Login error:', err);
-      // Type guard for error handling
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Invalid email or password');
-      }
-      setIsLoading(false);
+      const apiError = err as ApiError;
+      
+      // Extract error message from different possible sources
+      const errorMessage = 
+        apiError.response?.data?.message || 
+        apiError.message || 
+        'Invalid email or password. Please try again.';
+      
+      setError(errorMessage);
     }
+  };
+
+  // Create a submit handler that just calls preventDefault
+  const onFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSubmit(e);
   };
 
   return (
@@ -61,12 +87,12 @@ const Login: React.FC = () => {
       </div>
       
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-2 mb-4 text-xs text-red-700">
+        <div className="bg-red-50 border-l-4 border-red-500 p-3 mb-4 text-sm text-red-700">
           {error}
         </div>
       )}
       
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={onFormSubmit} className="space-y-4">
         <div>
           <div className="relative">
             <input
@@ -76,7 +102,8 @@ const Login: React.FC = () => {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Username"
               required
-              className="w-full px-4 py-2 bg-[#fcfcf6] rounded-md border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#292648]"
+              disabled={loginInProgress}
+              className="w-full px-4 py-2 bg-[#fcfcf6] rounded-md border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#292648] disabled:opacity-70"
             />
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -95,7 +122,8 @@ const Login: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
               required
-              className="w-full px-4 py-2 bg-[#fcfcf6] rounded-md border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#292648]"
+              disabled={loginInProgress}
+              className="w-full px-4 py-2 bg-[#fcfcf6] rounded-md border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#292648] disabled:opacity-70"
             />
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -107,24 +135,23 @@ const Login: React.FC = () => {
         
         <div className="pt-2">
           <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-2 px-4 bg-[#171630] hover:bg-[#292648] text-white rounded-md font-medium focus:outline-none"
+            type="button" 
+            onClick={handleSubmit}
+            disabled={loginInProgress}
+            className="w-full py-2 px-4 bg-[#171630] hover:bg-[#292648] text-white rounded-md font-medium focus:outline-none disabled:opacity-70 flex justify-center items-center"
           >
-            {isLoading ? 'Signing in...' : 'Login'}
+            {loginInProgress ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Signing in...
+              </>
+            ) : 'Login'}
           </button>
         </div>
       </form>
-      
-      <div className="mt-4 text-xs text-center text-gray-500">
-        <p>Use these test accounts:</p>
-        <p className="text-[10px] mt-1">
-          student@example.com / password<br />
-          teacher@example.com / password<br />
-          admin@example.com / password<br />
-          parent@example.com / password
-        </p>
-      </div>
     </div>
   );
 };

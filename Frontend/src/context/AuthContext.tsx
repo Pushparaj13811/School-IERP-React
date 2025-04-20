@@ -1,17 +1,68 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { UserRole } from '../utils/roles';
+import { authAPI } from '../services/api';
+
+interface Student {
+  id: number;
+  name: string;
+  // Add other student properties as needed
+}
+
+interface Teacher {
+  id: number;
+  name: string;
+  // Add other teacher properties as needed
+}
+
+interface Admin {
+  id: number;
+  fullName: string;
+  // Add other admin properties as needed
+}
+
+interface Parent {
+  id: number;
+  name: string;
+  // Add other parent properties as needed
+}
 
 interface User {
-  id: string;
-  name: string;
+  id: number;
   email: string;
   role: UserRole;
+  student?: Student;
+  teacher?: Teacher;
+  admin?: Admin;
+  parent?: Parent;
+}
+
+interface ApiResponseData {
+  statusCode: number;
+  data: {
+    status: string;
+    token: string;
+    data: {
+      user: User;
+    }
+  };
+  message: string;
+  success: boolean;
+}
+
+// Add interface for login response
+interface LoginResponse {
+  status: string;
+  token: string;
+  data: {
+    user: User;
+  }
 }
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   loading: boolean;
+  loginInProgress: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<boolean>;
@@ -26,25 +77,53 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loginInProgress, setLoginInProgress] = useState(false);
 
   useEffect(() => {
-    // Check if user is authenticated on app load
     checkAuth();
   }, []);
+
+  // Helper function to normalize the role to match UserRole enum
+  const normalizeRole = (role: string): UserRole => {
+    return role.toLowerCase() as UserRole;
+  };
 
   const checkAuth = async (): Promise<boolean> => {
     try {
       setLoading(true);
-      // For demo purposes - replace with actual API call
-      const storedUser = localStorage.getItem('user');
+      const token = localStorage.getItem('token');
       
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-        setLoading(false);
-        return true;
+      if (token) {
+        console.log('Token found in localStorage, attempting to refresh');
+        try {
+          const response = await authAPI.refreshToken();
+          console.log('Refresh token response:', response.data);
+          
+          // Cast to unknown first to avoid type errors
+          const responseData = response.data as unknown as ApiResponseData;
+          const actualToken = responseData.data.token;
+          const actualUser = responseData.data.data.user;
+          
+          // Normalize the role
+          actualUser.role = normalizeRole(actualUser.role);
+          
+          localStorage.setItem('token', actualToken);
+          localStorage.setItem('user', JSON.stringify(actualUser));
+          setUser(actualUser);
+          console.log('User authenticated:', actualUser);
+          setLoading(false);
+          return true;
+        } catch (refreshError) {
+          console.error('Failed to refresh token:', refreshError);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setUser(null);
+          setLoading(false);
+          return false;
+        }
       }
 
-      // No default user - require explicit login
+      console.log('No token found, user is not authenticated');
       setUser(null);
       setLoading(false);
       return false;
@@ -58,46 +137,96 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<void> => {
     try {
-      setLoading(true);
+      setLoginInProgress(true);
       
-      // Validate credentials
-      if (!email || !password) {
-        throw new Error('Email and password are required');
+      console.log('Attempting login with:', email);
+      const response = await authAPI.login(email, password);
+      console.log('Login response:', response.data);
+      
+      // Cast to unknown first to safely handle different response formats
+      const responseData = response.data as unknown;
+      
+      if (typeof responseData === 'object' && responseData !== null) {
+        const typedResponse = responseData as { 
+          statusCode?: number; 
+          success?: boolean; 
+          data?: {
+            token: string;
+            data?: {
+              user: User;
+            };
+          }; 
+          status?: string;
+          token?: string;
+          message?: string;
+        };
+        
+        if (typedResponse.statusCode && typedResponse.success !== undefined) {
+          // Using the ApiResponse wrapper format
+          if (typedResponse.success && typedResponse.data) {
+            const token = typedResponse.data.token;
+            const userData = typedResponse.data.data?.user;
+            
+            if (!userData) {
+              throw new Error('User data not found in response');
+            }
+            
+            // Normalize the role
+            userData.role = normalizeRole(userData.role);
+            
+            localStorage.setItem('token', token);
+            localStorage.setItem('user', JSON.stringify(userData));
+            setUser(userData);
+          } else {
+            throw new Error(typedResponse.message || 'Login failed');
+          }
+        } else if (typedResponse.status === 'success') {
+          // Using the direct format from controller
+          const loginData = responseData as LoginResponse;
+          const token = loginData.token;
+          const userData = loginData.data?.user;
+          
+          if (!token || !userData) {
+            throw new Error('Invalid response format: missing token or user data');
+          }
+          
+          // Normalize the role
+          userData.role = normalizeRole(userData.role);
+          
+          localStorage.setItem('token', token);
+          localStorage.setItem('user', JSON.stringify(userData));
+          setUser(userData);
+        } else {
+          throw new Error('Invalid response format');
+        }
+      } else {
+        throw new Error('Invalid response data: not an object');
       }
-      
-      if (password !== 'password') {
-        throw new Error('Invalid password');
-      }
-      
-      // Mock login - replace with actual API call
-      console.log(`Login attempt with password length: ${password.length}`);
-      
-      const mockUser = {
-        id: '1',
-        name: email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1),
-        email,
-        role: email.includes('admin') 
-          ? UserRole.ADMIN 
-          : email.includes('teacher') 
-            ? UserRole.TEACHER 
-            : email.includes('parent') 
-              ? UserRole.PARENT 
-              : UserRole.STUDENT
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      setLoading(false);
     } catch (error) {
       console.error('Login failed:', error);
-      setLoading(false);
-      throw error;
+      
+      // Rethrow for handling in the Login component
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Unknown login error');
+      }
+    } finally {
+      // Reset login progress state
+      setLoginInProgress(false);
     }
   };
 
-  const logout = (): void => {
-    setUser(null);
-    localStorage.removeItem('user');
+  const logout = async (): Promise<void> => {
+    try {
+      await authAPI.logout();
+    } catch (error) {
+      console.error('Logout failed:', error);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+    }
   };
 
   return (
@@ -106,6 +235,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         user,
         isAuthenticated: !!user,
         loading,
+        loginInProgress,
         login,
         logout,
         checkAuth

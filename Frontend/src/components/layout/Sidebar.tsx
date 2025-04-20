@@ -34,12 +34,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     { icon: 'bi-speedometer2', label: 'Dashboard', path: '/' },
     { icon: 'bi-person', label: 'Profile', path: '/profile' },
     
+    { icon: 'bi-file-earmark-text', label: 'Academics', isGroup: true },
+    { icon: 'bi-key', label: 'Manage Results', path: '/manage-results' },
+    { icon: 'bi-calendar2-week', label: 'Manage Timetable', path: '/manage-timetable' },
+    { icon: 'bi-calendar-event', label: 'Holiday Management', path: '/holiday-management' },
     { icon: 'bi-clipboard-data', label: 'Report', path: '/report' },
+    { icon: 'bi-calendar-check', label: 'Leave Application', path: '/leave' },
     
     { icon: 'bi-people', label: 'User Management', isGroup: true },
     { icon: 'bi-person-plus', label: 'Teacher', path: '/teachers' },
     { icon: 'bi-people', label: 'Parents', path: '/parents' },
     { icon: 'bi-mortarboard', label: 'Students', path: '/students' },
+    { icon: 'bi-person-check', label: 'Class Teacher Assignments', path: '/class-teacher-assignment' },
     
     { icon: 'bi-megaphone', label: 'Announcements', isGroup: true },
     { icon: 'bi-bell', label: 'View Announcements', path: '/announcements' },
@@ -68,6 +74,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     
     { icon: 'bi-book', label: 'Academics', isGroup: true },
     { icon: 'bi-calendar-check', label: 'Attendance', path: '/attendance' },
+    { icon: 'bi-calendar2-week', label: 'Timetable', path: '/time-table' },
     
     { icon: 'bi-file-earmark-text', label: 'Exam', isGroup: true },
     { icon: 'bi-clipboard-data', label: 'Result', path: '/result' },
@@ -77,6 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
     { icon: 'bi-calendar-event', label: 'Holidays', path: '/holiday' },
     { icon: 'bi-chat-dots', label: 'Feedback', path: '/feedback' },
     { icon: 'bi-bell', label: 'View Announcements', path: '/announcements' },
+    { icon: 'bi-plus-circle', label: 'Create Announcement', path: '/announcements/create' },
     { icon: 'bi-box-arrow-right', label: 'Logout', path: '/logout' },
   ];
   
