@@ -6,18 +6,40 @@ import { leaveAPI, userAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { UserRole } from "../../utils/roles";
 
+// Define the interface for leave applications
+interface LeaveType {
+  id: number;
+  name: string;
+  description?: string;
+}
+
 interface LeaveApplication {
   id: number;
   subject: string;
-  leaveType: {
-    id: number;
-    name: string;
-    description?: string;
-  };
+  leaveType: LeaveType;
   fromDate: string;
   toDate: string;
   description: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  studentId?: number;
+  student?: {
+    id: number;
+    name: string;
+    rollNo?: string;
+    class?: {
+      id: number;
+      name: string;
+    };
+    section?: {
+      id: number;
+      name: string;
+    };
+  };
+}
+
+// Interface for API response
+interface LeaveResponse {
+  leaveApplications: LeaveApplication[];
 }
 
 const Leave: React.FC = () => {
@@ -27,6 +49,7 @@ const Leave: React.FC = () => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState<LeaveApplication | null>(null);
   const [studentInfo, setStudentInfo] = useState<{ name: string, class: string, section: string } | null>(null);
+  const [filterWarning, setFilterWarning] = useState<string | null>(null);
   
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -39,6 +62,7 @@ const Leave: React.FC = () => {
   const fetchLeaveApplications = async () => {
     setIsLoading(true);
     setError(null);
+    setFilterWarning(null);
     
     try {
       // Determine which student ID to use
@@ -67,12 +91,54 @@ const Leave: React.FC = () => {
         }
       }
       
+      // Fetch leaves specifically for the targetStudentId
       const response = await leaveAPI.getLeaves({
         studentId: targetStudentId
       });
       
       if (response.data?.status === 'success' && Array.isArray(response.data?.data?.leaveApplications)) {
-        setLeaveApplications(response.data?.data?.leaveApplications as LeaveApplication[]);
+        // Use type assertion to fix TypeScript error
+        const responseData = response.data.data as LeaveResponse;
+        
+        // Log the raw data received
+        console.log('All leave applications received:', responseData.leaveApplications);
+        console.log('Target student ID:', targetStudentId);
+        
+        // Double-check filtering for the specific student in case the API doesn't filter properly
+        const filteredLeaves = responseData.leaveApplications.filter(leave => {
+          // Log each leave object to check its structure
+          console.log('Leave application:', leave);
+          
+          // When viewing as parent, filter by the application's studentId property directly
+          if (leave.studentId) {
+            console.log(`Comparing leave studentId ${leave.studentId} with target ${targetStudentId}`);
+            return Number(leave.studentId) === Number(targetStudentId);
+          }
+          
+          // Try student object property if it exists
+          if (leave.student) {
+            console.log(`Comparing student.id ${leave.student.id} with target ${targetStudentId}`);
+            return Number(leave.student.id) === Number(targetStudentId);
+          }
+          
+          // If we're the student viewing our own leaves
+          if (!studentId) {
+            return true;
+          }
+          
+          // If we can't determine the student, don't include it when filtering for a specific student
+          console.log('No studentId or student object found on leave application:', leave);
+          return false;
+        });
+        
+        console.log(`Filtered ${responseData.leaveApplications.length} leaves to ${filteredLeaves.length} for student ID ${targetStudentId}`);
+        
+        // If we filtered out leaves and we're viewing as a parent, show a warning
+        if (studentId && responseData.leaveApplications.length > filteredLeaves.length) {
+          setFilterWarning(`Filtered out ${responseData.leaveApplications.length - filteredLeaves.length} leave applications that didn't belong to this student.`);
+        }
+        
+        setLeaveApplications(filteredLeaves);
       } else {
         setLeaveApplications([]);
       }
@@ -127,6 +193,13 @@ const Leave: React.FC = () => {
             </button>
           )}
         </div>
+
+        {filterWarning && (
+          <div className="bg-yellow-100 p-3 rounded-md mb-4 text-yellow-800 text-sm">
+            <p>{filterWarning}</p>
+            <p className="mt-1">Only showing leave applications for this specific student.</p>
+          </div>
+        )}
 
         {isLoading && (
           <div className="flex justify-center items-center h-40">
