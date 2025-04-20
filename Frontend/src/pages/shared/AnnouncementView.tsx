@@ -69,9 +69,9 @@ const AnnouncementView: React.FC = () => {
                 setLoading(true);
                 const response = await announcementAPI.getAll();
                 
-                if (response.data?.status === 'success' && response.data?.data?.announcements) {
+                if (response.data?.status === 'success' && response.data?.data) {
                     // Type as API response type first, then process into our known Announcement type
-                    const apiAnnouncements = response.data.data.announcements as unknown as AnnouncementData[];
+                    const apiAnnouncements = response.data.data as unknown as AnnouncementData[];
                     
                     const formattedAnnouncements: Announcement[] = apiAnnouncements.map(announcement => ({
                         id: announcement.id,

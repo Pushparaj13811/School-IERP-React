@@ -168,27 +168,38 @@ const CreateAnnouncement: React.FC = () => {
         setTargetAll(true);
       }
       
-      // For now, we're not handling file uploads in this example
-      // In a real implementation, you would upload files to a server/cloud storage
-      // and then include the URLs in the announcement data
+      // Create FormData for multipart file upload
+      const formData = new FormData();
       
-      const announcementData = {
-        title,
-        content,
-        priority,
-        expiresAt: expiresAt || undefined,
-        targetClassIds: selectedClasses,
-        targetSectionIds: selectedSections,
-        targetRoles,
-        attachments: attachments.map(attachment => ({
-          name: attachment.name,
-          url: URL.createObjectURL(attachment.file), // For demo purposes
-          type: attachment.type,
-          size: attachment.size
-        }))
-      };
+      // Add basic announcement data
+      formData.append('title', title);
+      formData.append('content', content);
+      formData.append('priority', priority);
       
-      const response = await announcementAPI.create(announcementData);
+      if (expiresAt) {
+        formData.append('expiresAt', expiresAt);
+      }
+      
+      // Add target classes and sections
+      selectedClasses.forEach(classId => {
+        formData.append('targetClassIds', classId.toString());
+      });
+      
+      selectedSections.forEach(sectionId => {
+        formData.append('targetSectionIds', sectionId.toString());
+      });
+      
+      // Add target roles
+      targetRoles.forEach(role => {
+        formData.append('targetRoles', role);
+      });
+      
+      // Add attachments
+      attachments.forEach(attachment => {
+        formData.append('attachments', attachment.file);
+      });
+      
+      const response = await announcementAPI.create(formData);
       
       if (response.data?.status === 'success') {
         setSubmitStatus('success');
