@@ -104,8 +104,8 @@ export const getClassAttendance = async (req, res, next) => {
         const attendance = await attendanceService.getClassAttendance(
             req.user.id,
             req.user.role,
-            classId, 
-            sectionId, 
+            classId,
+            sectionId,
             date
         );
 
@@ -173,14 +173,43 @@ export const markDailyAttendance = async (req, res, next) => {
             return next(new ApiError(403, 'Only teachers can mark attendance'));
         }
 
+        console.log('Received attendance marking request:', {
+            classId,
+            sectionId,
+            date,
+            dateType: typeof date,
+            attendanceDataCount: attendanceData.length
+        });
+
+        // Parse date if it's a string
+        let formattedDate;
+        try {
+            if (typeof date === 'string') {
+                formattedDate = new Date(date);
+                if (isNaN(formattedDate.getTime())) {
+                    return next(new ApiError(400, 'Invalid date format'));
+                }
+            } else if (date instanceof Date) {
+                formattedDate = date;
+            } else {
+                return next(new ApiError(400, 'Invalid date type'));
+            }
+        } catch (error) {
+            console.error('Error parsing date:', error);
+            return next(new ApiError(400, 'Invalid date format'));
+        }
+
         // Use service method for business logic
         const results = await attendanceService.markDailyAttendance(
             req.user.teacher.id,
             classId,
             sectionId,
-            date,
+            formattedDate,
             attendanceData
         );
+
+        // Use the same formatted date for updating monthly attendance
+        updateMonthlyAttendance(classId, sectionId, formattedDate);
 
         return res
             .status(200)
@@ -200,7 +229,25 @@ export const markDailyAttendance = async (req, res, next) => {
 // Helper function to update monthly attendance summary
 const updateMonthlyAttendance = async (classId, sectionId, date) => {
     try {
-        await attendanceService.updateDailyAttendanceSummary(classId, sectionId, date);
+        // Ensure date is a proper Date object
+        let dateObj;
+        if (typeof date === 'string') {
+            dateObj = new Date(date);
+        } else if (date instanceof Date) {
+            dateObj = date;
+        } else {
+            console.error('Invalid date format:', date);
+            // Default to today's date if invalid
+            dateObj = new Date();
+        }
+        
+        if (isNaN(dateObj.getTime())) {
+            console.error('Invalid date value:', date);
+            dateObj = new Date(); // Default to today if invalid
+        }
+        
+        console.log('Converting date', date, 'to Date object', dateObj);
+        await attendanceService.updateDailyAttendanceSummary(classId, sectionId, dateObj);
     } catch (error) {
         console.error('Error updating monthly attendance:', error);
         throw error;
