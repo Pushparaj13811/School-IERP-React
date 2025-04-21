@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { academicAPI, resultAPI } from '../../services/api';
 import { FaLock, FaUnlock } from 'react-icons/fa';
 import Button from '../../components/ui/Button';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
 
 // Define types
 interface Class {
@@ -75,6 +76,17 @@ const ManageResults: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Add confirmation modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    action: 'lock' | 'unlock';
+    count: number;
+  }>({
+    isOpen: false,
+    action: 'unlock',
+    count: 0
+  });
 
   // Fetch classes
   useEffect(() => {
@@ -231,7 +243,7 @@ const ManageResults: React.FC = () => {
     }
   };
 
-  // Add a new function to handle bulk unlock operation
+  // Update handleUnlockAll function to use the modal
   const handleUnlockAll = async () => {
     if (!results.length) {
       setError('No results to unlock');
@@ -245,11 +257,52 @@ const ManageResults: React.FC = () => {
       return;
     }
 
-    // Confirm with the user
-    if (!window.confirm(`Are you sure you want to unlock all ${lockedResults.length} results for the selected class, section, and subject?`)) {
+    // Open confirmation modal instead of window.confirm
+    setConfirmModal({
+      isOpen: true,
+      action: 'unlock',
+      count: lockedResults.length
+    });
+  };
+
+  // Update handleLockAll function to use the modal
+  const handleLockAll = async () => {
+    if (!results.length) {
+      setError('No results to lock');
       return;
     }
 
+    // Only proceed with results that are currently unlocked
+    const unlockedResults = results.filter(result => !result.isLocked);
+    if (!unlockedResults.length) {
+      setSuccessMessage('All results are already locked');
+      return;
+    }
+
+    // Open confirmation modal instead of window.confirm
+    setConfirmModal({
+      isOpen: true,
+      action: 'lock',
+      count: unlockedResults.length
+    });
+  };
+
+  // Add a function to handle the confirmation
+  const handleConfirmAction = async () => {
+    if (confirmModal.action === 'unlock') {
+      await processUnlockAll();
+    } else {
+      await processLockAll();
+    }
+    
+    // Close the modal
+    setConfirmModal({ ...confirmModal, isOpen: false });
+  };
+
+  // Extract the unlock logic to a separate function
+  const processUnlockAll = async () => {
+    const lockedResults = results.filter(result => result.isLocked);
+    
     setIsLoading(true);
     setError(null);
     setSuccessMessage(null);
@@ -289,25 +342,10 @@ const ManageResults: React.FC = () => {
     }
   };
 
-  // Add a function to lock all results
-  const handleLockAll = async () => {
-    if (!results.length) {
-      setError('No results to lock');
-      return;
-    }
-
-    // Only proceed with results that are currently unlocked
+  // Extract the lock logic to a separate function
+  const processLockAll = async () => {
     const unlockedResults = results.filter(result => !result.isLocked);
-    if (!unlockedResults.length) {
-      setSuccessMessage('All results are already locked');
-      return;
-    }
-
-    // Confirm with the user
-    if (!window.confirm(`Are you sure you want to lock all ${unlockedResults.length} results for the selected class, section, and subject?`)) {
-      return;
-    }
-
+    
     setIsLoading(true);
     setError(null);
     setSuccessMessage(null);
@@ -554,6 +592,17 @@ const ManageResults: React.FC = () => {
           No results found. Please adjust your search criteria.
         </div>
       ) : null}
+
+      {/* Add the Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={handleConfirmAction}
+        title={confirmModal.action === 'unlock' ? 'Unlock Results' : 'Lock Results'}
+        message={`Are you sure you want to ${confirmModal.action} all ${confirmModal.count} results for the selected class, section, and subject?`}
+        confirmLabel={confirmModal.action === 'unlock' ? 'Unlock' : 'Lock'}
+        cancelLabel="Cancel"
+      />
     </div>
   );
 };
