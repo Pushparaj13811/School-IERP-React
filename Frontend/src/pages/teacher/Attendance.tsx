@@ -74,6 +74,7 @@ const Attendance: React.FC = () => {
   const [holidays, setHolidays] = useState<{date: string, name: string}[]>([]);
   const [isHoliday, setIsHoliday] = useState<boolean>(false);
   const [holidayName, setHolidayName] = useState<string>('');
+  const [isSaturday, setIsSaturday] = useState<boolean>(false);
 
   // Fetch classes assigned to the teacher as class teacher and their students
   useEffect(() => {
@@ -183,6 +184,15 @@ const Attendance: React.FC = () => {
       return;
     }
 
+    // Check if selected date is a Saturday (6 is Saturday in JavaScript)
+    const isSaturdayDate = selectedDateObj.getDay() === 6;
+    setIsSaturday(isSaturdayDate);
+    
+    if (isSaturdayDate) {
+      setError('Cannot mark attendance on Saturdays (Weekend)');
+      return;
+    }
+
     // Check if selected date is a holiday
     const holiday = holidays.find(h => h.date === selectedDate);
     if (holiday) {
@@ -196,7 +206,7 @@ const Attendance: React.FC = () => {
     }
 
     // Fetch attendance data if date is valid
-    if (!isAfter(selectedDateObj, today) && !holiday) {
+    if (!isAfter(selectedDateObj, today) && !holiday && !isSaturdayDate) {
       if (students.length > 0 && assignedClasses.length > 0) {
         fetchAttendanceData(students, assignedClasses);
       }
@@ -344,6 +354,12 @@ const Attendance: React.FC = () => {
         return;
       }
 
+      // Check if selected date is a Saturday
+      if (isSaturday) {
+        setError('Cannot mark attendance on Saturdays (Weekend)');
+        return;
+      }
+
       // Check if selected date is a holiday
       if (isHoliday) {
         setError(`Cannot mark attendance on ${holidayName} (Holiday)`);
@@ -450,15 +466,20 @@ const Attendance: React.FC = () => {
                 Holiday: {holidayName}
               </p>
             )}
+            {isSaturday && (
+              <p className="mt-1 text-sm text-red-500">
+                Weekend: Saturday (No Attendance Required)
+              </p>
+            )}
           </div>
           
           <div>
             <Button
               variant="primary"
               onClick={saveAttendance}
-              disabled={saving || students.length === 0 || isHoliday || isAfter(parseISO(selectedDate), new Date())}
+              disabled={saving || students.length === 0 || isHoliday || isSaturday || isAfter(parseISO(selectedDate), new Date())}
               className={`px-4 py-2 rounded-md text-white flex items-center gap-2 ${
-                saving || students.length === 0 || isHoliday || isAfter(parseISO(selectedDate), new Date())
+                saving || students.length === 0 || isHoliday || isSaturday || isAfter(parseISO(selectedDate), new Date())
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-[#292648] hover:bg-[#3b3664]'
               }`}   
