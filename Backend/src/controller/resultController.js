@@ -210,7 +210,8 @@ export const getOverallResult = async (req, res, next) => {
             return next(new AppError(400, 'Please provide studentId, academicYear, and term'));
         }
 
-        const result = await resultService.getOverallResult(studentId, academicYear, term);
+        // Convert studentId to a number to fix Prisma type error
+        const result = await resultService.getOverallResult(Number(studentId), academicYear, term);
         
         res.status(200).json({
             status: 'success',
