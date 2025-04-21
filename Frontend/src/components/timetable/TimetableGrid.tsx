@@ -9,7 +9,7 @@ interface TimetableRow {
 
 interface TimetableGridProps {
   periodGrid: TimetableRow[] | null;
-  onDeletePeriod: (periodId: number) => void;
+  onDeletePeriod: (periodId: number, periodName?: string) => void;
 }
 
 const TimetableGrid: React.FC<TimetableGridProps> = ({ periodGrid, onDeletePeriod }) => {
@@ -59,7 +59,7 @@ const TimetableGrid: React.FC<TimetableGridProps> = ({ periodGrid, onDeletePerio
                       </div>
                       <Button
                         className="absolute top-2 right-2 text-red-500 hover:text-red-700"
-                        onClick={() => onDeletePeriod((row[day] as Period).id)}
+                        onClick={() => onDeletePeriod((row[day] as Period).id, (row[day] as Period).subject.name)}
                       >
                         <span className="text-xs">×</span>
                       </Button>

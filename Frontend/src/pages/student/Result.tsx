@@ -117,7 +117,8 @@ const Result: React.FC = () => {
       const subjectResponse = await resultAPI.getResults({
         studentId: targetStudentId,
         academicYear: currentYear,
-        term: apiTerm
+        term: apiTerm,
+        isPublished: true // Only fetch published results
       });
       
       console.log("API Response:", subjectResponse.data);
@@ -128,8 +129,20 @@ const Result: React.FC = () => {
         
         // Check if we have any results
         if (subjectResults.length === 0) {
-          setError("No results found for the selected term");
+          setSubjects([]);
+          setError("No results have been published for the selected term");
           setIsLoading(false);
+          
+          // Reset the result summary with placeholder values
+          setResultSummary({
+            status: "Pending",
+            totalPercentage: "0%",
+            strongestSubject: "N/A",
+            subjectToImprove: "N/A",
+            rank: "N/A",
+            note: "Results have not been published yet",
+            classTeacher: "N/A"
+          });
           return;
         }
         
@@ -161,7 +174,8 @@ const Result: React.FC = () => {
             const overallResponse = await resultAPI.getOverallResult({
               studentId: targetStudentId,
               academicYear: currentYear,
-              term: apiTerm
+              term: apiTerm,
+              isPublished: true // Only fetch published overall results
             });
             
             console.log("Overall Result Response:", overallResponse.data);
@@ -220,11 +234,35 @@ const Result: React.FC = () => {
         }
       } else {
         console.error("API response doesn't contain expected format:", subjectResponse.data);
-        setError("Failed to fetch results or no results found. Check API response in console.");
+        setSubjects([]);
+        setError("No results have been published for this term yet");
+        
+        // Reset the result summary with placeholder values
+        setResultSummary({
+          status: "Pending",
+          totalPercentage: "0%",
+          strongestSubject: "N/A",
+          subjectToImprove: "N/A",
+          rank: "N/A",
+          note: "Results have not been published yet",
+          classTeacher: "N/A"
+        });
       }
     } catch (err) {
       console.error("Error fetching results:", err);
-      setError("An error occurred while fetching results");
+      setError("No results have been published for this term yet");
+      setSubjects([]);
+      
+      // Reset the result summary with placeholder values
+      setResultSummary({
+        status: "Pending",
+        totalPercentage: "0%",
+        strongestSubject: "N/A",
+        subjectToImprove: "N/A",
+        rank: "N/A",
+        note: "Results have not been published yet",
+        classTeacher: "N/A"
+      });
     } finally {
       setIsLoading(false);
     }

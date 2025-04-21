@@ -5,23 +5,21 @@ import Button from '../ui/Button';
 
 interface TimeSlotListProps {
   timeSlots: TimeSlot[];
-  onDelete?: (timeSlotId: number) => Promise<void>;
+  onDelete?: (timeSlotId: number, timeSlotName?: string) => Promise<void>;
   isAdmin?: boolean;
 }
 
 const TimeSlotList: React.FC<TimeSlotListProps> = ({ timeSlots, onDelete, isAdmin = false }) => {
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
 
-  const handleDelete = async (timeSlotId: number) => {
+  const handleDelete = async (timeSlotId: number, timeSlotName?: string) => {
     if (!onDelete) return;
     
-    if (confirm("Are you sure you want to delete this time slot? This action cannot be undone.")) {
-      try {
-        setIsDeleting(timeSlotId);
-        await onDelete(timeSlotId);
-      } finally {
-        setIsDeleting(null);
-      }
+    try {
+      setIsDeleting(timeSlotId);
+      await onDelete(timeSlotId, timeSlotName);
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -69,10 +67,14 @@ const TimeSlotList: React.FC<TimeSlotListProps> = ({ timeSlots, onDelete, isAdmi
               {onDelete && isAdmin && (
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <Button
-                    onClick={() => handleDelete(slot.id)}
+                    onClick={() => handleDelete(
+                      slot.id, 
+                      slot.isBreak 
+                        ? `${slot.breakType || 'Break'} (${formatTime(slot.startTime)} - ${formatTime(slot.endTime)})` 
+                        : `Class Period (${formatTime(slot.startTime)} - ${formatTime(slot.endTime)})`
+                    )}
                     disabled={isDeleting === slot.id}
                     variant="danger"
-                    className={`text-red-600 hover:text-red-900 ${isDeleting === slot.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     {isDeleting === slot.id ? (
                       <span className="flex items-center">

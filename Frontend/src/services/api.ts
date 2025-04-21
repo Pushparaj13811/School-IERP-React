@@ -488,6 +488,15 @@ export const resultAPI = {
     updateResult: (id: string, data: Record<string, unknown>) => api.put<ApiResponse<{ result: Result }>>(`/results/${id}`, data),
     recalculateResults: (data: Record<string, unknown>) => api.post<ApiResponse<{ message: string }>>('/results/recalculate', data),
     toggleResultLock: (id: string, isLocked: boolean) => api.patch<ApiResponse<{ result: Result }>>(`/results/subject/${id}/lock`, { isLocked }),
+    bulkToggleResultLock: (data: {
+        isLocked: boolean;
+        subjectId: number;
+        classId?: number;
+        sectionId?: number;
+        academicYear: string;
+        term: string;
+        studentId?: number;
+    }) => api.post('/results/bulk-lock', data),
 };
 
 // Leave API

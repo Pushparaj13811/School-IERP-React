@@ -403,9 +403,34 @@ export class AttendanceService {
     async markDailyAttendance(teacherId, classId, sectionId, date, attendanceData, remarks) {
         try {
             console.log(`Marking attendance for teacherId: ${teacherId}, classId: ${classId}, sectionId: ${sectionId}`);
+            console.log('Date received:', date, 'Type:', typeof date);
             
-            // Format the date
-            const attendanceDate = new Date(date);
+            // Format the date properly
+            let attendanceDate;
+            if (typeof date === 'string') {
+                attendanceDate = new Date(date);
+            } else if (date instanceof Date) {
+                attendanceDate = new Date(date); // Create a new instance to avoid reference issues
+            } else {
+                console.error('Invalid date format in markDailyAttendance:', date);
+                // Default to today's date if invalid
+                attendanceDate = new Date();
+            }
+            
+            if (isNaN(attendanceDate.getTime())) {
+                console.error('Invalid date value in markDailyAttendance:', date);
+                throw new ApiError(400, 'Invalid date format provided');
+            }
+            
+            // Set to midnight for consistent date handling
+            const normalizedDate = new Date(attendanceDate.setHours(0, 0, 0, 0));
+            console.log('Using normalized date:', normalizedDate);
+            
+            // Check if the date is a Saturday (day 6)
+            if (normalizedDate.getDay() === 6) {
+                console.log('Attendance marking attempted on Saturday:', normalizedDate);
+                throw new ApiError(400, 'Attendance cannot be marked on Saturdays');
+            }
             
             // Check if the teacher is authorized to mark attendance for this class/section
             try {
@@ -458,7 +483,7 @@ export class AttendanceService {
                     throw new ApiError(400, `Student with ID ${record.studentId} is not in this class/section`);
                 }
                 
-                if (!['PRESENT', 'ABSENT', 'LATE', 'EXCUSED'].includes(record.status)) {
+                if (!['PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'EXCUSED'].includes(record.status)) {
                     throw new ApiError(400, `Invalid status: ${record.status}`);
                 }
             });
@@ -469,8 +494,8 @@ export class AttendanceService {
                     classId: parseInt(classId),
                     sectionId: parseInt(sectionId),
                     date: {
-                        gte: new Date(attendanceDate.setHours(0, 0, 0, 0)),
-                        lt: new Date(new Date(attendanceDate).setHours(23, 59, 59, 999)),
+                        gte: new Date(normalizedDate.getTime()),
+                        lt: new Date(normalizedDate.getTime() + 24 * 60 * 60 * 1000), // Add 24 hours
                     }
                 }
             });
@@ -479,7 +504,7 @@ export class AttendanceService {
             const createAttendance = attendanceData.map(record => {
                 return prisma.dailyAttendance.create({
                     data: {
-                        date: new Date(date),
+                        date: normalizedDate, // Use the normalized date
                         status: record.status,
                         remarks: record.remarks || remarks || null,
                         student: {
@@ -665,18 +690,58 @@ export class AttendanceService {
     // Update monthly attendance summary based on daily attendance
     async updateDailyAttendanceSummary(classId, sectionId, date) {
         try {
-            const month = date.getMonth();
-            const year = date.getFullYear();
+            console.log('updateDailyAttendanceSummary called with:', {
+                classId,
+                sectionId,
+                date,
+                dateType: typeof date,
+                isDateObject: date instanceof Date
+            });
+            
+            // Ensure date is a proper Date object
+            let attendanceDate;
+            if (typeof date === 'string') {
+                attendanceDate = new Date(date);
+            } else if (date instanceof Date) {
+                attendanceDate = date;
+            } else {
+                console.error('Invalid date format in updateDailyAttendanceSummary:', date);
+                // Default to today's date if invalid
+                attendanceDate = new Date();
+            }
+            
+            if (isNaN(attendanceDate.getTime())) {
+                console.error('Invalid date value in updateDailyAttendanceSummary:', date);
+                attendanceDate = new Date(); // Default to today if invalid
+            }
+            
+            console.log('Using date:', attendanceDate);
+            
+            const month = attendanceDate.getMonth();
+            const year = attendanceDate.getFullYear();
             const monthStart = new Date(year, month, 1);
             const monthEnd = new Date(year, month + 1, 0);
+            
+            console.log('Month calculations:', {
+                month,
+                year,
+                monthStart,
+                monthEnd
+            });
+            
+            // Ensure classId and sectionId are integers
+            const classIdInt = parseInt(classId);
+            const sectionIdInt = parseInt(sectionId);
             
             // Get all students in this class/section
             const students = await prisma.student.findMany({
                 where: {
-                    classId,
-                    sectionId
+                    classId: classIdInt,
+                    sectionId: sectionIdInt
                 }
             });
+            
+            console.log(`Found ${students.length} students in class ${classIdInt}, section ${sectionIdInt}`);
             
             for (const student of students) {
                 // Get daily attendance records for this student in the month
@@ -690,6 +755,8 @@ export class AttendanceService {
                     }
                 });
                 
+                console.log(`Found ${dailyRecords.length} attendance records for student ${student.id} in month ${month + 1}/${year}`);
+                
                 // Calculate attendance counts
                 const presentCount = dailyRecords.filter(record => 
                     record.status === 'PRESENT' || record.status === 'LATE' || record.status === 'HALF_DAY').length;
@@ -697,6 +764,14 @@ export class AttendanceService {
                     record.status === 'ABSENT' || record.status === 'EXCUSED').length;
                 const totalDays = presentCount + absentCount;
                 const percentage = totalDays > 0 ? (presentCount / totalDays) * 100 : 0;
+                
+                console.log('Attendance counts:', {
+                    studentId: student.id,
+                    presentCount,
+                    absentCount,
+                    totalDays,
+                    percentage
+                });
                 
                 // Update or create monthly attendance record
                 await prisma.monthlyAttendance.upsert({
@@ -714,8 +789,8 @@ export class AttendanceService {
                     },
                     create: {
                         studentId: student.id,
-                        classId,
-                        sectionId,
+                        classId: classIdInt,
+                        sectionId: sectionIdInt,
                         month: monthStart,
                         year,
                         presentCount,
@@ -723,8 +798,11 @@ export class AttendanceService {
                         percentage
                     }
                 });
+                
+                console.log(`Updated monthly attendance for student ${student.id}`);
             }
         } catch (error) {
+            console.error('Error in updateDailyAttendanceSummary:', error);
             throw error;
         }
     }

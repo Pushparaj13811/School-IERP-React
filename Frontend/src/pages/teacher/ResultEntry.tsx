@@ -4,7 +4,7 @@ import { FaSave, FaLock, FaUnlock, FaSync } from 'react-icons/fa';
 import { academicAPI, resultAPI } from '../../services/api';
 import { Class, Section, Subject, Teacher } from '../../types/api';
 import teacherService from '../../services/teacherService';
-import resultService, { Student } from '../../services/resultService';
+import resultService, { Student, ResultData } from '../../services/resultService';
 
 const ResultEntry: React.FC = () => {
     const [classes, setClasses] = useState<Class[]>([]);
@@ -150,23 +150,8 @@ const ResultEntry: React.FC = () => {
             setIsLoading(true);
             setError(null);
             
-            // For debugging - directly check the API response
-            if (selectedSubject) {
-                try {
-                    // Directly get one student to test
-                    const directTest = await resultAPI.getResults({
-                        classId: selectedClass,
-                        sectionId: selectedSection,
-                        subjectId: selectedSubject,
-                        academicYear,
-                        term
-                    });
-                    console.log("DIRECT API TEST:", JSON.stringify(directTest.data, null, 2));
-                } catch (e) {
-                    console.error("Debug direct API test failed:", e);
-                }
-            }
-
+            console.log(`Fetching student results for class=${selectedClass}, section=${selectedSection}, subject=${selectedSubject}, year=${academicYear}, term=${term}`);
+            
             // First fetch students for the selected class and section
             const fetchedStudents = await resultService.getStudentsForClassAndSection(
                 selectedClass, 
@@ -179,32 +164,96 @@ const ResultEntry: React.FC = () => {
                 return;
             }
             
-            // Set initial student list
-            setStudents(fetchedStudents);
+            // Ensure all students start with default values (not showing previous subject data)
+            const initialStudents = fetchedStudents.map(student => ({
+                ...student,
+                theoryMarks: 0,
+                practicalMarks: 0,
+                isEditable: true,
+                isLocked: false
+            }));
             
-            // If a subject is selected, check for existing results
+            // Set initial student list
+            setStudents(initialStudents);
+            
+            // If a subject is selected, check for existing results directly from API
             if (selectedSubject) {
-                const updatedStudents = await resultService.getExistingResults(
-                    fetchedStudents,
-                    selectedSubject,
-                    academicYear,
-                    term
-                );
+                console.log(`Fetching existing results for class=${selectedClass}, section=${selectedSection}, subject=${selectedSubject}, year=${academicYear}, term=${term}`);
                 
-                setStudents(updatedStudents);
-                
-                // Additional debug logging
-                console.log("Final students state after update:", 
-                    updatedStudents.map(s => ({
-                        id: s.id,
-                        name: s.name,
-                        isLocked: s.isLocked,
-                        isEditable: s.isEditable
-                    }))
-                );
+                try {
+                    // Make direct API call like admin page does
+                    const response = await resultAPI.getResults({
+                        classId: selectedClass,
+                        sectionId: selectedSection,
+                        subjectId: selectedSubject,
+                        academicYear,
+                        term
+                    });
+                    
+                    console.log("API response for student results:", response.data);
+                    
+                    // Process API response like admin page does
+                    if (response.data?.status === 'success' && Array.isArray(response.data.data?.results)) {
+                        // Start with initial students
+                        const updatedStudents = [...initialStudents];
+                        
+                        // Process each student
+                        for (let i = 0; i < updatedStudents.length; i++) {
+                            const student = updatedStudents[i];
+                            
+                            // Find this student in the API response
+                            const apiResult = response.data.data.results.find(
+                                (r: unknown) => {
+                                    const result = r as ResultData;
+                                    return result.studentId === student.id || 
+                                           (result.student && result.student.id === student.id);
+                                }
+                            ) as unknown as ResultData;
+                            
+                            if (apiResult) {
+                                console.log(`Found result for student ${student.id} (${student.name}), lock status: ${apiResult.isLocked}`);
+                                
+                                // Make sure isLocked is boolean, just like admin page does
+                                const isLocked = apiResult.isLocked !== undefined ? apiResult.isLocked === true : true;
+                                
+                                // Set marks and lock status
+                                student.theoryMarks = typeof apiResult.theoryMarks === 'number' ? apiResult.theoryMarks : 0;
+                                student.practicalMarks = typeof apiResult.practicalMarks === 'number' ? apiResult.practicalMarks : 0;
+                                student.isLocked = isLocked;
+                                student.isEditable = !isLocked;
+                                
+                                console.log(`Student ${student.id} (${student.name}): isLocked=${isLocked}, isEditable=${!isLocked}`);
+                            } else {
+                                // No result for this student
+                                console.log(`No result found for student ${student.id} (${student.name}), setting as editable`);
+                                student.isLocked = false;
+                                student.isEditable = true;
+                            }
+                        }
+                        
+                        setStudents(updatedStudents);
+                        
+                        // Log final state
+                        console.log('Final students state after lock status processing:', 
+                            updatedStudents.map(s => ({
+                                id: s.id,
+                                name: s.name,
+                                isLocked: s.isLocked,
+                                isEditable: s.isEditable
+                            }))
+                        );
+                    } else {
+                        console.log('No results found in API response, all students are editable');
+                        setStudents(initialStudents);
+                    }
+                } catch (apiError) {
+                    console.error('Error fetching results from API:', apiError);
+                    setError("Error retrieving existing results");
+                    setStudents(initialStudents);
+                }
             }
         } catch (error) {
-            console.error('Error fetching students and results:', error);
+            console.error('Error in fetchStudentsAndResults:', error);
             setError("Error loading students");
             setStudents([]);
         } finally {
@@ -220,8 +269,12 @@ const ResultEntry: React.FC = () => {
             return;
         }
         
+        // Only fetch automatically on class/section/year/term change, not subject change
+        // Subject changes are handled by handleSubjectChange
         fetchStudentsAndResults();
-    }, [selectedClass, selectedSection, selectedSubject, academicYear, term]);
+        
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedClass, selectedSection, academicYear, term]);
 
     const handleClassChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const classId = parseInt(e.target.value);
@@ -242,11 +295,28 @@ const ResultEntry: React.FC = () => {
 
     const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const subjectId = parseInt(e.target.value);
+        console.log(`Subject change requested from ${selectedSubject} to ${subjectId}`);
+        
+        // Clear previous students data completely before switching subjects
+        setStudents([]);
+        
+        // Set the new subject id
         setSelectedSubject(subjectId);
         
-        // Refetch students to get updated results for this subject
+        // Reset any error messages
+        setError(null);
+        
+        // Reset save status
+        setSaveStatus(null);
+        
+        // Explicitly refetch students and results for the new subject
         if (selectedClass && selectedSection) {
-            fetchStudentsAndResults();
+            console.log(`Subject changed to ${subjectId} - refetching students and lock status`);
+            
+            // Use setTimeout to ensure the state update for selectedSubject completes
+            setTimeout(() => {
+                fetchStudentsAndResults();
+            }, 100); // Small delay to ensure state updates complete
         }
     };
 
@@ -275,7 +345,7 @@ const ResultEntry: React.FC = () => {
         // Check if there are any editable results
         const editableStudents = students.filter(student => student.isEditable);
         if (editableStudents.length === 0) {
-            setError("No editable results to save. Please unlock results first.");
+            setError("No editable results to save. All results are locked by the system.");
             return;
         }
 
@@ -294,14 +364,9 @@ const ResultEntry: React.FC = () => {
             );
             
             if (success) {
-                // Mark as locked after successful save, but preserve the admin lock status
-                setStudents(students.map(student => ({
-                    ...student,
-                    isEditable: student.isLocked ? false : false // Always set to false, but keep this format for clarity
-                })));
                 setSaveStatus('success');
                 
-                // Refresh the results to ensure the UI reflects the current state
+                // Refresh the results to get the latest lock status from the backend
                 await fetchStudentsAndResults();
             } else {
                 setSaveStatus('error');
@@ -535,91 +600,97 @@ const ResultEntry: React.FC = () => {
             
             {isLoading && selectedSubject ? (
                 <div className="flex justify-center items-center h-64">Loading students...</div>
-            ) : students.length > 0 ? (
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Roll No
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Name
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Theory Marks
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Practical Marks
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Status
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {students.map(student => (
-                                <tr key={student.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        {student.rollNo}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {student.name}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max={fullMarks}
-                                            value={student.theoryMarks}
-                                            onChange={(e) => handleMarkChange(student.id, 'theoryMarks', e.target.value)}
-                                            disabled={!student.isEditable}
-                                            className={`w-20 p-1 border rounded ${!student.isEditable ? 'bg-gray-100' : ''
-                                                }`}
-                                        />
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            max={fullMarks}
-                                            value={student.practicalMarks}
-                                            onChange={(e) => handleMarkChange(student.id, 'practicalMarks', e.target.value)}
-                                            disabled={!student.isEditable}
-                                            className={`w-20 p-1 border rounded ${!student.isEditable ? 'bg-gray-100' : ''
-                                                }`}
-                                        />
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        {student.isLocked ? (
-                                            <span className="text-red-600 flex items-center gap-1">
-                                                <FaLock /> Locked
-                                                <small className="ml-2 text-gray-500">(isLocked={String(student.isLocked)})</small>
-                                            </span>
-                                        ) : student.isEditable ? (
-                                            <span className="text-green-600 flex items-center gap-1">
-                                                <FaUnlock /> Editable
-                                                <small className="ml-2 text-gray-500">(isLocked={String(student.isLocked)})</small>
-                                            </span>
-                                        ) : (
-                                            <span className="text-red-600 flex items-center gap-1">
-                                                <FaLock /> Locked
-                                                <small className="ml-2 text-gray-500">(isLocked={String(student.isLocked)})</small>
-                                            </span>
-                                        )}
-                                    </td>
+            ) : (selectedClass && selectedSection && selectedSubject && academicYear && term) ? (
+                students.length > 0 ? (
+                    <div className="bg-white rounded-lg shadow overflow-hidden">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Roll No
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Name
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Theory Marks
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Practical Marks
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Status
+                                    </th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {students.map(student => (
+                                    <tr key={student.id}>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            {student.rollNo}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {student.name}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max={fullMarks}
+                                                value={student.theoryMarks}
+                                                onChange={(e) => handleMarkChange(student.id, 'theoryMarks', e.target.value)}
+                                                disabled={!student.isEditable}
+                                                className={`w-20 p-1 border rounded ${!student.isEditable ? 'bg-gray-100' : ''
+                                                    }`}
+                                            />
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max={fullMarks}
+                                                value={student.practicalMarks}
+                                                onChange={(e) => handleMarkChange(student.id, 'practicalMarks', e.target.value)}
+                                                disabled={!student.isEditable}
+                                                className={`w-20 p-1 border rounded ${!student.isEditable ? 'bg-gray-100' : ''
+                                                    }`}
+                                            />
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            {student.isLocked ? (
+                                                <span className="text-red-600 flex items-center gap-1">
+                                                    <FaLock /> Locked
+                                                    <small className="ml-2 text-gray-500">(isLocked={String(student.isLocked)})</small>
+                                                </span>
+                                            ) : student.isEditable ? (
+                                                <span className="text-green-600 flex items-center gap-1">
+                                                    <FaUnlock /> Editable
+                                                    <small className="ml-2 text-gray-500">(isLocked={String(student.isLocked)})</small>
+                                                </span>
+                                            ) : (
+                                                <span className="text-red-600 flex items-center gap-1">
+                                                    <FaLock /> Locked
+                                                    <small className="ml-2 text-gray-500">(isLocked={String(student.isLocked)})</small>
+                                                </span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="text-center p-8 text-gray-500">
+                        No students found in this class and section. Please check your selection.
+                    </div>
+                )
+            ) : (
+                <div className="text-center p-8 bg-blue-50 rounded-lg">
+                    <p className="text-blue-800">Please select all required fields (class, section, subject, academic year, and term) to view and enter results.</p>
                 </div>
-            ) : selectedSubject && !isLoading ? (
-                <div className="text-center p-8 text-gray-500">
-                    No students found in this class and section. Please check your selection.
-                </div>
-            ) : null}
+            )}
             
-            {students.length > 0 && (
+            {(selectedClass && selectedSection && selectedSubject && academicYear && term && students.length > 0) && (
                 <div className="mt-6 flex justify-end gap-4">
                     <div className="flex-1 self-center">
                         <p className="text-sm text-gray-600 italic">
