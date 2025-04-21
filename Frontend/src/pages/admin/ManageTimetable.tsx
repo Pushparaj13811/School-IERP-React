@@ -5,6 +5,7 @@ import TimeSlotDialog from '../../components/timetable/TimeSlotDialog';
 import TimetableGrid from '../../components/timetable/TimetableGrid';
 import TimeSlotList from '../../components/timetable/TimeSlotList';
 import Button from '../../components/ui/Button';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -69,6 +70,19 @@ const ManageTimetable: React.FC = () => {
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<number | ''>('');
   const [selectedSubject, setSelectedSubject] = useState<number | ''>('');
   const [selectedTeacher, setSelectedTeacher] = useState<number | ''>('');
+
+  // Confirmation modal states
+  const [confirmationModal, setConfirmationModal] = useState<{
+    isOpen: boolean;
+    type: 'period' | 'timeSlot';
+    id: number;
+    name: string;
+  }>({
+    isOpen: false,
+    type: 'period',
+    id: 0,
+    name: '',
+  });
 
   // Fetch initial data
   useEffect(() => {
@@ -425,6 +439,13 @@ const ManageTimetable: React.FC = () => {
       }
 
       setLoading(false);
+      // Close confirmation modal
+      setConfirmationModal({
+        isOpen: false,
+        type: 'period',
+        id: 0,
+        name: '',
+      });
     } catch (error) {
       console.error('Error deleting period:', error);
       setAlert({
@@ -433,6 +454,59 @@ const ManageTimetable: React.FC = () => {
         severity: 'error',
       });
       setLoading(false);
+    }
+  };
+
+  // Add function to open the confirmation modal for periods
+  const confirmDeletePeriod = (periodId: number, periodName?: string) => {
+    setConfirmationModal({
+      isOpen: true,
+      type: 'period',
+      id: periodId,
+      name: periodName || `Period #${periodId}`,
+    });
+  };
+
+  // Add function to handle the time slot deletion after confirmation
+  const handleDeleteTimeSlot = async (timeSlotId: number) => {
+    try {
+      setLoading(true);
+      const success = await timetableService.deleteTimeSlot(timeSlotId);
+      if (success) {
+        // Refresh time slots
+        const timeSlotsData = await timetableService.getTimeSlots();
+        setTimeSlots(timeSlotsData);
+        setAlert({
+          open: true,
+          message: 'Time slot deleted successfully',
+          severity: 'success',
+        });
+      }
+      setLoading(false);
+      // Close confirmation modal
+      setConfirmationModal({
+        isOpen: false,
+        type: 'timeSlot',
+        id: 0,
+        name: '',
+      });
+    } catch (error) {
+      console.error('Error deleting time slot:', error);
+      setAlert({
+        open: true,
+        message: 'Error deleting time slot. Please try again.',
+        severity: 'error',
+      });
+      setLoading(false);
+    }
+  };
+
+  // Add function to handle confirmation based on type
+  const handleConfirmDelete = () => {
+    if (confirmationModal.type === 'period') {
+      handleDeletePeriod(confirmationModal.id);
+    } else if (confirmationModal.type === 'timeSlot') {
+      handleDeleteTimeSlot(confirmationModal.id);
     }
   };
 
@@ -565,7 +639,7 @@ const ManageTimetable: React.FC = () => {
 
             <TimetableGrid
               periodGrid={periodGrid}
-              onDeletePeriod={handleDeletePeriod}
+              onDeletePeriod={confirmDeletePeriod}
             />
           </div>
         )}
@@ -575,41 +649,24 @@ const ManageTimetable: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex flex-col md:flex-row justify-between mb-4">
             <h2 className="text-lg font-bold mb-2 md:mb-0">Manage Time Slots</h2>
-            <button
+            <Button
+              variant="primary"
               onClick={handleOpenTimeSlotDialog}
-              className="px-4 py-2 bg-[#292648] text-white rounded-md hover:bg-[#3b3664] flex items-center"
             >
               <span className="mr-1">+</span> Add Time Slot
-            </button>
+            </Button>
           </div>
 
           <TimeSlotList 
             timeSlots={timeSlots} 
             isAdmin={true} 
-            onDelete={async (timeSlotId) => {
-              try {
-                setLoading(true);
-                const success = await timetableService.deleteTimeSlot(timeSlotId);
-                if (success) {
-                  // Refresh time slots
-                  const timeSlotsData = await timetableService.getTimeSlots();
-                  setTimeSlots(timeSlotsData);
-                  setAlert({
-                    open: true,
-                    message: 'Time slot deleted successfully',
-                    severity: 'success',
-                  });
-                }
-                setLoading(false);
-              } catch (error) {
-                console.error('Error deleting time slot:', error);
-                setAlert({
-                  open: true,
-                  message: 'Failed to delete time slot',
-                  severity: 'error',
-                });
-                setLoading(false);
-              }
+            onDelete={async (timeSlotId, timeSlotName) => {
+              setConfirmationModal({
+                isOpen: true,
+                type: 'timeSlot',
+                id: timeSlotId,
+                name: timeSlotName || `Time Slot #${timeSlotId}`,
+              });
             }}
           />
         </div>
@@ -647,18 +704,29 @@ const ManageTimetable: React.FC = () => {
         loading={isAddingTimeSlot}
       />
 
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        onClose={() => setConfirmationModal({ ...confirmationModal, isOpen: false })}
+        onConfirm={handleConfirmDelete}
+        title={`Delete ${confirmationModal.type === 'period' ? 'Period' : 'Time Slot'}`}
+        message={`Are you sure you want to delete ${confirmationModal.name}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+      />
+
       {/* Alert notification */}
       {alert.open && (
         <div className={`fixed bottom-4 right-4 p-4 rounded-md shadow-lg ${alert.severity === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
         }`}>
           <div className="flex justify-between items-center">
             <span>{alert.message}</span>
-            <button 
+            <Button 
+              variant="primary"
               onClick={() => setAlert({ ...alert, open: false })}
-              className="ml-4 text-gray-500 hover:text-gray-700"
             >
               ×
-            </button>
+            </Button>
           </div>
         </div>
       )}
