@@ -133,79 +133,44 @@ export const getSubjectResults = async (req, res, next) => {
     try {
         const { studentId, classId, sectionId, subjectId, academicYear, term } = req.query;
 
-        // If studentId is provided, get results for that specific student
-        if (studentId && academicYear && term) {
-            const results = await resultService.getSubjectResults(studentId, academicYear, term);
+        if (!academicYear || !term) {
+            return next(new ApiError(400, 'academicYear and term are required parameters'));
+        }
 
+        // Logging the request for debugging
+        console.log('GetSubjectResults request:', {
+            studentId, classId, sectionId, subjectId, academicYear, term
+        });
+
+        // Call the service method with all available parameters
+        const results = await resultService.getSubjectResults(
+            studentId || null, 
+            academicYear, 
+            term, 
+            subjectId || null, 
+            classId || null, 
+            sectionId || null
+        );
+
+        if (results.length === 0) {
+            console.log('No results found with the given parameters');
             return res.status(200).json(
                 new ApiResponse(
                     200,
-                    { results },
-                    'Results fetched successfully'
+                    { results: [] },
+                    'No results found with the given parameters'
                 )
             );
         }
 
-        // If classId, sectionId, and subjectId are provided, get results for all students in the class/section for the subject
-        if (classId && sectionId && subjectId && academicYear && term) {
-            // Get all students in this class and section
-            const students = await prisma.student.findMany({
-                where: {
-                    classId: Number(classId),
-                    sectionId: Number(sectionId)
-                },
-                select: { id: true }
-            });
-
-            if (students.length === 0) {
-                return next(new ApiError(404, 'No students found in the specified class/section'));
-            }
-
-            // Get all results for the students in the class/section for the specific subject
-            const results = await prisma.subjectResult.findMany({
-                where: {
-                    studentId: { in: students.map(s => s.id) },
-                    subjectId: Number(subjectId),
-                    academicYear,
-                    term
-                },
-                include: {
-                    student: {
-                        select: {
-                            name: true,
-                            rollNo: true
-                        }
-                    },
-                    subject: {
-                        select: {
-                            name: true
-                        }
-                    }
-                },
-                orderBy: {
-                    student: {
-                        rollNo: 'asc'
-                    }
-                }
-            });
-
-            console.log('Fetched results for class/section with lock status:', results.map(r => ({
-                id: r.id,
-                studentId: r.studentId,
-                isLocked: r.isLocked
-            })));
-
-            return res.status(200).json(
-                new ApiResponse(
-                    200,
-                    { results },
-                    'Results fetched successfully'
-                )
-            );
-        }
-
-        // If we get here, required parameters are missing
-        return next(new ApiError(400, 'Please provide either studentId OR (classId, sectionId, and subjectId) along with academicYear and term'));
+        console.log(`Returning ${results.length} results`);
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { results },
+                'Results fetched successfully'
+            )
+        );
     } catch (error) {
         console.error('Error in getSubjectResults:', error);
         next(error);
@@ -402,6 +367,98 @@ export const toggleSubjectResultLock = async (req, res, next) => {
             );
     } catch (error) {
         console.error('Error toggling subject result lock:', error);
+        next(error);
+    }
+};
+
+export const bulkToggleResultLock = async (req, res, next) => {
+    try {
+        const { 
+            isLocked, 
+            subjectId, 
+            classId, 
+            sectionId, 
+            academicYear, 
+            term,
+            studentId 
+        } = req.body;
+
+        if (isLocked === undefined) {
+            return next(new ApiError(400, 'isLocked status is required'));
+        }
+
+        if (!academicYear || !term) {
+            return next(new ApiError(400, 'academicYear and term are required'));
+        }
+
+        if (!subjectId) {
+            return next(new ApiError(400, 'subjectId is required'));
+        }
+
+        console.log('Bulk toggle request:', {
+            isLocked,
+            subjectId,
+            classId,
+            sectionId,
+            academicYear,
+            term,
+            studentId
+        });
+
+        // Build where clause based on provided parameters
+        const whereClause = {
+            subjectId: Number(subjectId),
+            academicYear,
+            term
+        };
+
+        // Add student filter if provided
+        if (studentId) {
+            whereClause.studentId = Number(studentId);
+        } 
+        // Otherwise use class/section filter if provided
+        else if (classId && sectionId) {
+            // Get students in this class/section
+            const students = await prisma.student.findMany({
+                where: {
+                    classId: Number(classId),
+                    sectionId: Number(sectionId)
+                },
+                select: { id: true }
+            });
+
+            if (students.length === 0) {
+                return next(new ApiError(404, 'No students found in the specified class/section'));
+            }
+
+            whereClause.studentId = { in: students.map(s => s.id) };
+        } else {
+            return next(new ApiError(400, 'Either studentId or both classId and sectionId must be provided'));
+        }
+
+        // Update all matching results
+        const { count } = await prisma.subjectResult.updateMany({
+            where: whereClause,
+            data: {
+                isLocked: Boolean(isLocked),
+                updatedAt: new Date()
+            }
+        });
+
+        const action = isLocked ? 'locked' : 'unlocked';
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { 
+                    affectedCount: count,
+                    isLocked
+                },
+                `${count} results have been ${action}`
+            )
+        );
+    } catch (error) {
+        console.error('Error in bulk toggle result lock:', error);
         next(error);
     }
 }; 

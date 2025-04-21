@@ -28,7 +28,7 @@ export class ResultService {
             });
 
             // If result exists, update it instead of creating a new one
-            if (existingResult) {
+            if (existingResult) {                
                 // Check if result is locked - if so, only admin can update it
                 if (existingResult.isLocked) {
                     throw new ApiError(403, 'This result is locked. Only an admin can unlock it for editing.');
@@ -56,14 +56,13 @@ export class ResultService {
                     }
                 });
 
-                console.log(`Updated result ${existingResult.id} with isLocked=${isLocked}`);
 
                 // Recalculate overall result
                 await this.calculateOverallResult(studentId, academicYear, term);
 
                 return updatedResult;
             }
-
+            
             // Calculate total marks for new result
             const totalMarks = isAbsent ? 0 : (theoryMarks || 0) + (practicalMarks || 0);
 
@@ -88,7 +87,6 @@ export class ResultService {
                 }
             });
 
-            console.log(`Created new result for student ${studentId}, subject ${subjectId} with isLocked=${isLocked}`);
 
             // Update overall result
             await this.calculateOverallResult(studentId, academicYear, term);
@@ -99,29 +97,78 @@ export class ResultService {
         }
     }
 
-    async getSubjectResults(studentId, academicYear, term) {
+    async getSubjectResults(studentId, academicYear, term, subjectId = null, classId = null, sectionId = null) {
         try {
+            // Build the query filter based on provided parameters
+            const whereClause = {
+                academicYear,
+                term
+            };
+            
+            // Add filters based on provided parameters
+            if (studentId) {
+                whereClause.studentId = Number(studentId);
+            }
+            
+            if (subjectId) {
+                whereClause.subjectId = Number(subjectId);
+            }
+            
+            // If classId and sectionId are provided but no studentId, 
+            // we need to find all students in that class/section
+            if (!studentId && classId && sectionId) {
+                // First get all students in the class/section
+                const students = await prisma.student.findMany({
+                    where: {
+                        classId: Number(classId),
+                        sectionId: Number(sectionId)
+                    },
+                    select: { id: true }
+                });
+                
+                if (students.length > 0) {
+                    whereClause.studentId = { in: students.map(s => s.id) };
+                } else {
+                    return [];
+                }
+            }
+            
+            // Execute the query with the constructed where clause
             const results = await prisma.subjectResult.findMany({
-                where: {
-                    studentId: Number(studentId),
-                    academicYear,
-                    term
-                },
+                where: whereClause,
                 include: {
                     subject: true,
-                    grade: true
+                    grade: true,
+                    student: {
+                        select: {
+                            id: true,
+                            name: true,
+                            rollNo: true
+                        }
+                    }
+                },
+                orderBy: {
+                    student: {
+                        rollNo: 'asc'
+                    }
                 }
             });
 
-            console.log('Fetched subject results with lock status:', results.map(r => ({
-                id: r.id,
-                studentId: r.studentId,
-                subjectId: r.subjectId,
-                isLocked: r.isLocked
-            })));
+            
+            // Process the results to ensure isLocked field is always a boolean
+            const processedResults = results.map(result => {
+                // Explicitly convert to boolean to avoid any type inconsistencies
+                const isLocked = result.isLocked === true;
+                
+                return {
+                    ...result,
+                    isLocked  // Make sure it's a boolean
+                };
+            });
 
-            return results;
+            return processedResults;
         } catch (error) {
+            console.error("Error in getSubjectResults:", error);
             throw error;
         }
     }

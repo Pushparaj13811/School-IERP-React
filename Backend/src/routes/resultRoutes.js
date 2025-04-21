@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect, restrictTo } from '../middlewares/authMiddleware.js';
-import { addSubjectResult, getSubjectResults, getOverallResult, calculateOverallResult, recalculateResults, toggleSubjectResultLock } from '../controller/resultController.js';
+import { addSubjectResult, getSubjectResults, getOverallResult, calculateOverallResult, recalculateResults, toggleSubjectResultLock, bulkToggleResultLock } from '../controller/resultController.js';
 
 const router = express.Router();
 
@@ -24,5 +24,8 @@ router.post('/recalculate', restrictTo('TEACHER', 'ADMIN'), recalculateResults);
 
 // Toggle lock status for a subject result (admin only)
 router.patch('/subject/:id/lock', restrictTo('ADMIN'), toggleSubjectResultLock);
+
+// Bulk toggle lock status for multiple results (admin only)
+router.post('/bulk-lock', restrictTo('ADMIN'), bulkToggleResultLock);
 
 export default router; 
