@@ -239,6 +239,22 @@ const Profile: React.FC = () => {
     );
   };
 
+  const handleDownloadProfile = async () => {
+    try {
+      const profileData = getProfileData();
+      if (!profileData?.studentData) {
+        toast.error("Student data not found");
+        return;
+      }
+      
+      await userService.downloadProfile('STUDENT', profileData.studentData.id);
+      toast.success("Profile download initiated");
+    } catch (error) {
+      console.error("Error downloading profile:", error);
+      toast.error("Failed to download profile");
+    }
+  };
+
   if (isLoading) {
     return <Spinner />;
   }
@@ -345,20 +361,10 @@ const Profile: React.FC = () => {
                 <Button
                   variant="primary"
                   className="w-full mb-2"
-                  onClick={() => toast.info("Download feature coming soon")}
+                  onClick={handleDownloadProfile}
                 >
                   Download Profile
                 </Button>
-
-                {isOwnProfile && (
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => toast.info("Edit feature coming soon")}
-                  >
-                    Edit Profile
-                  </Button>
-                )}
               </div>
             </div>
           </div>
