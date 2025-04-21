@@ -227,6 +227,12 @@ export class AuthService {
             throw new AppError(401, 'Incorrect email or password');
         }
 
+        // Check if user is active
+        if (!user.isActive) {
+            console.log(`Login attempt failed: User account ${email} is inactive`);
+            throw new AppError(401, 'Your account has been deactivated. Please contact the administrator.');
+        }
+
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             console.log(`Login attempt failed: Invalid password for user ${email}`);
