@@ -119,12 +119,24 @@ const ManageResults: React.FC = () => {
       
       try {
         const response = await academicAPI.getSubjectsByClass(selectedClass);
-        if (response.data?.success) {
+        
+        // Handle different response formats
+        if ('status' in response.data && response.data.status === 'success' && response.data.data?.subjects) {
+          // New API format with status and nested subjects
+          setSubjects(response.data.data.subjects);
+        } else if ('success' in response.data && response.data.success && Array.isArray(response.data.data)) {
+          // Old API format with success flag and direct subjects array
           setSubjects(response.data.data);
+        } else {
+          // Handle unexpected response format
+          console.error('Unexpected subjects API response format:', response.data);
+          setSubjects([]);
+          setError('Failed to parse subjects data. Check console for details.');
         }
       } catch (error) {
         console.error('Error fetching subjects:', error);
         setError('Failed to load subjects');
+        setSubjects([]);
       }
     };
 

@@ -1,8 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../databases/prismaClient.js';
 import { ApiError } from '../utils/apiError.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 
-const prisma = new PrismaClient();
 
 // Get all announcements
 export const getAllAnnouncements = async (req, res, next) => {

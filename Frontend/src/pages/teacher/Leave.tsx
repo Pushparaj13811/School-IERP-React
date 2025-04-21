@@ -59,7 +59,16 @@ const Leave: React.FC = () => {
       });
       
       if (myLeavesResponse.data.status === 'success') {
-        setMyLeaves([...myLeavesResponse.data.data.leaveApplications] as LeaveApplication[]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let myLeavesData: any[] = [];
+        if (Array.isArray(myLeavesResponse.data?.data)) {
+          // New response format: data.data is the array directly
+          myLeavesData = myLeavesResponse.data.data;
+        } else if (Array.isArray(myLeavesResponse.data?.data?.leaveApplications)) {
+          // Old response format: data.data.leaveApplications is the array
+          myLeavesData = myLeavesResponse.data.data.leaveApplications;
+        }
+        setMyLeaves(myLeavesData as LeaveApplication[]);
       }
 
       // Fetch pending student applications for approval
@@ -69,7 +78,16 @@ const Leave: React.FC = () => {
       });
       
       if (pendingApprovalsResponse.data.status === 'success') {
-        setPendingApprovals([...pendingApprovalsResponse.data.data.leaveApplications] as LeaveApplication[]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let pendingData: any[] = [];
+        if (Array.isArray(pendingApprovalsResponse.data?.data)) {
+          // New response format
+          pendingData = pendingApprovalsResponse.data.data;
+        } else if (Array.isArray(pendingApprovalsResponse.data?.data?.leaveApplications)) {
+          // Old response format
+          pendingData = pendingApprovalsResponse.data.data.leaveApplications;
+        }
+        setPendingApprovals(pendingData as LeaveApplication[]);
       }
 
       // Fetch processed student applications (approved/rejected)
@@ -79,7 +97,16 @@ const Leave: React.FC = () => {
       });
       
       if (processedApprovalsResponse.data.status === 'success') {
-        setProcessedApprovals([...processedApprovalsResponse.data.data.leaveApplications] as LeaveApplication[]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let processedData: any[] = [];
+        if (Array.isArray(processedApprovalsResponse.data?.data)) {
+          // New response format
+          processedData = processedApprovalsResponse.data.data;
+        } else if (Array.isArray(processedApprovalsResponse.data?.data?.leaveApplications)) {
+          // Old response format
+          processedData = processedApprovalsResponse.data.data.leaveApplications;
+        }
+        setProcessedApprovals(processedData as LeaveApplication[]);
       }
     } catch (err) {
       console.error("Error fetching leave applications:", err);

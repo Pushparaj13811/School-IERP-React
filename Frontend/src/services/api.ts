@@ -423,7 +423,8 @@ export const academicAPI = {
     }),
     getSectionsByClass: (classId: number) => api.get<ApiResponse<SectionsResponse>>(`/sections/class/${classId}`),
     getSubjects: () => api.get<ApiResponse<SubjectsResponse>>('/academic/subjects'),
-    getSubjectsByClass: (classId: number) => api.get<{success: boolean, data: Subject[]}>(`/academic/subjects/class/${classId}`),
+    getSubjectsByClass: (classId: number) => 
+        api.get<{ status: string, data: { subjects: Subject[] } } | { success: boolean, data: Subject[] }>(`/academic/subjects/class/${classId}`),
     getDesignations: () => api.get<ApiResponse<DesignationsResponse>>('/academic/designations'),
 };
 
@@ -491,7 +492,9 @@ export const resultAPI = {
 
 // Leave API
 export const leaveAPI = {
-    getLeaves: (params: Record<string, unknown>) => api.get<ApiResponse<{ leaveApplications: LeaveApplication[] }>>('/leaves', { params }),
+    getLeaves: (params: Record<string, unknown>) => 
+        api.get<ApiResponse<{ leaveApplications: LeaveApplication[] }> | { statusCode: number, data: LeaveApplication[], message: string, success: boolean, status: string }>
+        ('/leaves', { params }),
     getLeaveById: (id: number) => api.get<ApiResponse<{ leaveApplication: LeaveApplication }>>(`/leaves/${id}`),
     createLeave: (data: Record<string, unknown>) => api.post<ApiResponse<{ leaveApplication: LeaveApplication }>>('/leaves', data),
     updateLeaveStatus: (id: number, data: { status: 'APPROVED' | 'REJECTED' | 'CANCELLED', remarks?: string }) => 

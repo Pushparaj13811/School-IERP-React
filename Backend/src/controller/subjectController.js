@@ -1,5 +1,5 @@
 import { subjectService } from '../services/subjectService.js';
-import { AppError } from '../middlewares/errorHandler.js';
+import { ApiError } from '../utils/apiError.js';
 import { ApiResponse } from '../utils/apiResponse.js';
 
 // Create a new subject
@@ -18,12 +18,13 @@ export const createSubject = async (req, res, next) => {
 export const getAllSubjects = async (req, res, next) => {
   try {
     const subjects = await subjectService.getAllSubjects();
-    res.status(200).json({
-      status: 'success',
-      data: {
-        subjects
-      }
-    });
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        { subjects },
+        'Subjects fetched successfully'
+      )
+    );
   } catch (error) {
     next(error);
   }
@@ -69,17 +70,20 @@ export const deleteSubject = async (req, res, next) => {
 export const getSubjectsByClassId = async (req, res, next) => {
   try {
     const { classId } = req.params;
-    
+
     if (!classId || isNaN(parseInt(classId))) {
-      return next(new AppError(400, "Invalid class ID provided"));
+      return next(new ApiError(400, "Invalid class ID provided"));
     }
 
     const subjects = await subjectService.getSubjectsByClassId(classId);
 
-    return res.status(200).json({
-      success: true,
-      data: subjects,
-    });
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        { subjects },
+        'Subjects fetched successfully'
+      )
+    );
   } catch (error) {
     console.error("Error fetching subjects by class ID:", error);
     next(error);
@@ -93,19 +97,22 @@ export const assignSubjectToClasses = async (req, res, next) => {
     const { classes } = req.body;
 
     if (!subjectId || isNaN(parseInt(subjectId))) {
-      return next(new AppError(400, "Invalid subject ID provided"));
+      return next(new ApiError(400, "Invalid subject ID provided"));
     }
 
     if (!classes || !Array.isArray(classes) || classes.length === 0) {
-      return next(new AppError(400, "Classes array is required"));
+      return next(new ApiError(400, "Classes array is required"));
     }
 
     const result = await subjectService.assignSubjectToClasses(subjectId, classes);
-    
-    return res.status(200).json({
-      status: 'success',
-      data: result
-    });
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        { result },
+        'Subject assigned to classes successfully'
+      )
+    );
   } catch (error) {
     next(error);
   }

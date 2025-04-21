@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { ApiError } from '../utils/apiError.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../databases/prismaClient.js';
 
 export class AttendanceService {
     async markSubjectAttendance(studentId, subjectId, isPresent) {

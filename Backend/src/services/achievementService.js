@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
-import { AppError } from '../middlewares/errorHandler.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../databases/prismaClient.js';
+import { ApiError } from '../utils/apiError.js';
 
 export class AchievementService {
     async addAchievement(data) {
@@ -13,7 +11,7 @@ export class AchievementService {
             const to = new Date(toDate);
 
             if (from > to) {
-                throw new AppError(400, 'From date cannot be after to date');
+                throw new ApiError(400, 'From date cannot be after to date');
             }
 
             // Validate achievement type
@@ -22,7 +20,7 @@ export class AchievementService {
             });
 
             if (!achievementType) {
-                throw new AppError(400, 'Invalid achievement type');
+                throw new ApiError(400, 'Invalid achievement type');
             }
 
             // Validate student or teacher exists
@@ -32,7 +30,7 @@ export class AchievementService {
                 });
 
                 if (!student) {
-                    throw new AppError(400, 'Student not found');
+                    throw new ApiError(400, 'Student not found');
                 }
             }
 
@@ -42,7 +40,7 @@ export class AchievementService {
                 });
 
                 if (!teacher) {
-                    throw new AppError(400, 'Teacher not found');
+                    throw new ApiError(400, 'Teacher not found');
                 }
             }
 
@@ -132,7 +130,7 @@ export class AchievementService {
             });
 
             if (!existingAchievement) {
-                throw new AppError(404, 'Achievement not found');
+                throw new ApiError(404, 'Achievement not found');
             }
 
             // Validate date range if dates are being updated
@@ -141,7 +139,7 @@ export class AchievementService {
                 const to = new Date(updateData.toDate || existingAchievement.toDate);
 
                 if (from > to) {
-                    throw new AppError(400, 'From date cannot be after to date');
+                    throw new ApiError(400, 'From date cannot be after to date');
                 }
             }
 
@@ -170,7 +168,7 @@ export class AchievementService {
             });
 
             if (!existingAchievement) {
-                throw new AppError(404, 'Achievement not found');
+                throw new ApiError(404, 'Achievement not found');
             }
 
             // Delete achievement

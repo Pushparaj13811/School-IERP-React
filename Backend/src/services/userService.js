@@ -1,5 +1,5 @@
 import { prisma } from '../databases/prismaClient.js';
-import { AppError } from '../middlewares/errorHandler.js';
+import { ApiError } from '../utils/apiError.js';
 import bcrypt from 'bcryptjs';
 import { config } from '../config/config.js';
 import { generateRandomPassword } from '../utils/passwordGenerator.js';
@@ -78,7 +78,7 @@ export class UserService {
         });
 
         if (!user) {
-            throw new AppError(404, 'User not found');
+            throw new ApiError(404, 'User not found');
         }
 
         return user;
@@ -96,7 +96,7 @@ export class UserService {
         });
 
         if (!user) {
-            throw new AppError(404, 'User not found');
+            throw new ApiError(404, 'User not found');
         }
 
         // Update address if provided
@@ -136,7 +136,7 @@ export class UserService {
             case 'PARENT':
                 return await this.updateParentProfile(user.parent.id, data);
             default:
-                throw new AppError(400, 'Invalid user role');
+                throw new ApiError(400, 'Invalid user role');
         }
     }
 
@@ -146,13 +146,13 @@ export class UserService {
         });
 
         if (!user) {
-            throw new AppError(404, 'User not found');
+            throw new ApiError(404, 'User not found');
         }
 
         // Verify current password
         const isPasswordCorrect = await bcrypt.compare(currentPassword, user.password);
         if (!isPasswordCorrect) {
-            throw new AppError(401, 'Current password is incorrect');
+            throw new ApiError(401, 'Current password is incorrect');
         }
 
         // Hash new password
@@ -168,7 +168,7 @@ export class UserService {
     async updateProfilePicture(userId, fileUrl) {
         console.log('Updating profile picture for user:', userId);
         console.log('With URL:', fileUrl);
-        
+
         try {
             const user = await prisma.user.findUnique({
                 where: { id: userId },
@@ -181,7 +181,7 @@ export class UserService {
             });
 
             if (!user) {
-                throw new AppError(404, 'User not found');
+                throw new ApiError(404, 'User not found');
             }
 
             console.log('User found with role:', user.role);
@@ -246,9 +246,9 @@ export class UserService {
                     });
                     break;
                 default:
-                    throw new AppError(400, 'Invalid user role');
+                    throw new ApiError(400, 'Invalid user role');
             }
-            
+
             console.log('Profile updated successfully');
             return result;
         } catch (error) {
@@ -359,7 +359,7 @@ export class UserService {
         });
 
         if (existingUser) {
-            throw new AppError(400, 'User with this email already exists');
+            throw new ApiError(400, 'User with this email already exists');
         }
 
         // Generate random password
@@ -382,41 +382,41 @@ export class UserService {
         try {
             // First, verify required fields are present
             if (!email || !studentData.name || !studentData.gender || !studentData.rollNo) {
-                throw new AppError(400, 'Missing required fields for student creation');
+                throw new ApiError(400, 'Missing required fields for student creation');
             }
 
             // Verify class and section exist
             if (!studentData.classId || !studentData.sectionId) {
-                throw new AppError(400, 'Class and section are required');
+                throw new ApiError(400, 'Class and section are required');
             }
 
             // Make sure address data is complete
             if (!studentData.address || !studentData.address.addressLine1) {
-                throw new AppError(400, 'Address information is required');
+                throw new ApiError(400, 'Address information is required');
             }
 
             // First create the user
             const { user, password } = await this.createUserWithAutoPassword(email, 'STUDENT');
-            
+
             // Extract fields that are only for the address
-            const { 
+            const {
                 address,
                 parentId,
-                ...otherStudentData 
+                ...otherStudentData
             } = studentData;
-            
+
             // Create the address first
             console.log('Creating address:', address);
             const createdAddress = await prisma.address.create({
                 data: address
             });
-            
+
             if (!createdAddress || !createdAddress.id) {
-                throw new AppError(500, 'Failed to create address record');
+                throw new ApiError(500, 'Failed to create address record');
             }
-            
+
             console.log('Address created with ID:', createdAddress.id);
-            
+
             // Format dateOfBirth properly to ISO format
             let formattedData = { ...otherStudentData };
             if (formattedData.dateOfBirth) {
@@ -426,7 +426,7 @@ export class UserService {
                 }
                 console.log('Formatted date of birth:', formattedData.dateOfBirth);
             }
-            
+
             // Create student with correct relationships
             const studentCreateData = {
                 userId: user.id,
@@ -434,30 +434,30 @@ export class UserService {
                 ...formattedData,
                 addressId: createdAddress.id
             };
-            
+
             // Add parent relation only if parentId is provided
             if (parentId) {
                 studentCreateData.parentId = parseInt(parentId);
             }
-            
+
             console.log('Creating student with data:', studentCreateData);
-            
+
             // Create the student record
             const student = await prisma.student.create({
                 data: studentCreateData
             });
-            
+
             console.log('Student created successfully with ID:', student.id);
 
             return { user, password };
         } catch (error) {
             console.error('Error in createStudentWithAutoPassword:', error);
-            
+
             // Clean up if user was created but student creation failed
             if (error.code === 'P2002') {
-                throw new AppError(400, `Duplicate entry: ${error.meta?.target?.[0] || 'A record with this information'} already exists`);
+                throw new ApiError(400, `Duplicate entry: ${error.meta?.target?.[0] || 'A record with this information'} already exists`);
             }
-            
+
             throw error;
         }
     }
@@ -466,14 +466,14 @@ export class UserService {
         try {
             // First create the user
             const { user, password } = await this.createUserWithAutoPassword(email, 'PARENT');
-            
+
             // Extract fields that are only for the address and children
-            const { 
+            const {
                 address,
                 children,
-                ...otherParentData 
+                ...otherParentData
             } = parentData;
-            
+
             // Create the address first if provided
             let addressId;
             if (address) {
@@ -482,13 +482,13 @@ export class UserService {
                 });
                 addressId = createdAddress.id;
             }
-            
+
             // Format date fields if needed
             let formattedData = { ...otherParentData };
             if (formattedData.dateOfBirth && formattedData.dateOfBirth.length === 10) {
                 formattedData.dateOfBirth = new Date(`${formattedData.dateOfBirth}T00:00:00Z`).toISOString();
             }
-            
+
             // Create parent with correct relationships
             const parentCreateData = {
                 userId: user.id,
@@ -496,12 +496,12 @@ export class UserService {
                 ...formattedData,
                 ...(addressId ? { addressId } : {})
             };
-            
+
             // Create the parent record
             const parent = await prisma.parent.create({
                 data: parentCreateData
             });
-            
+
             // Connect children to parent if provided
             if (children && Array.isArray(children) && children.length > 0) {
                 // Update each child to connect to this parent
@@ -516,12 +516,12 @@ export class UserService {
             return { user, password };
         } catch (error) {
             console.error('Error in createParentWithAutoPassword:', error);
-            
+
             // Clean up if user was created but parent creation failed
             if (error.code === 'P2002') {
-                throw new AppError(400, `Duplicate entry: ${error.meta?.target?.[0] || 'A record with this information'} already exists`);
+                throw new ApiError(400, `Duplicate entry: ${error.meta?.target?.[0] || 'A record with this information'} already exists`);
             }
-            
+
             throw error;
         }
     }
@@ -530,16 +530,16 @@ export class UserService {
         try {
             // First create the user
             const { user, password } = await this.createUserWithAutoPassword(email, 'TEACHER');
-            
+
             // Extract fields that are only for the address
-            const { 
+            const {
                 address,
                 subjects,
                 classes,
                 sections,
-                ...otherTeacherData 
+                ...otherTeacherData
             } = teacherData;
-            
+
             // Create the address first if provided
             let addressId;
             if (address) {
@@ -548,7 +548,7 @@ export class UserService {
                 });
                 addressId = createdAddress.id;
             }
-            
+
             // Format date fields properly
             let formattedData = { ...otherTeacherData };
             if (formattedData.dateOfBirth && formattedData.dateOfBirth.length === 10) {
@@ -557,7 +557,7 @@ export class UserService {
             if (formattedData.joinDate && formattedData.joinDate.length === 10) {
                 formattedData.joinDate = new Date(`${formattedData.joinDate}T00:00:00Z`).toISOString();
             }
-            
+
             // Create teacher with correct relationships
             const teacherCreateData = {
                 userId: user.id,
@@ -565,12 +565,12 @@ export class UserService {
                 ...formattedData,
                 ...(addressId ? { addressId } : {})
             };
-            
+
             // Create the teacher record
             const teacher = await prisma.teacher.create({
                 data: teacherCreateData
             });
-            
+
             // Connect subjects if provided
             if (subjects && Array.isArray(subjects) && subjects.length > 0) {
                 for (const subjectId of subjects) {
@@ -582,7 +582,7 @@ export class UserService {
                     });
                 }
             }
-            
+
             // Connect classes if provided
             if (classes && Array.isArray(classes) && classes.length > 0) {
                 for (const classId of classes) {
@@ -594,7 +594,7 @@ export class UserService {
                     });
                 }
             }
-            
+
             // Connect sections if provided
             if (sections && Array.isArray(sections) && sections.length > 0) {
                 for (const sectionId of sections) {
@@ -610,12 +610,12 @@ export class UserService {
             return { user, password };
         } catch (error) {
             console.error('Error in createTeacherWithAutoPassword:', error);
-            
+
             // Clean up if user was created but teacher creation failed
             if (error.code === 'P2002') {
-                throw new AppError(400, `Duplicate entry: ${error.meta?.target?.[0] || 'A record with this information'} already exists`);
+                throw new ApiError(400, `Duplicate entry: ${error.meta?.target?.[0] || 'A record with this information'} already exists`);
             }
-            
+
             throw error;
         }
     }
