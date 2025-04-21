@@ -31,14 +31,52 @@ interface CalendarDay {
   isHoliday: boolean;
 }
 
-interface MonthlyAttendanceResponse {
-  attendance: {
-    month: string;
-    year: number;
-    presentCount: number;
-    absentCount: number;
-    percentage: number;
+// API response interfaces with more flexible types to handle different formats
+interface AttendanceRecord {
+  studentId?: number;
+  student?: { id: number; name?: string };
+  present?: number;
+  absent?: number;
+  late?: number;
+  halfDay?: number;
+  excused?: number;
+  percentage?: number;
+  presentCount?: number;
+  absentCount?: number;
+  year?: number;
+  date?: string;
+  status?: string;
+  remarks?: string;
+  id?: number;
+  [key: string]: unknown;
+}
+
+// Type for API responses to avoid unsafe type assertions
+interface ApiResponseType {
+  data: {
+    status: string;
+    data: {
+      attendance?: AttendanceRecord[];
+      [key: string]: unknown;
+    };
   }
+}
+
+// Update the MonthlyAttendanceSummary interface to match the API response
+interface MonthlyAttendanceSummary {
+  studentId?: number;
+  student?: { id: number; name?: string };
+  studentName?: string;
+  rollNumber?: string;
+  present?: number;
+  absent?: number;
+  late?: number;
+  excused?: number;
+  halfDay?: number;
+  total?: number;
+  percentage?: number;
+  year?: number;
+  [key: string]: unknown; // Add index signature for flexible property access
 }
 
 const Attendance: React.FC = () => {
@@ -62,7 +100,7 @@ const Attendance: React.FC = () => {
   useEffect(() => {
     generateCalendarDays(currentMonth);
   }, [currentMonth, recentAttendance]);
-  
+   
   const fetchAttendanceData = async () => {
     try {
       setIsLoading(true);
@@ -99,63 +137,101 @@ const Attendance: React.FC = () => {
       
       // Fetch current month's attendance
       try {
+        console.log(`Fetching monthly attendance for studentId ${targetStudentId}, month ${today.getMonth() + 1}, year ${currentYear}`);
+        
         const monthlyResponse = await attendanceAPI.getMonthlyAttendance({
           month: today.getMonth() + 1,
           year: currentYear,
           studentId: targetStudentId
         });
         
-        if (monthlyResponse.data?.status === 'success') {
-          // Type assertion to tell TypeScript about the correct structure
-          const responseData = monthlyResponse.data.data as unknown as MonthlyAttendanceResponse;
-          if (responseData.attendance) {
-            // Format monthly data
-            const data = responseData.attendance;
-            setMonthlyAttendance([
-              {
-                month: format(new Date(data.month), 'MMMM yyyy'),
-                year: data.year,
-                presentCount: data.presentCount || 0,
-                absentCount: data.absentCount || 0,
-                percentage: data.percentage || 0
-              }
-            ]);
-          } else {  
-            // Set default values if no data
-            setMonthlyAttendance([
-              {
-                month: format(today, 'MMMM yyyy'),
-                year: currentYear,
-                presentCount: 0,
-                absentCount: 0,
-                percentage: 0
-              }
-            ]);
+        if (monthlyResponse?.data?.status === 'success') {
+          // Check which format the API returned
+          if (Array.isArray(monthlyResponse.data?.data)) {
+            // New API format: direct array of student attendance summaries
+            console.log('Processing array response format');
+            // Fix the type mismatch by properly casting the array first
+            const attendanceData = monthlyResponse.data.data as unknown as MonthlyAttendanceSummary[];
+            const studentSummary = attendanceData.find((item) => {
+              // Look for matching student in attendance records
+              return (
+                Number(item.studentId) === targetStudentId || 
+                (item.student && typeof item.student === 'object' && 
+                'id' in item.student && Number((item.student as {id: number}).id) === targetStudentId)
+              );
+            });
+            
+            if (studentSummary) {
+              console.log('Found student summary in array:', studentSummary);
+              
+              // Use the process function to correctly extract attendance data
+              const processedData = processMonthlyAttendance(studentSummary);
+              
+              // Create standardized monthly attendance object
+              setMonthlyAttendance([
+                {
+                  month: format(today, 'MMMM yyyy'),
+                  year: currentYear,
+                  presentCount: processedData.presentCount,
+                  absentCount: processedData.absentCount,
+                  percentage: processedData.percentage
+                }
+              ]);
+            } else {
+              console.log('No matching student found in array data');
+              // Set default values if student not found
+              setDefaultMonthlyAttendance(today, currentYear);
+            }
+          } else if (monthlyResponse.data?.data && typeof monthlyResponse.data.data === 'object') {
+            const responseData = monthlyResponse.data.data as Record<string, unknown>;
+            
+            if (responseData.attendance) {
+              // Old API format: nested attendance object
+              console.log('Processing nested object response format');
+              const attendanceData = responseData.attendance as Record<string, unknown>;
+              
+              // Create standardized monthly attendance object
+              setMonthlyAttendance([
+                {
+                  month: format(today, 'MMMM yyyy'),
+                  year: currentYear,
+                  presentCount: typeof attendanceData.presentCount === 'number' ? attendanceData.presentCount : 0,
+                  absentCount: typeof attendanceData.absentCount === 'number' ? attendanceData.absentCount : 0,
+                  percentage: typeof attendanceData.percentage === 'number' ? 
+                    attendanceData.percentage : calculatePercentage(attendanceData)
+                }
+              ]);
+            } else {
+              // Direct object format
+              console.log('Processing direct object response format');
+              
+              // Create standardized monthly attendance object
+              setMonthlyAttendance([
+                {
+                  month: format(today, 'MMMM yyyy'),
+                  year: currentYear,
+                  presentCount: 
+                    typeof responseData.presentCount === 'number' ? responseData.presentCount : 
+                    typeof responseData.present === 'number' ? responseData.present : 0,
+                  absentCount: 
+                    typeof responseData.absentCount === 'number' ? responseData.absentCount : 
+                    typeof responseData.absent === 'number' ? responseData.absent : 0,
+                  percentage: typeof responseData.percentage === 'number' ? 
+                    responseData.percentage : calculatePercentage(responseData)
+                }
+              ]);
+            }
+          } else {
+            console.log('Unrecognized API response format:', monthlyResponse.data);
+            setDefaultMonthlyAttendance(today, currentYear);
           }
         } else {
-          // Continue with daily attendance even if monthly fails
-          setMonthlyAttendance([
-            {
-              month: format(today, 'MMMM yyyy'),
-              year: currentYear,
-              presentCount: 0,
-              absentCount: 0,
-              percentage: 0
-            }
-          ]);
+          console.log('API returned non-success status for monthly attendance');
+          setDefaultMonthlyAttendance(today, currentYear);
         }
       } catch (monthlyErr) {
         console.error('Error fetching monthly attendance:', monthlyErr);
-        // Continue with daily attendance even if monthly fails
-        setMonthlyAttendance([
-          {
-            month: format(today, 'MMMM yyyy'),
-            year: currentYear,
-            presentCount: 0,
-            absentCount: 0,
-            percentage: 0
-          }
-        ]);
+        setDefaultMonthlyAttendance(today, currentYear);
       }
       
       // Fetch last 30 days of attendance
@@ -165,41 +241,112 @@ const Attendance: React.FC = () => {
         thirtyDaysAgo.setFullYear(currentYear);
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
-        // Log the date range we're using for debugging
-        console.log(`Fetching attendance for studentId ${targetStudentId} from ${format(thirtyDaysAgo, 'yyyy-MM-dd')} to ${format(today, 'yyyy-MM-dd')}`);
+        console.log(`Fetching daily attendance for studentId ${targetStudentId} from ${format(thirtyDaysAgo, 'yyyy-MM-dd')} to ${format(today, 'yyyy-MM-dd')}`);
         
-        // First, attempt to get student class and section since backend requires them
+        // First, attempt to get student class and section
         const student = await userAPI.getStudentById(targetStudentId);
         if (student?.data?.status === 'success' && student?.data?.data?.student) {
           const studentData = student.data.data.student;
           const classId = studentData.classId || studentData.class?.id;
           const sectionId = studentData.sectionId || studentData.section?.id;
           
-          // Check if we have the required class and section IDs
+          console.log(`Student belongs to classId=${classId}, sectionId=${sectionId}`);
+          
           if (classId && sectionId) {
-            // Use the class/section approach since student-specific endpoint needs these
-            const dailyResponse = await attendanceAPI.getDailyAttendance({
-              date: format(today, 'yyyy-MM-dd'), // Use current date
-              classId,
-              sectionId,
-              studentId: targetStudentId // Include studentId for filtering
+            // Try to get attendance for the last 30 days
+            const attendancePromises = [];
+            
+            // Get the current date and the date 30 days ago
+            const endDate = new Date(today);
+            const startDate = new Date(thirtyDaysAgo);
+            
+            // Use a loop to fetch attendance for each day in the last 30 days
+            for (let i = 0; i < 30; i++) {
+              const currentDate = new Date(endDate);
+              currentDate.setDate(endDate.getDate() - i);
+              
+              // Skip if the date is before start date
+              if (currentDate < startDate) continue;
+              
+              const formattedDate = format(currentDate, 'yyyy-MM-dd');
+              
+              attendancePromises.push(
+                attendanceAPI.getDailyAttendance({
+                  date: formattedDate,
+                  classId,
+                  sectionId,
+                  studentId: targetStudentId
+                }).catch(err => {
+                  console.log(`Error fetching attendance for ${formattedDate}:`, err);
+                  return null; // Return null for failed requests
+                })
+              );
+            }
+            
+            // Wait for all requests to complete
+            const attendanceResponses = await Promise.all(attendancePromises);
+            console.log(`Received ${attendanceResponses.length} daily attendance responses`);
+            
+            // Process all responses to gather attendance records
+            const allAttendanceRecords: DailyAttendance[] = [];
+            
+            attendanceResponses.forEach((response: unknown) => {
+              // Fix the type errors with proper type checking
+              if (response && 
+                  typeof response === 'object' && 
+                  'data' in response && 
+                  response.data && 
+                  typeof response.data === 'object' && 
+                  'status' in response.data && 
+                  (response.data as { status: unknown }).status === 'success' &&
+                  'data' in response.data) {
+                
+                const responseWithData = response as ApiResponseType;
+                const attendanceData = responseWithData.data.data;
+                
+                if (attendanceData && 
+                    typeof attendanceData === 'object' && 
+                    'attendance' in attendanceData && 
+                    Array.isArray(attendanceData.attendance)) {
+                  
+                  // Filter for this student's records
+                  const attendance = attendanceData.attendance;
+                  const studentRecords = attendance
+                    .filter((record: AttendanceRecord) => {
+                      return Number(record.studentId) === targetStudentId || 
+                             (record.student && typeof record.student === 'object' && 
+                              'id' in record.student && Number((record.student as {id: number}).id) === targetStudentId);
+                    })
+                    .map((record: AttendanceRecord) => {
+                      // Convert to proper DailyAttendance type
+                      return { 
+                        id: typeof record.id === 'number' ? record.id : 0,
+                        date: typeof record.date === 'string' ? record.date : new Date().toISOString(),
+                        status: (record.status as DailyAttendance['status']) || 'REMAINING',
+                        remarks: typeof record.remarks === 'string' ? record.remarks : undefined
+                      } as DailyAttendance;
+                    });
+                  
+                  allAttendanceRecords.push(...studentRecords);
+                }
+              }
             });
             
-            if (dailyResponse.data?.status === 'success' && Array.isArray(dailyResponse.data?.data?.attendance)) {
-              // Filter attendance for this specific student if needed
-              const studentAttendance = dailyResponse.data.data.attendance.filter(
-                record => record.studentId === targetStudentId || record.student?.id === targetStudentId
-              ).map(record => {
-                // If no status is recorded, mark as REMAINING
-                if (!record.status) {
-                  return { ...record, status: 'REMAINING' as const };
-                }
-                return record;
-              });
-              setRecentAttendance(studentAttendance as DailyAttendance[]);
-            } else {
-              setRecentAttendance([]);
-            }
+            console.log(`Found ${allAttendanceRecords.length} attendance records for student in the last 30 days`);
+            
+            // Remove duplicates (in case same day appears multiple times)
+            const uniqueAttendance = allAttendanceRecords.reduce((acc, current) => {
+              const existing = acc.find(item => item.date === current.date);
+              if (!existing) {
+                acc.push(current);
+              }
+              return acc;
+            }, [] as DailyAttendance[]);
+            
+            setRecentAttendance(uniqueAttendance);
+          } else {
+            console.error('Missing classId or sectionId required for attendance fetch');
+            setRecentAttendance([]);
           }
         } else {
           console.error('Could not fetch student class/section data');
@@ -216,6 +363,19 @@ const Attendance: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  // Helper function to set default monthly attendance
+  const setDefaultMonthlyAttendance = (today: Date, year: number) => {
+    setMonthlyAttendance([
+      {
+        month: format(today, 'MMMM yyyy'),
+        year: year,
+        presentCount: 0,
+        absentCount: 0,
+        percentage: 0
+      }
+    ]);
   };
   
   const generateCalendarDays = (month: Date) => {
@@ -251,15 +411,22 @@ const Attendance: React.FC = () => {
     // Generate calendar days
     const days: CalendarDay[] = [];
     
+    // Today's date for comparison
+    const today = new Date();
+    today.setFullYear(currentYear);
+    today.setHours(0, 0, 0, 0);
+    
     // Add days from previous month
     for (let i = 0; i < daysFromPrevMonth; i++) {
       const date = new Date(calendarStart);
       date.setDate(date.getDate() + i);
       
+      const isWeekend = date.getDay() === 6;
+      
       days.push({
         date,
         isCurrentMonth: false,
-        isWeekend: date.getDay() === 0 || date.getDay() === 6,
+        isWeekend,
         isHoliday: false // Would need to check against holiday API
       });
     }
@@ -267,22 +434,40 @@ const Attendance: React.FC = () => {
     // Add days from current month
     for (let i = 0; i < totalDaysInCurrentMonth; i++) {
       const date = new Date(year, monthIndex, i + 1);
+      date.setHours(0, 0, 0, 0);
+      
+      const isWeekend = date.getDay() === 6;
+      const isPast = date < today;
       
       // Check if attendance exists for this day
-      const attendance = recentAttendance.find(a => {
-        const attendanceDate = new Date(a.date);
-        return (
-          attendanceDate.getDate() === date.getDate() &&
-          attendanceDate.getMonth() === date.getMonth() &&
-          attendanceDate.getFullYear() === date.getFullYear()
-        );
-      });
+      let attendanceStatus: CalendarDay['status'] = undefined;
+      
+      // Only set status for non-weekend days
+      if (!isWeekend) {
+        // Look for attendance record for this date
+        const attendance = recentAttendance.find(a => {
+          const attendanceDate = new Date(a.date);
+          return (
+            attendanceDate.getDate() === date.getDate() &&
+            attendanceDate.getMonth() === date.getMonth() &&
+            attendanceDate.getFullYear() === date.getFullYear()
+          );
+        });
+        
+        if (attendance) {
+          // Use recorded attendance status
+          attendanceStatus = attendance.status;
+        } else if (isPast) {
+          // For past dates with no record, mark as REMAINING
+          attendanceStatus = 'REMAINING';
+        }
+      }
       
       days.push({
         date,
-        status: attendance?.status,
+        status: attendanceStatus,
         isCurrentMonth: true,
-        isWeekend: date.getDay() === 0 || date.getDay() === 6,
+        isWeekend,
         isHoliday: false // Would need to check against holiday API
       });
     }
@@ -293,10 +478,12 @@ const Attendance: React.FC = () => {
       const date = new Date(nextMonthStart);
       date.setDate(date.getDate() + i);
       
+      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+      
       days.push({
         date,
         isCurrentMonth: false,
-        isWeekend: date.getDay() === 0 || date.getDay() === 6,
+        isWeekend,
         isHoliday: false // Would need to check against holiday API
       });
     }
@@ -368,6 +555,54 @@ const Attendance: React.FC = () => {
       }
     }
   ];
+
+  // Helper function to calculate attendance percentage
+  const calculatePercentage = (data: Record<string, unknown>): number => {
+    // Safely get values using type guards and fallbacks
+    const present = 
+      typeof data.present === 'number' ? data.present : 
+      typeof data.presentCount === 'number' ? data.presentCount : 0;
+    
+    const absent = 
+      typeof data.absent === 'number' ? data.absent : 
+      typeof data.absentCount === 'number' ? data.absentCount : 0;
+    
+    const late = typeof data.late === 'number' ? data.late : 0;
+    const halfDay = typeof data.halfDay === 'number' ? data.halfDay : 0;
+    const excused = typeof data.excused === 'number' ? data.excused : 0;
+    
+    // Calculate total using all attendance types
+    const total = present + absent + late + halfDay + excused;
+    
+    // Return 0 if there's no attendance data
+    if (total === 0) return 0;
+    
+    // Calculate and return percentage - counting partial attendance
+    const effectivePresent = present + (late * 0.75) + (halfDay * 0.5);
+    return (effectivePresent / total) * 100;
+  };
+
+  // Process monthly attendance data properly for correct display
+  const processMonthlyAttendance = (data: Record<string, unknown>) => {
+    // Get present and absent days, checking all possible property names
+    const present = 
+      typeof data.present === 'number' ? data.present : 
+      typeof data.presentCount === 'number' ? data.presentCount : 0;
+    
+    const absent = 
+      typeof data.absent === 'number' ? data.absent : 
+      typeof data.absentCount === 'number' ? data.absentCount : 0;
+    
+    // Calculate percentage
+    const percentage = typeof data.percentage === 'number' ? 
+      data.percentage : calculatePercentage(data);
+      
+    return {
+      presentCount: present,
+      absentCount: absent,
+      percentage: percentage
+    };
+  };
 
   return (
     <div className="w-full p-4 bg-[#EEF5FF]">
@@ -460,14 +695,14 @@ const Attendance: React.FC = () => {
                       ${!day.isCurrentMonth ? 'text-gray-400' : ''}
                       ${day.isWeekend ? 'bg-blue-50' : ''}
                       ${day.isHoliday ? 'bg-red-50' : ''}
-                      ${day.status ? getStatusColor(day.status) : ''}
+                      ${!day.isWeekend && !day.isHoliday && day.status ? getStatusColor(day.status) : ''}
                     `}
                     role="gridcell"
-                    aria-label={`${format(day.date, 'EEEE, MMMM d, yyyy')}${day.status ? `, ${day.status}` : ''}`}
+                    aria-label={`${format(day.date, 'EEEE, MMMM d, yyyy')}${day.status ? `, ${day.status}` : ''}${day.isWeekend ? ', Weekend' : ''}${day.isHoliday ? ', Holiday' : ''}`}
                     tabIndex={day.isCurrentMonth ? 0 : -1}
                   >
                     <span className="text-sm">{format(day.date, 'd')}</span>
-                    {day.status && (
+                    {!day.isWeekend && !day.isHoliday && day.status && (
                       <span className="text-xs mt-1 font-medium">
                         {day.status === 'PRESENT' ? 'P' : 
                           day.status === 'ABSENT' ? 'A' : 
@@ -475,6 +710,12 @@ const Attendance: React.FC = () => {
                           day.status === 'HALF_DAY' ? 'H' : 
                           day.status === 'REMAINING' ? 'R' : 'E'}
                       </span>
+                    )}
+                    {day.isWeekend && (
+                      <span className="text-xs mt-1 font-medium text-blue-600">W</span>
+                    )}
+                    {day.isHoliday && (
+                      <span className="text-xs mt-1 font-medium text-red-600">H</span>
                     )}
                   </div>
                 ))}
