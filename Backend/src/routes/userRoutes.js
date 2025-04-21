@@ -1,7 +1,7 @@
 import express from 'express';
-import { getProfile, updateProfile, updatePassword, updateProfilePicture, createUser, createStudent, createParent, createTeacher, getStudents, getParents, getTeachers, getUsers, getStudentById, getTeacherById, getParentById, updateStudent, updateParent, updateTeacher, updateProfilePictureById } from '../controller/userController.js';
-import { protect } from '../middlewares/authMiddleware.js';
-import upload, { createUploader } from '../middlewares/multerMiddleware.js';
+import { getProfile, updateProfile, updatePassword, updateProfilePicture, createUser, createStudent, createParent, createTeacher, getStudents, getParents, getTeachers, getUsers, getStudentById, getTeacherById, getParentById, updateStudent, updateParent, updateTeacher, updateProfilePictureById, downloadUserProfile, toggleUserActiveStatus, toggleStudentActiveStatus, toggleTeacherActiveStatus, toggleParentActiveStatus } from '../controller/userController.js';
+import { protect, restrictTo } from '../middlewares/authMiddleware.js';
+import { createUploader } from '../middlewares/multerMiddleware.js';
 import { ApiError } from '../utils/apiError.js';
 
 const router = express.Router();
@@ -12,8 +12,8 @@ const profilePictureUploader = createUploader('profile-pictures');
 // Custom error handler for multer
 const handleProfilePictureUpload = (req, res, next) => {
     const multerSingle = profilePictureUploader.single('profilePicture');
-    
-    multerSingle(req, res, function(err) {
+
+    multerSingle(req, res, function (err) {
         if (err) {
             console.error('Multer error:', err);
             if (err instanceof multer.MulterError) {
@@ -72,5 +72,14 @@ router.patch('/teachers/:id/profile-picture', handleProfilePictureUpload, (req, 
     req.params.userRole = 'TEACHER';
     next();
 }, updateProfilePictureById);
+
+// Download profile routes
+router.get('/download-profile/:userRole/:id', protect, downloadUserProfile);
+
+// User activation/deactivation
+router.patch('/users/:userId/status', protect, restrictTo('ADMIN'), toggleUserActiveStatus);
+router.patch('/students/:studentId/status', protect, restrictTo('ADMIN'), toggleStudentActiveStatus);
+router.patch('/teachers/:teacherId/status', protect, restrictTo('ADMIN'), toggleTeacherActiveStatus);
+router.patch('/parents/:parentId/status', protect, restrictTo('ADMIN'), toggleParentActiveStatus);
 
 export default router; 
