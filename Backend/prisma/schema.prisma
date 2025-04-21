@@ -17,18 +17,22 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  role      Role     @default(STUDENT)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  Int       @id @default(autoincrement())
+  email               String    @unique
+  password            String
+  role                Role      @default(STUDENT)
+  isActive            Boolean   @default(true)
+  passwordResetToken  String?
+  passwordResetExpires DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   // One-to-one relationships with role-specific models
   student Student?
   teacher Teacher?
   parent  Parent?
   admin   Admin?
+  Report  Report[]
 
   @@map("users")
 }
@@ -98,20 +102,20 @@ model Teacher {
   profilePictureId Int? @unique
 
   // Relations
-  user                   User                     @relation(fields: [userId], references: [id])
-  designation            Designation              @relation(fields: [designationId], references: [id])
-  address                Address                  @relation(fields: [addressId], references: [id])
-  profilePicture         ProfilePicture?          @relation(fields: [profilePictureId], references: [id])
-  subjects               TeacherSubject[]
-  classes                TeacherClass[]
-  sections               TeacherSection[]
-  periods                Period[]
-  classResults           OverallResult[] // For class teacher role
-  markedAttendances      DailyAttendance[]        @relation("TeacherAttendanceMarking")
-  leaveApplications      LeaveApplication[]       @relation("TeacherLeaveApplications")
-  achievements           Achievement[]
-  Feedback               Feedback[]
-  announcements          Announcement[]           @relation("TeacherAnnouncements")
+  user                    User                     @relation(fields: [userId], references: [id])
+  designation             Designation              @relation(fields: [designationId], references: [id])
+  address                 Address                  @relation(fields: [addressId], references: [id])
+  profilePicture          ProfilePicture?          @relation(fields: [profilePictureId], references: [id])
+  subjects                TeacherSubject[]
+  classes                 TeacherClass[]
+  sections                TeacherSection[]
+  periods                 Period[]
+  classResults            OverallResult[] // For class teacher role
+  markedAttendances       DailyAttendance[]        @relation("TeacherAttendanceMarking")
+  leaveApplications       LeaveApplication[]       @relation("TeacherLeaveApplications")
+  achievements            Achievement[]
+  Feedback                Feedback[]
+  announcements           Announcement[]           @relation("TeacherAnnouncements")
   classTeacherAssignments ClassTeacherAssignment[]
 
   @@map("teachers")
@@ -148,15 +152,15 @@ model Class {
   updatedAt DateTime @updatedAt
 
   // Relations
-  students               Student[]
-  sections               Section[]
-  teacherClasses         TeacherClass[]
-  timetables             Timetable[]
-  periods                Period[]
-  dailyAttendances       DailyAttendance[]
-  monthlyAttendances     MonthlyAttendance[]
-  announcements          AnnouncementClass[]
-  subjects               ClassSubject[]
+  students                Student[]
+  sections                Section[]
+  teacherClasses          TeacherClass[]
+  timetables              Timetable[]
+  periods                 Period[]
+  dailyAttendances        DailyAttendance[]
+  monthlyAttendances      MonthlyAttendance[]
+  announcements           AnnouncementClass[]
+  subjects                ClassSubject[]
   classTeacherAssignments ClassTeacherAssignment[]
 
   @@map("classes")
@@ -304,14 +308,14 @@ model Section {
   classId Int
 
   // Relations
-  class                  Class                 @relation(fields: [classId], references: [id])
-  students               Student[]
-  timetables             Timetable[]
-  periods                Period[]
-  dailyAttendances       DailyAttendance[]
-  monthlyAttendances     MonthlyAttendance[]
-  teacherSections        TeacherSection[]
-  announcements          AnnouncementSection[]
+  class                   Class                    @relation(fields: [classId], references: [id])
+  students                Student[]
+  timetables              Timetable[]
+  periods                 Period[]
+  dailyAttendances        DailyAttendance[]
+  monthlyAttendances      MonthlyAttendance[]
+  teacherSections         TeacherSection[]
+  announcements           AnnouncementSection[]
   classTeacherAssignments ClassTeacherAssignment[]
 
   @@unique([classId, name])
@@ -814,4 +818,23 @@ model ClassTeacherAssignment {
 
   @@unique([classId, sectionId])
   @@map("class_teacher_assignments")
+}
+
+// Report model for storing generated reports
+model Report {
+  id          Int      @id @default(autoincrement())
+  title       String
+  type        String // 'attendance', 'performance', 'financial', 'exam'
+  format      String // 'pdf', 'excel', 'csv'
+  filePath    String
+  fileName    String
+  downloadUrl String
+  userId      Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("reports")
 }
