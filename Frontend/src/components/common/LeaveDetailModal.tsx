@@ -3,7 +3,7 @@ import React from "react";
 interface LeaveApplication {
   id: number;
   subject: string;
-  leaveType: {
+  leaveType?: {
     id: number;
     name: string;
     description?: string;

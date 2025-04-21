@@ -73,7 +73,16 @@ const Leave: React.FC = () => {
       });
       
       if (myLeavesResponse.data.status === 'success') {
-        setMyLeaves([...myLeavesResponse.data.data.leaveApplications] as LeaveApplication[]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let myLeavesData: any[] = [];
+        if (Array.isArray(myLeavesResponse.data?.data)) {
+          // New response format: data.data is the array directly
+          myLeavesData = myLeavesResponse.data.data;
+        } else if (Array.isArray(myLeavesResponse.data?.data?.leaveApplications)) {
+          // Old response format: data.data.leaveApplications is the array
+          myLeavesData = myLeavesResponse.data.data.leaveApplications;
+        }
+        setMyLeaves(myLeavesData as LeaveApplication[]);
       }
 
       // Fetch pending student applications
@@ -83,7 +92,16 @@ const Leave: React.FC = () => {
       });
       
       if (pendingStudentLeavesResponse.data.status === 'success') {
-        setPendingStudentLeaves([...pendingStudentLeavesResponse.data.data.leaveApplications] as LeaveApplication[]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let pendingStudentData: any[] = [];
+        if (Array.isArray(pendingStudentLeavesResponse.data?.data)) {
+          // New response format
+          pendingStudentData = pendingStudentLeavesResponse.data.data;
+        } else if (Array.isArray(pendingStudentLeavesResponse.data?.data?.leaveApplications)) {
+          // Old response format
+          pendingStudentData = pendingStudentLeavesResponse.data.data.leaveApplications;
+        }
+        setPendingStudentLeaves(pendingStudentData as LeaveApplication[]);
       }
 
       // Fetch pending teacher applications
@@ -93,7 +111,16 @@ const Leave: React.FC = () => {
       });
       
       if (pendingTeacherLeavesResponse.data.status === 'success') {
-        setPendingTeacherLeaves([...pendingTeacherLeavesResponse.data.data.leaveApplications] as LeaveApplication[]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let pendingTeacherData: any[] = [];
+        if (Array.isArray(pendingTeacherLeavesResponse.data?.data)) {
+          // New response format
+          pendingTeacherData = pendingTeacherLeavesResponse.data.data;
+        } else if (Array.isArray(pendingTeacherLeavesResponse.data?.data?.leaveApplications)) {
+          // Old response format
+          pendingTeacherData = pendingTeacherLeavesResponse.data.data.leaveApplications;
+        }
+        setPendingTeacherLeaves(pendingTeacherData as LeaveApplication[]);
       }
 
       // Fetch processed applications (approved/rejected) for all types
@@ -102,7 +129,16 @@ const Leave: React.FC = () => {
       });
       
       if (processedLeavesResponse.data.status === 'success') {
-        setProcessedLeaves([...processedLeavesResponse.data.data.leaveApplications] as LeaveApplication[]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let processedData: any[] = [];
+        if (Array.isArray(processedLeavesResponse.data?.data)) {
+          // New response format
+          processedData = processedLeavesResponse.data.data;
+        } else if (Array.isArray(processedLeavesResponse.data?.data?.leaveApplications)) {
+          // Old response format
+          processedData = processedLeavesResponse.data.data.leaveApplications;
+        }
+        setProcessedLeaves(processedData as LeaveApplication[]);
       }
     } catch (err) {
       console.error("Error fetching leave applications:", err);

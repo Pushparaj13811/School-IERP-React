@@ -363,33 +363,33 @@ const Holiday: React.FC = () => {
       try {
         console.log("=== DIRECT API DEBUG ===");
         
-        // Check holiday service directly
-        console.log("Checking upcoming holidays from API directly...");
+        // Check holiday service using the API service
+        console.log("Checking upcoming holidays from API service...");
         try {
-          const upcomingRes = await fetch('/api/v1/holidays/upcoming');
-          const upcomingData = await upcomingRes.json();
-          console.log("Direct upcoming holidays API response:", upcomingData);
+          const upcomingResponse = await holidayApi.getUpcomingHolidays();
+          console.log("Upcoming holidays API response:", upcomingResponse.data);
           
-          if (upcomingData.data && upcomingData.data.holidays) {
-            console.log(`Direct API returned ${upcomingData.data.holidays.length} upcoming holidays`);
+          if (upcomingResponse.data?.status === 'success' && 
+              upcomingResponse.data?.data?.holidays) {
+            console.log(`API returned ${upcomingResponse.data.data.holidays.length} upcoming holidays`);
             
-            if (upcomingData.data.holidays.length === 0) {
-              console.log("No upcoming holidays returned directly from API.");
+            if (upcomingResponse.data.data.holidays.length === 0) {
+              console.log("No upcoming holidays returned from API.");
             }
           }
         } catch (upErr) {
-          console.error("Error directly calling upcoming holidays API:", upErr);
+          console.error("Error calling upcoming holidays API:", upErr);
         }
         
         // Check all holidays
-        console.log("Checking all holidays from API directly...");
+        console.log("Checking all holidays from API service...");
         try {
-          const allRes = await fetch('/api/v1/holidays');
-          const allData = await allRes.json();
-          console.log("Direct all holidays API response:", allData);
+          const allResponse = await holidayApi.getHolidays();
+          console.log("All holidays API response:", allResponse.data);
           
-          if (allData.data && allData.data.holidays) {
-            console.log(`Direct API returned ${allData.data.holidays.length} total holidays`);
+          if (allResponse.data?.status === 'success' && 
+              allResponse.data?.data?.holidays) {
+            console.log(`API returned ${allResponse.data.data.holidays.length} total holidays`);
             
             // Try to find upcoming ones
             const today = new Date();
@@ -397,7 +397,7 @@ const Holiday: React.FC = () => {
             futureDate.setDate(today.getDate() + 30);
             
             // Manually check which holidays are upcoming
-            const manualUpcoming = allData.data.holidays.filter((h: HolidayData) => {
+            const manualUpcoming = allResponse.data.data.holidays.filter((h: HolidayData) => {
               try {
                 const holidayDate = new Date(h.fromDate || h.date || '');
                 const isUpcoming = holidayDate >= today && holidayDate <= futureDate;
@@ -426,7 +426,7 @@ const Holiday: React.FC = () => {
             }
           }
         } catch (allErr) {
-          console.error("Error directly calling all holidays API:", allErr);
+          console.error("Error calling all holidays API:", allErr);
         }
         
         console.log("=== END DIRECT API DEBUG ===");

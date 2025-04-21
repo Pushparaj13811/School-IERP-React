@@ -12,6 +12,8 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 
 // Lazy-loaded pages
 const Login = lazy(() => import('./pages/Login'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Unauthorized = lazy(() => import('./pages/Unauthorized'));
 const Logout = lazy(() => import('./pages/Logout'));
 
@@ -32,6 +34,9 @@ const AppRoutes = () => {
           {/* Public routes */}
           <Route element={<PublicLayout />}>
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
           </Route>
           
           {/* Unauthorized page - accessible to everyone */}

@@ -16,7 +16,7 @@ interface LeaveType {
 interface LeaveApplication {
   id: number;
   subject: string;
-  leaveType: LeaveType;
+  leaveType?: LeaveType;
   fromDate: string;
   toDate: string;
   description: string;
@@ -35,11 +35,6 @@ interface LeaveApplication {
       name: string;
     };
   };
-}
-
-// Interface for API response
-interface LeaveResponse {
-  leaveApplications: LeaveApplication[];
 }
 
 const Leave: React.FC = () => {
@@ -96,16 +91,29 @@ const Leave: React.FC = () => {
         studentId: targetStudentId
       });
       
-      if (response.data?.status === 'success' && Array.isArray(response.data?.data?.leaveApplications)) {
-        // Use type assertion to fix TypeScript error
-        const responseData = response.data.data as LeaveResponse;
-        
-        // Log the raw data received
-        console.log('All leave applications received:', responseData.leaveApplications);
-        console.log('Target student ID:', targetStudentId);
-        
+      // Handle both old and new API response formats
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let leaveData: any[] = [];
+      
+      if (response.data?.status === 'success') {
+        if (Array.isArray(response.data?.data)) {
+          // New response format: data.data is the array directly
+          leaveData = response.data.data;
+          console.log('New format - leave applications received:', leaveData);
+        } else if (Array.isArray(response.data?.data?.leaveApplications)) {
+          // Old response format: data.data.leaveApplications is the array
+          leaveData = response.data.data.leaveApplications;
+          console.log('Old format - leave applications received:', leaveData);
+        }
+      }
+      
+      // Log the raw data received
+      console.log('All leave applications received:', leaveData);
+      console.log('Target student ID:', targetStudentId);
+      
+      if (leaveData.length > 0) {
         // Double-check filtering for the specific student in case the API doesn't filter properly
-        const filteredLeaves = responseData.leaveApplications.filter(leave => {
+        const filteredLeaves = leaveData.filter(leave => {
           // Log each leave object to check its structure
           console.log('Leave application:', leave);
           
@@ -131,14 +139,15 @@ const Leave: React.FC = () => {
           return false;
         });
         
-        console.log(`Filtered ${responseData.leaveApplications.length} leaves to ${filteredLeaves.length} for student ID ${targetStudentId}`);
+        console.log(`Filtered ${leaveData.length} leaves to ${filteredLeaves.length} for student ID ${targetStudentId}`);
         
         // If we filtered out leaves and we're viewing as a parent, show a warning
-        if (studentId && responseData.leaveApplications.length > filteredLeaves.length) {
-          setFilterWarning(`Filtered out ${responseData.leaveApplications.length - filteredLeaves.length} leave applications that didn't belong to this student.`);
+        if (studentId && leaveData.length > filteredLeaves.length) {
+          setFilterWarning(`Filtered out ${leaveData.length - filteredLeaves.length} leave applications that didn't belong to this student.`);
         }
         
-        setLeaveApplications(filteredLeaves);
+        // Cast the filtered leaves to the expected type
+        setLeaveApplications(filteredLeaves as unknown as LeaveApplication[]);
       } else {
         setLeaveApplications([]);
       }
@@ -152,7 +161,8 @@ const Leave: React.FC = () => {
   };
 
   const handleViewDetails = (leave: LeaveApplication) => {
-    setSelectedLeave(leave);
+    // Use a more specific type definition
+    setSelectedLeave(leave as unknown as LeaveApplication);
     setIsDetailModalOpen(true);
   };
 

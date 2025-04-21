@@ -4,6 +4,7 @@ import { userService, UserProfile } from '../../services/userService';
 import { userAPI } from '../../services/api';
 import { Teacher, Subject } from '../../types/api';
 import Button from '../../components/ui/Button';
+import { toast } from 'react-toastify';
 
 // Define interface for teacher profile data from API response
 interface TeacherWithAddress extends Teacher {
@@ -78,6 +79,34 @@ const TeacherProfile: React.FC = () => {
     fetchTeacherData();
   }, [id]);
 
+  const handleDownloadProfile = async () => {
+    try {
+      if (!teacher) {
+        toast.error("Teacher data not found");
+        return;
+      }
+      
+      let teacherId: number;
+      if (isOwnProfile) {
+        const profile = teacher as UserProfile;
+        if (profile.roleSpecificData && 'id' in profile.roleSpecificData) {
+          teacherId = profile.roleSpecificData.id as number;
+        } else {
+          toast.error("Teacher ID not found");
+          return;
+        }
+      } else {
+        teacherId = (teacher as TeacherWithAddress).id;
+      }
+      
+      await userService.downloadProfile('TEACHER', teacherId);
+      toast.success("Profile download initiated");
+    } catch (error) {
+      console.error("Error downloading profile:", error);
+      toast.error("Failed to download profile");
+    }
+  };
+
   if (loading) {
     return <Spinner />;
   }
@@ -147,8 +176,9 @@ const TeacherProfile: React.FC = () => {
                 <Button
                   variant='primary'
                   className='w-full'
+                  onClick={handleDownloadProfile}
                 >
-                  Download Pdf
+                  Download Profile
                 </Button>
                 {isOwnProfile && (
                   <Button
