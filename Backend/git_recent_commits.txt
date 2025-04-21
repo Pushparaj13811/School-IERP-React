@@ -1,0 +1,25 @@
+e670c9d feat: add Forgot Password and Reset Password routes; implement lazy loading for improved performance
+5d37a3d feat: implement profile download feature for teachers; enhance error handling and user feedback with toast notifications
+756889f feat: enhance Dashboard component with improved accessibility features; add keyboard navigation support, ARIA attributes, and role definitions for better user experience
+dd4b709 feat: add Reset Password page with token validation, password strength requirements, and user feedback; implement error handling and success notifications
+7c3d9d0 feat: implement activation/deactivation functionality for Students and Teachers lists; refactor action handling and improve user feedback with toast notifications
+5aef6b7 feat: enhance Button and Table components with improved accessibility features; add ARIA attributes, keyboard navigation support, and customizable cell rendering for better user experience
+3deea75 feat: enhance LeaveApplicationForm with improved accessibility features, keyboard navigation for form submission, and better error handling; refactor form elements for clarity and user experience
+a74b665 feat: enhance Navbar component with user dropdown menu functionality; add accessibility features and improve user interaction with keyboard navigation and click outside detection
+653dbd9 feat: add Forgot Password page with email validation and API integration; enhance user feedback with success and error notifications
+f9a885e feat: enhance ParentsList component with activation/deactivation functionality; refactor navigation and improve user feedback with toast notifications
+63aec2d feat: implement profile download feature for parents; enhance user feedback with toast notifications and refactor button component for improved UI consistency
+b389351 feat: add profile download functionality for students; implement error handling and user feedback for download process
+dcb05f2 feat: implement report service for generating and downloading various report types; add methods for fetching recent reports and chart data, along with data structures for report and chart data management
+6143ccf feat: refactor API service to use centralized axios instance; add user activation status management and new password recovery endpoints; enhance user profile download functionality
+44e8753 feat: update package dependencies and enhance ConfirmationModal with accessibility features; add focus management and keyboard navigation support
+5a8d1be feat: enhance authentication service to check user activation status during login; improve password validation to enforce complexity requirements; update email templates for better button styling and layout
+97b22fe feat: enhance attendance service with new methods for daily attendance management, authorization checks, and attendance statistics; refactor error handling and improve input validation
+500081c feat: implement report generation service and routes for attendance, performance, financial, and exam reports; add data fetching methods and chart data retrieval for enhanced reporting capabilities
+359a1e5 feat: add user profile download functionality and user activation status management; enhance password validation and include isActive status in user data responses
+4ebd52e feat: implement report generation and data fetching controllers for attendance, performance, financial, and exam reports; add chart data retrieval functionality
+8f1a760 fix: convert studentId to a number in getOverallResult to resolve Prisma type error
+5cda71e feat: add report routes to app and enhance attendance controller with new daily attendance and statistics features; improve password reset validation
+8423956 feat: add User model enhancements with password reset fields and isActive status; introduce Report model for generated reports
+1c5d273 chore: update dependencies in package.json and package-lock.json; add csv-writer, exceljs, html2canvas, jspdf, and pdfkit; update .gitignore to include reports directory
+f0e487e feat: enhance Leave component to support detailed leave application filtering by student; add warning for filtered applications and improve TypeScript typings
