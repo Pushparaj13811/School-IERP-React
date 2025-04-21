@@ -1,5 +1,5 @@
 import { prisma } from '../databases/prismaClient.js';
-import { AppError } from '../middlewares/errorHandler.js';
+import { ApiError } from '../utils/apiError.js';
 
 export class SubjectService {
     async createSubject(data) {
@@ -9,7 +9,7 @@ export class SubjectService {
             });
 
             if (existingSubject) {
-                throw new AppError(400, `Subject with code '${data.code}' already exists`);
+                throw new ApiError(400, `Subject with code '${data.code}' already exists`);
             }
 
             const newSubject = await prisma.subject.create({
@@ -27,8 +27,8 @@ export class SubjectService {
 
             return newSubject;
         } catch (error) {
-            if (error instanceof AppError) throw error;
-            throw new AppError(500, 'Failed to create subject');
+            if (error instanceof ApiError) throw error;
+            throw new ApiError(500, 'Failed to create subject');
         }
     }
 
@@ -41,7 +41,7 @@ export class SubjectService {
             });
             return subjects;
         } catch (error) {
-            throw new AppError(500, 'Failed to fetch subjects');
+            throw new ApiError(500, 'Failed to fetch subjects');
         }
     }
 
@@ -59,13 +59,13 @@ export class SubjectService {
             });
 
             if (!subject) {
-                throw new AppError(404, 'Subject not found');
+                throw new ApiError(404, 'Subject not found');
             }
 
             return subject;
         } catch (error) {
-            if (error instanceof AppError) throw error;
-            throw new AppError(500, 'Failed to fetch subject');
+            if (error instanceof ApiError) throw error;
+            throw new ApiError(500, 'Failed to fetch subject');
         }
     }
 
@@ -81,7 +81,7 @@ export class SubjectService {
                 });
 
                 if (existingSubject) {
-                    throw new AppError(400, `Subject with code '${data.code}' already exists`);
+                    throw new ApiError(400, `Subject with code '${data.code}' already exists`);
                 }
             }
 
@@ -102,10 +102,10 @@ export class SubjectService {
             return updatedSubject;
         } catch (error) {
             if (error.code === 'P2025') {
-                throw new AppError(404, 'Subject not found');
+                throw new ApiError(404, 'Subject not found');
             }
-            if (error instanceof AppError) throw error;
-            throw new AppError(500, 'Failed to update subject');
+            if (error instanceof ApiError) throw error;
+            throw new ApiError(500, 'Failed to update subject');
         }
     }
 
@@ -120,13 +120,13 @@ export class SubjectService {
             await prisma.subject.delete({
                 where: { id: parseInt(id) }
             });
-            
+
             return { message: 'Subject deleted successfully' };
         } catch (error) {
             if (error.code === 'P2025') {
-                throw new AppError(404, 'Subject not found');
+                throw new ApiError(404, 'Subject not found');
             }
-            throw new AppError(500, 'Failed to delete subject');
+            throw new ApiError(500, 'Failed to delete subject');
         }
     }
 
@@ -143,7 +143,7 @@ export class SubjectService {
 
             return subjects.map(item => item.subject);
         } catch (error) {
-            throw new AppError(500, 'Failed to fetch subjects by class ID');
+            throw new ApiError(500, 'Failed to fetch subjects by class ID');
         }
     }
 
@@ -167,7 +167,7 @@ export class SubjectService {
 
             return { message: 'Subject assigned to classes successfully' };
         } catch (error) {
-            throw new AppError(500, 'Failed to assign subject to classes');
+            throw new ApiError(500, 'Failed to assign subject to classes');
         }
     }
 

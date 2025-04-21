@@ -1,5 +1,6 @@
 import { AchievementService } from '../services/achievementService.js';
-import { AppError } from '../middlewares/errorHandler.js';
+import { ApiError } from '../utils/apiError.js';
+import { ApiResponse } from '../utils/apiResponse.js';
 
 const achievementService = new AchievementService();
 
@@ -8,11 +9,11 @@ export const addAchievement = async (req, res, next) => {
         const { activityType, title, organization, numberOfDays, fromDate, toDate, description, testimonial, achievementTypeId, certificateUrl, studentId, teacherId } = req.body;
         
         if (!activityType || !title || !organization || !fromDate || !toDate || !description || !achievementTypeId) {
-            return next(new AppError(400, 'Please provide all required fields'));
+            return next(new ApiError(400, 'Please provide all required fields'));
         }
 
         if (!studentId && !teacherId) {
-            return next(new AppError(400, 'Please provide either studentId or teacherId'));
+            return next(new ApiError(400, 'Please provide either studentId or teacherId'));
         }
 
         const achievement = await achievementService.addAchievement({
@@ -30,10 +31,15 @@ export const addAchievement = async (req, res, next) => {
             teacherId
         });
         
-        res.status(201).json({
-            status: 'success',
-            data: { achievement }
-        });
+        return res
+            .status(201)
+            .json(
+                new ApiResponse(
+                    201,
+                    achievement,
+                    'Achievement created successfully'
+                )
+            );
     } catch (error) {
         next(error);
     }
@@ -51,10 +57,15 @@ export const getAchievements = async (req, res, next) => {
             endDate
         });
         
-        res.status(200).json({
-            status: 'success',
-            data: { achievements }
-        });
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    achievements,
+                    'Achievements fetched successfully'
+                )
+            );
     } catch (error) {
         next(error);
     }
@@ -67,10 +78,15 @@ export const updateAchievement = async (req, res, next) => {
         
         const achievement = await achievementService.updateAchievement(id, updateData);
         
-        res.status(200).json({
-            status: 'success',
-            data: { achievement }
-        });
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    achievement,
+                    'Achievement updated successfully'
+                )
+            );
     } catch (error) {
         next(error);
     }
@@ -82,10 +98,15 @@ export const deleteAchievement = async (req, res, next) => {
         
         await achievementService.deleteAchievement(id);
         
-        res.status(204).json({
-            status: 'success',
-            data: null
-        });
+        return res
+            .status(204)
+            .json(
+                new ApiResponse(
+                    204,
+                    null,
+                    'Achievement deleted successfully'
+                )
+            );
     } catch (error) {
         next(error);
     }

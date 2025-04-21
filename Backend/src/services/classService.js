@@ -1,5 +1,5 @@
 import { prisma } from '../databases/prismaClient.js';
-import { AppError } from '../middlewares/errorHandler.js';
+import { ApiError } from '../utils/apiError.js';
 
 export class ClassService {
     async createClass(data) {
@@ -11,7 +11,7 @@ export class ClassService {
             });
             return newClass;
         } catch (error) {
-            throw new AppError(500, 'Failed to create class');
+            throw new ApiError(500, 'Failed to create class');
         }
     }
 
@@ -25,7 +25,7 @@ export class ClassService {
             });
             return classes;
         } catch (error) {
-            throw new AppError(500, 'Failed to fetch classes');
+            throw new ApiError(500, 'Failed to fetch classes');
         }
     }
 
@@ -40,13 +40,13 @@ export class ClassService {
             });
 
             if (!classData) {
-                throw new AppError(404, 'Class not found');
+                throw new ApiError(404, 'Class not found');
             }
 
             return classData;
         } catch (error) {
-            if (error instanceof AppError) throw error;
-            throw new AppError(500, 'Failed to fetch class');
+            if (error instanceof ApiError) throw error;
+            throw new ApiError(500, 'Failed to fetch class');
         }
     }
 
@@ -61,9 +61,9 @@ export class ClassService {
             return updatedClass;
         } catch (error) {
             if (error.code === 'P2025') {
-                throw new AppError(404, 'Class not found');
+                throw new ApiError(404, 'Class not found');
             }
-            throw new AppError(500, 'Failed to update class');
+            throw new ApiError(500, 'Failed to update class');
         }
     }
 
@@ -75,9 +75,9 @@ export class ClassService {
             return { message: 'Class deleted successfully' };
         } catch (error) {
             if (error.code === 'P2025') {
-                throw new AppError(404, 'Class not found');
+                throw new ApiError(404, 'Class not found');
             }
-            throw new AppError(500, 'Failed to delete class');
+            throw new ApiError(500, 'Failed to delete class');
         }
     }
 }

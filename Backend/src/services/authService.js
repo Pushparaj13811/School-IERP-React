@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { prisma } from '../databases/prismaClient.js';
 import { config } from '../config/config.js';
-import { AppError } from '../middlewares/errorHandler.js';
+import { ApiError } from '../utils/apiError.js';
 import { emailService } from './emailService.js';
 import {
     validateEmail,
@@ -54,7 +54,7 @@ export class AuthService {
         });
 
         if (existingUser) {
-            throw new AppError(400, 'Email already in use');
+            throw new ApiError(400, 'Email already in use');
         }
 
         // Hash password
@@ -224,19 +224,19 @@ export class AuthService {
 
         if (!user) {
             console.log(`Login attempt failed: No user found with email ${email}`);
-            throw new AppError(401, 'Incorrect email or password');
+            throw new ApiError(401, 'Incorrect email or password');
         }
 
         // Check if user is active
         if (!user.isActive) {
             console.log(`Login attempt failed: User account ${email} is inactive`);
-            throw new AppError(401, 'Your account has been deactivated. Please contact the administrator.');
+            throw new ApiError(401, 'Your account has been deactivated. Please contact the administrator.');
         }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             console.log(`Login attempt failed: Invalid password for user ${email}`);
-            throw new AppError(401, 'Incorrect email or password');
+            throw new ApiError(401, 'Incorrect email or password');
         }
 
         console.log(`Login successful for user ${email}`);
@@ -259,7 +259,7 @@ export class AuthService {
         });
 
         if (!user) {
-            throw new AppError(404, 'There is no user with this email address');
+            throw new ApiError(404, 'There is no user with this email address');
         }
 
         // Generate reset token
@@ -289,7 +289,7 @@ export class AuthService {
         validatePassword(newPassword);
 
         if (!token) {
-            throw new AppError(400, 'Please provide a valid reset token');
+            throw new ApiError(400, 'Please provide a valid reset token');
         }
 
         // Get user based on the token
@@ -308,7 +308,7 @@ export class AuthService {
         });
 
         if (!user) {
-            throw new AppError(400, 'Token is invalid or has expired');
+            throw new ApiError(400, 'Token is invalid or has expired');
         }
 
         // Update password

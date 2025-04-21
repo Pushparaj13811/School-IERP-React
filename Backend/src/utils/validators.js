@@ -1,9 +1,9 @@
-import { AppError } from '../middlewares/errorHandler.js';
+import { ApiError } from './apiError.js';
 
 export const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email)) {
-        throw new AppError(400, 'Please provide a valid email address');
+        throw new ApiError(400, 'Please provide a valid email address');
     }
     return true;
 };
@@ -12,7 +12,7 @@ export const validatePassword = (password) => {
     // Check if password is at least 8 chars and contains uppercase, lowercase, number, and special character
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$/;
     if (!password || !passwordRegex.test(password)) {
-        throw new AppError(400, 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character');
+        throw new ApiError(400, 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character');
     }
     return true;
 };
@@ -20,14 +20,14 @@ export const validatePassword = (password) => {
 export const validateRole = (role) => {
     const validRoles = ['STUDENT', 'TEACHER', 'ADMIN', 'PARENT'];
     if (!role || !validRoles.includes(role)) {
-        throw new AppError(400, 'Please provide a valid role (STUDENT, TEACHER, ADMIN, PARENT)');
+        throw new ApiError(400, 'Please provide a valid role (STUDENT, TEACHER, ADMIN, PARENT)');
     }
     return true;
 };
 
 export const validateName = (name) => {
     if (!name || name.length < 2) {
-        throw new AppError(400, 'Name must be at least 2 characters long');
+        throw new ApiError(400, 'Name must be at least 2 characters long');
     }
     return true;
 };
@@ -35,14 +35,14 @@ export const validateName = (name) => {
 export const validatePhone = (phone) => {
     const phoneRegex = /^[0-9]{10}$/;
     if (!phone || !phoneRegex.test(phone)) {
-        throw new AppError(400, 'Please provide a valid 10-digit phone number');
+        throw new ApiError(400, 'Please provide a valid 10-digit phone number');
     }
     return true;
 };
 
 export const validateDate = (date) => {
     if (!date || isNaN(new Date(date).getTime())) {
-        throw new AppError(400, 'Please provide a valid date');
+        throw new ApiError(400, 'Please provide a valid date');
     }
     return true;
 };
@@ -51,7 +51,7 @@ export const validateAddress = (address) => {
     const requiredFields = ['addressLine1', 'city', 'ward', 'municipality', 'district', 'province'];
     for (const field of requiredFields) {
         if (!address[field]) {
-            throw new AppError(400, `Please provide ${field} in the address`);
+            throw new ApiError(400, `Please provide ${field} in the address`);
         }
     }
 
@@ -72,7 +72,7 @@ export const validateStudentData = (data) => {
     
     for (const field of requiredFields) {
         if (!data[field]) {
-            throw new AppError(400, `Please provide ${field} for student registration`);
+            throw new ApiError(400, `Please provide ${field} for student registration`);
         }
     }
 
@@ -93,7 +93,7 @@ export const validateTeacherData = (data) => {
     
     for (const field of requiredFields) {
         if (!data[field]) {
-            throw new AppError(400, `Please provide ${field} for teacher registration`);
+            throw new ApiError(400, `Please provide ${field} for teacher registration`);
         }
     }
 
@@ -113,7 +113,7 @@ export const validateAdminData = (data) => {
     
     for (const field of requiredFields) {
         if (!data[field]) {
-            throw new AppError(400, `Please provide ${field} for admin registration`);
+            throw new ApiError(400, `Please provide ${field} for admin registration`);
         }
     }
 
@@ -131,7 +131,7 @@ export const validateParentData = (data) => {
     
     for (const field of requiredFields) {
         if (!data[field]) {
-            throw new AppError(400, `Please provide ${field} for parent registration`);
+            throw new ApiError(400, `Please provide ${field} for parent registration`);
         }
     }
 

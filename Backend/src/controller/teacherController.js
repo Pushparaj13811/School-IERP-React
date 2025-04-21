@@ -1,4 +1,5 @@
 import { ApiError } from '../utils/apiError.js';
+import { ApiResponse } from '../utils/apiResponse.js';
 import { prisma } from '../databases/prismaClient.js';
 
 // Add these controller methods for class teacher assignments
@@ -95,11 +96,13 @@ export const assignClassTeacher = async (req, res, next) => {
                 }
             });
             
-            return res.status(200).json({
-                status: 'success',
-                message: `Class teacher reassigned from ${existingAssignment.teacher.name} to ${teacher.name}`,
-                data: { assignment: result }
-            });
+            return res.status(200).json(
+                new ApiResponse(
+                    200,
+                    { assignment: result },
+                    `Class teacher reassigned from ${existingAssignment.teacher.name} to ${teacher.name}`
+                )
+            );
         } else {
             // Create a new assignment
             result = await prisma.classTeacherAssignment.create({
@@ -136,11 +139,13 @@ export const assignClassTeacher = async (req, res, next) => {
                 }
             });
             
-            return res.status(201).json({
-                status: 'success',
-                message: 'Class teacher assigned successfully',
-                data: { assignment: result }
-            });
+            return res.status(201).json(
+                new ApiResponse(
+                    201,
+                    { assignment: result },
+                    'Class teacher assigned successfully'
+                )
+            );
         }
     } catch (error) {
         console.error('Error assigning class teacher:', error);
@@ -248,11 +253,13 @@ export const getAllClassTeacherAssignments = async (req, res, next) => {
             ]
         });
         
-        return res.status(200).json({
-            status: 'success',
-            results: assignments.length,
-            data: { assignments }
-        });
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { assignments },
+                'Class teacher assignments fetched successfully'
+            )
+        );
     } catch (error) {
         console.error('Error fetching class teacher assignments:', error);
         next(error);
@@ -298,10 +305,13 @@ export const removeClassTeacherAssignment = async (req, res, next) => {
             where: { id: parseInt(id) }
         });
         
-        return res.status(200).json({
-            status: 'success',
-            message: `Class teacher ${assignment.teacher.name} removed from ${assignment.class.name} ${assignment.section.name}`
-        });
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { message: `Class teacher ${assignment.teacher.name} removed from ${assignment.class.name} ${assignment.section.name}` },
+                'Class teacher removed successfully'
+            )
+        );
     } catch (error) {
         console.error('Error removing class teacher assignment:', error);
         next(error);

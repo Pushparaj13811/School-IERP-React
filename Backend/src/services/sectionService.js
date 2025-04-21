@@ -1,5 +1,5 @@
 import { prisma } from '../databases/prismaClient.js';
-import { AppError } from '../middlewares/errorHandler.js';
+import { ApiError } from '../utils/apiError.js';
 
 export class SectionService {
     async createSection(data) {
@@ -10,7 +10,7 @@ export class SectionService {
             });
 
             if (!classExists) {
-                throw new AppError(404, 'Class not found');
+                throw new ApiError(404, 'Class not found');
             }
 
             // Check if section with same name already exists in the class
@@ -22,7 +22,7 @@ export class SectionService {
             });
 
             if (existingSection) {
-                throw new AppError(400, 'Section with this name already exists in this class');
+                throw new ApiError(400, 'Section with this name already exists in this class');
             }
 
             const newSection = await prisma.section.create({
@@ -33,8 +33,8 @@ export class SectionService {
             });
             return newSection;
         } catch (error) {
-            if (error instanceof AppError) throw error;
-            throw new AppError(500, 'Failed to create section');
+            if (error instanceof ApiError) throw error;
+            throw new ApiError(500, 'Failed to create section');
         }
     }
 
@@ -48,8 +48,8 @@ export class SectionService {
             });
             return sections;
         } catch (error) {
-            throw new AppError(500, 'Failed to fetch sections');
-        }
+            throw new ApiError(500, 'Failed to fetch sections');
+        }   
     }
 
     async getSectionById(id) {
@@ -63,13 +63,13 @@ export class SectionService {
             });
 
             if (!section) {
-                throw new AppError(404, 'Section not found');
+                throw new ApiError(404, 'Section not found');
             }
 
             return section;
         } catch (error) {
-            if (error instanceof AppError) throw error;
-            throw new AppError(500, 'Failed to fetch section');
+            if (error instanceof ApiError) throw error;
+            throw new ApiError(500, 'Failed to fetch section');
         }
     }
 
@@ -81,7 +81,7 @@ export class SectionService {
             });
 
             if (!section) {
-                throw new AppError(404, 'Section not found');
+                throw new ApiError(404, 'Section not found');
             }
 
             // If name is being updated, check for duplicates
@@ -95,7 +95,7 @@ export class SectionService {
                 });
 
                 if (existingSection) {
-                    throw new AppError(400, 'Section with this name already exists in this class');
+                    throw new ApiError(400, 'Section with this name already exists in this class');
                 }
             }
 
@@ -108,8 +108,8 @@ export class SectionService {
             });
             return updatedSection;
         } catch (error) {
-            if (error instanceof AppError) throw error;
-            throw new AppError(500, 'Failed to update section');
+            if (error instanceof ApiError) throw error;
+            throw new ApiError(500, 'Failed to update section');
         }
     }
 
@@ -121,9 +121,9 @@ export class SectionService {
             return { message: 'Section deleted successfully' };
         } catch (error) {
             if (error.code === 'P2025') {
-                throw new AppError(404, 'Section not found');
+                throw new ApiError(404, 'Section not found');
             }
-            throw new AppError(500, 'Failed to delete section');
+            throw new ApiError(500, 'Failed to delete section');
         }
     }
 
@@ -137,7 +137,7 @@ export class SectionService {
             });
             return sections;
         } catch (error) {
-            throw new AppError(500, 'Failed to fetch sections');
+            throw new ApiError(500, 'Failed to fetch sections');
         }
     }
 }

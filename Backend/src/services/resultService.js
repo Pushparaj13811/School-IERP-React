@@ -1,20 +1,18 @@
-import { PrismaClient } from '@prisma/client';
-import { AppError } from '../middlewares/errorHandler.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../databases/prismaClient.js';
+import { ApiError } from '../utils/apiError.js';
 
 export class ResultService {
     async addSubjectResult(data) {
         try {
-            const { 
-                studentId, 
-                subjectId, 
-                academicYear, 
-                term, 
-                fullMarks, 
-                passMarks, 
-                theoryMarks, 
-                practicalMarks, 
+            const {
+                studentId,
+                subjectId,
+                academicYear,
+                term,
+                fullMarks,
+                passMarks,
+                theoryMarks,
+                practicalMarks,
                 isAbsent,
                 isLocked = true // Default to locked if not specified
             } = data;
@@ -33,7 +31,7 @@ export class ResultService {
             if (existingResult) {
                 // Check if result is locked - if so, only admin can update it
                 if (existingResult.isLocked) {
-                    throw new AppError(403, 'This result is locked. Only an admin can unlock it for editing.');
+                    throw new ApiError(403, 'This result is locked. Only an admin can unlock it for editing.');
                 }
 
                 // Calculate total marks
@@ -115,11 +113,11 @@ export class ResultService {
                 }
             });
 
-            console.log('Fetched subject results with lock status:', results.map(r => ({ 
-                id: r.id, 
-                studentId: r.studentId, 
-                subjectId: r.subjectId, 
-                isLocked: r.isLocked 
+            console.log('Fetched subject results with lock status:', results.map(r => ({
+                id: r.id,
+                studentId: r.studentId,
+                subjectId: r.subjectId,
+                isLocked: r.isLocked
             })));
 
             return results;
@@ -168,7 +166,7 @@ export class ResultService {
             });
 
             if (subjectResults.length === 0) {
-                throw new AppError(400, 'No subject results found for calculation');
+                throw new ApiError(400, 'No subject results found for calculation');
             }
 
             // Get all subjects assigned to the student's class
@@ -192,12 +190,12 @@ export class ResultService {
             });
 
             if (!student) {
-                throw new AppError(404, 'Student not found');
+                throw new ApiError(404, 'Student not found');
             }
 
             // Get expected subjects for this class
             const expectedSubjectIds = student.class.subjects.map(s => s.subjectId);
-            
+
             // Calculate how many subjects have marks entered vs total expected
             const subjectsWithMarks = new Set(subjectResults.map(r => r.subjectId));
             const completedSubjectsCount = subjectsWithMarks.size;
@@ -205,7 +203,7 @@ export class ResultService {
 
             // Determine if all subjects have results
             const isComplete = completedSubjectsCount >= totalExpectedSubjects;
-            
+
             // Calculate result metrics based on entered subjects
             const totalMarks = subjectResults.reduce((sum, result) => sum + result.totalMarks, 0);
             const totalFullMarks = subjectResults.reduce((sum, result) => sum + result.fullMarks, 0);
@@ -213,7 +211,7 @@ export class ResultService {
 
             // Determine result status (pass/fail)
             const resultStatus = this.determineResultStatus(subjectResults, totalPercentage);
-            
+
             // Calculate strongest and weakest subjects
             let strongestSubject = null;
             let weakestSubject = null;
@@ -229,12 +227,12 @@ export class ResultService {
 
                 subjectPercentages.sort((a, b) => b.percentage - a.percentage);
                 strongestSubject = subjectPercentages[0]?.subjectName || null;
-                
+
                 // Find subjects that need improvement (below 50%)
                 subjectsToImprove = subjectPercentages
                     .filter(s => s.percentage < 50)
                     .map(s => s.subjectName);
-                    
+
                 // Find weakest subject
                 weakestSubject = subjectPercentages[subjectPercentages.length - 1]?.subjectName || null;
             }
@@ -242,7 +240,7 @@ export class ResultService {
             // Get class teacher
             const classTeacher = student.class.teacherClasses[0]?.teacher;
             let classTeacherId = 1; // Default value
-            
+
             if (classTeacher && classTeacher.id) {
                 classTeacherId = classTeacher.id;
             } else {

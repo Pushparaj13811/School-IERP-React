@@ -1,17 +1,21 @@
 import { UserService } from '../services/userService.js';
-import { AppError } from '../middlewares/errorHandler.js';
 import { emailService } from '../services/emailService.js';
 import { prisma } from '../databases/prismaClient.js';
+import { ApiResponse } from '../utils/apiResponse.js';
+import { ApiError } from '../utils/apiError.js';
 
 const userService = new UserService();
 
 export const getProfile = async (req, res, next) => {
     try {
         const user = await userService.getUserProfile(req.user.id);
-        res.status(200).json({
-            status: 'success',
-            data: { user }
-        });
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { user },
+                'User profile fetched successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -20,10 +24,13 @@ export const getProfile = async (req, res, next) => {
 export const updateProfile = async (req, res, next) => {
     try {
         const updatedUser = await userService.updateProfile(req.user.id, req.body);
-        res.status(200).json({
-            status: 'success',
-            data: { user: updatedUser }
-        });
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { user: updatedUser },
+                'User profile updated successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -35,21 +42,24 @@ export const updatePassword = async (req, res, next) => {
 
         // Check if passwords match
         if (newPassword !== confirmPassword) {
-            return next(new AppError(400, 'New passwords do not match'));
+            return next(new ApiError(400, 'New passwords do not match'));
         }
 
         // Validate password strength
         const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$/;
         if (!passwordRegex.test(newPassword)) {
-            return next(new AppError(400, 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character'));
+            return next(new ApiError(400, 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character'));
         }
 
         await userService.updatePassword(req.user.id, currentPassword, newPassword);
 
-        res.status(200).json({
-            status: 'success',
-            message: 'Password updated successfully'
-        });
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { message: 'Password updated successfully' },
+                'Password updated successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -58,7 +68,7 @@ export const updatePassword = async (req, res, next) => {
 export const updateProfilePicture = async (req, res, next) => {
     try {
         if (!req.file) {
-            return next(new AppError(400, 'Please upload a file'));
+            return next(new ApiError(400, 'Please upload a file'));
         }
 
         console.log('File upload received:', req.file);
@@ -66,7 +76,7 @@ export const updateProfilePicture = async (req, res, next) => {
         // Validate file type
         const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
         if (!allowedTypes.includes(req.file.mimetype)) {
-            return next(new AppError(400, 'Please upload an image file (jpeg, jpg, or png)'));
+            return next(new ApiError(400, 'Please upload an image file (jpeg, jpg, or png)'));
         }
 
         // Generate a proper URL for the uploaded file
@@ -74,19 +84,22 @@ export const updateProfilePicture = async (req, res, next) => {
         const host = req.headers.host;
         const protocol = req.secure ? 'https' : 'http';
         const fileUrl = `${protocol}://${host}/uploads/profile-pictures/${req.file.filename}`;
-        
+
         console.log('File URL:', fileUrl);
 
         try {
             const profilePicture = await userService.updateProfilePicture(req.user.id, fileUrl);
-            
-            res.status(200).json({
-                status: 'success',
-                data: { profilePicture }
-            });
+
+            return res.status(200).json(
+                new ApiResponse(
+                    200,
+                    { profilePicture },
+                    'Profile picture updated successfully'
+                )
+            );
         } catch (profileError) {
             console.error('Error updating profile picture in database:', profileError);
-            return next(new AppError(500, 'Error saving profile picture to database'));
+            return next(new ApiError(500, 'Error saving profile picture to database'));
         }
     } catch (error) {
         console.error('Error in file upload:', error);
@@ -98,7 +111,7 @@ export const createUser = async (req, res, next) => {
     try {
         // Check if the requesting user is an admin
         if (req.user.role !== 'ADMIN') {
-            return next(new AppError(403, 'Only admins can create users'));
+            return next(new ApiError(403, 'Only admins can create users'));
         }
 
         const { email, role, ...userData } = req.body;
@@ -109,11 +122,13 @@ export const createUser = async (req, res, next) => {
         // Send email with credentials
         await emailService.sendUserCredentials(email, password, role);
 
-        res.status(201).json({
-            status: 'success',
-            message: 'User created successfully',
-            data: { user }
-        });
+        return res.status(201).json(
+            new ApiResponse(
+                201,
+                { message: 'User created successfully', data: { user } },
+                'User created successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -122,19 +137,21 @@ export const createUser = async (req, res, next) => {
 export const createStudent = async (req, res, next) => {
     try {
         if (req.user.role !== 'ADMIN') {
-            return next(new AppError(403, 'Only admins can create students'));
+            return next(new ApiError(403, 'Only admins can create students'));
         }
 
         const { email, ...studentData } = req.body;
         const { user, password } = await userService.createStudentWithAutoPassword(email, studentData);
-        
+
         await emailService.sendUserCredentials(email, password, 'STUDENT');
 
-        res.status(201).json({
-            status: 'success',
-            message: 'Student created successfully',
-            data: { user }
-        });
+        return res.status(201).json(
+            new ApiResponse(
+                201,
+                { message: 'Student created successfully', data: { user } },
+                'Student created successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -143,19 +160,21 @@ export const createStudent = async (req, res, next) => {
 export const createParent = async (req, res, next) => {
     try {
         if (req.user.role !== 'ADMIN') {
-            return next(new AppError(403, 'Only admins can create parents'));
+            return next(new ApiError(403, 'Only admins can create parents'));
         }
 
         const { email, ...parentData } = req.body;
         const { user, password } = await userService.createParentWithAutoPassword(email, parentData);
-        
+
         await emailService.sendUserCredentials(email, password, 'PARENT');
 
-        res.status(201).json({
-            status: 'success',
-            message: 'Parent created successfully',
-            data: { user }
-        });
+        return res.status(201).json(
+            new ApiResponse(
+                201,
+                { message: 'Parent created successfully', data: { user } },
+                'Parent created successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -164,19 +183,21 @@ export const createParent = async (req, res, next) => {
 export const createTeacher = async (req, res, next) => {
     try {
         if (req.user.role !== 'ADMIN') {
-            return next(new AppError(403, 'Only admins can create teachers'));
+            return next(new ApiError(403, 'Only admins can create teachers'));
         }
 
         const { email, ...teacherData } = req.body;
         const { user, password } = await userService.createTeacherWithAutoPassword(email, teacherData);
-        
+
         await emailService.sendUserCredentials(email, password, 'TEACHER');
 
-        res.status(201).json({
-            status: 'success',
-            message: 'Teacher created successfully',
-            data: { user }
-        });
+        return res.status(201).json(
+            new ApiResponse(
+                201,
+                { message: 'Teacher created successfully', data: { user } },
+                'Teacher created successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -185,18 +206,18 @@ export const createTeacher = async (req, res, next) => {
 export const getStudents = async (req, res, next) => {
     try {
         const { classId, sectionId } = req.query;
-        
+
         // Build where clause based on provided filters
         const whereClause = {};
-        
+
         if (classId) {
             whereClause.classId = Number(classId);
         }
-        
+
         if (sectionId) {
             whereClause.sectionId = Number(sectionId);
         }
-        
+
         const students = await prisma.student.findMany({
             where: whereClause,
             include: {
@@ -207,7 +228,7 @@ export const getStudents = async (req, res, next) => {
                 profilePicture: true
             }
         });
-        
+
         // Format the data for the client
         const formattedStudents = students.map(student => ({
             id: student.id,
@@ -222,13 +243,14 @@ export const getStudents = async (req, res, next) => {
             profilePicture: student.profilePicture?.url,
             isActive: student.user.isActive
         }));
-        
-        res.status(200).json({
-            status: 'success',
-            data: {
-                students: formattedStudents
-            }
-        });
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { students: formattedStudents },
+                'Students fetched successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -248,7 +270,7 @@ export const getParents = async (req, res, next) => {
                 profilePicture: true
             }
         });
-        
+
         // Format the data for the client
         const formattedParents = parents.map(parent => ({
             id: parent.id,
@@ -265,13 +287,14 @@ export const getParents = async (req, res, next) => {
             profilePicture: parent.profilePicture?.url,
             isActive: parent.user.isActive
         }));
-        
-        res.status(200).json({
-            status: 'success',
-            data: {
-                parents: formattedParents
-            }
-        });
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { parents: formattedParents },
+                'Parents fetched successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -301,7 +324,7 @@ export const getTeachers = async (req, res, next) => {
                 profilePicture: true
             }
         });
-        
+
         // Format the data for the client
         const formattedTeachers = teachers.map(teacher => ({
             id: teacher.id,
@@ -320,13 +343,14 @@ export const getTeachers = async (req, res, next) => {
             profilePicture: teacher.profilePicture?.url,
             isActive: teacher.user.isActive
         }));
-        
-        res.status(200).json({
-            status: 'success',
-            data: {
-                teachers: formattedTeachers
-            }
-        });
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { teachers: formattedTeachers },
+                'Teachers fetched successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -347,12 +371,12 @@ export const getUsers = async (req, res, next) => {
                 admin: true
             }
         });
-        
+
         // Format the data for the client
         const formattedUsers = users.map(user => {
             const userRole = user.role;
             let roleSpecificData = {};
-            
+
             if (userRole === 'STUDENT' && user.student) {
                 roleSpecificData = {
                     studentId: user.student.id,
@@ -378,7 +402,7 @@ export const getUsers = async (req, res, next) => {
                     name: user.admin.name
                 };
             }
-            
+
             return {
                 id: user.id,
                 email: user.email,
@@ -387,13 +411,14 @@ export const getUsers = async (req, res, next) => {
                 ...roleSpecificData
             };
         });
-        
-        res.status(200).json({
-            status: 'success',
-            data: {
-                users: formattedUsers
-            }
-        });
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { users: formattedUsers },
+                'Users fetched successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -403,15 +428,15 @@ export const getUsers = async (req, res, next) => {
 export const getStudentById = async (req, res, next) => {
     try {
         const { id } = req.params;
-        
+
         // Convert ID to number
         const studentId = Number(id);
-        
+
         // Validate ID
         if (isNaN(studentId)) {
-            return next(new AppError(400, 'Invalid student ID'));
+            return next(new ApiError(400, 'Invalid student ID'));
         }
-        
+
         // Fetch student with all related data
         const student = await prisma.student.findUnique({
             where: { id: studentId },
@@ -424,12 +449,12 @@ export const getStudentById = async (req, res, next) => {
                 address: true
             }
         });
-        
+
         // Check if student exists
         if (!student) {
-            return next(new AppError(404, 'Student not found'));
+            return next(new ApiError(404, 'Student not found'));
         }
-        
+
         // Format student data for response
         const formattedStudent = {
             id: student.id,
@@ -456,13 +481,14 @@ export const getStudentById = async (req, res, next) => {
             address: student.address,
             profilePicture: student.profilePicture?.url
         };
-        
-        res.status(200).json({
-            status: 'success',
-            data: {
-                student: formattedStudent
-            }
-        });
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { student: formattedStudent },
+                'Student updated successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -472,15 +498,15 @@ export const getStudentById = async (req, res, next) => {
 export const getTeacherById = async (req, res, next) => {
     try {
         const { id } = req.params;
-        
+
         // Convert ID to number
         const teacherId = Number(id);
-        
+
         // Validate ID
         if (isNaN(teacherId)) {
-            return next(new AppError(400, 'Invalid teacher ID'));
+            return next(new ApiError(400, 'Invalid teacher ID'));
         }
-        
+
         // Fetch teacher with all related data
         const teacher = await prisma.teacher.findUnique({
             where: { id: teacherId },
@@ -506,12 +532,12 @@ export const getTeacherById = async (req, res, next) => {
                 address: true
             }
         });
-        
+
         // Check if teacher exists
         if (!teacher) {
-            return next(new AppError(404, 'Teacher not found'));
+            return next(new ApiError(404, 'Teacher not found'));
         }
-        
+
         // Format teacher data for response
         const formattedTeacher = {
             id: teacher.id,
@@ -530,13 +556,14 @@ export const getTeacherById = async (req, res, next) => {
             address: teacher.address,
             profilePicture: teacher.profilePicture?.url
         };
-        
-        res.status(200).json({
-            status: 'success',
-            data: {
-                teacher: formattedTeacher
-            }
-        });
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { teacher: formattedTeacher },
+                'Teacher updated successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -546,15 +573,15 @@ export const getTeacherById = async (req, res, next) => {
 export const getParentById = async (req, res, next) => {
     try {
         const { id } = req.params;
-        
+
         // Convert ID to number
         const parentId = Number(id);
-        
+
         // Validate ID
         if (isNaN(parentId)) {
-            return next(new AppError(400, 'Invalid parent ID'));
+            return next(new ApiError(400, 'Invalid parent ID'));
         }
-        
+
         // Fetch parent with all related data
         const parent = await prisma.parent.findUnique({
             where: { id: parentId },
@@ -570,12 +597,12 @@ export const getParentById = async (req, res, next) => {
                 address: true
             }
         });
-        
+
         // Check if parent exists
         if (!parent) {
-            return next(new AppError(404, 'Parent not found'));
+            return next(new ApiError(404, 'Parent not found'));
         }
-        
+
         // Format parent data for response
         const formattedParent = {
             id: parent.id,
@@ -592,13 +619,14 @@ export const getParentById = async (req, res, next) => {
             address: parent.address,
             profilePicture: parent.profilePicture?.url
         };
-        
-        res.status(200).json({
-            status: 'success',
-            data: {
-                parent: formattedParent
-            }
-        });
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { parent: formattedParent },
+                'Parent updated successfully'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -609,38 +637,38 @@ export const updateStudent = async (req, res, next) => {
     try {
         const { id } = req.params;
         const data = { ...req.body };
-        
+
         // Check if user is authorized to update students
         if (req.user.role !== 'ADMIN') {
-            return next(new AppError(403, 'Only admins can update students'));
+            return next(new ApiError(403, 'Only admins can update students'));
         }
-        
+
         // Convert ID to number
         const studentId = Number(id);
-        
+
         // Validate ID
         if (isNaN(studentId)) {
-            return next(new AppError(400, 'Invalid student ID'));
+            return next(new ApiError(400, 'Invalid student ID'));
         }
-        
+
         // Check if student exists
         const studentExists = await prisma.student.findUnique({
             where: { id: studentId }
         });
-        
+
         if (!studentExists) {
-            return next(new AppError(404, 'Student not found'));
+            return next(new ApiError(404, 'Student not found'));
         }
-        
+
         // Extract address data if provided
         const addressData = data.address ? { ...data.address } : undefined;
         delete data.address;
-        
+
         // Extract class and section IDs and convert to nested connect operations
         const classId = data.classId ? Number(data.classId) : undefined;
         const sectionId = data.sectionId ? Number(data.sectionId) : undefined;
         const parentId = data.parentId ? Number(data.parentId) : undefined;
-        
+
         // Remove direct ID properties
         delete data.classId;
         delete data.sectionId;
@@ -652,13 +680,13 @@ export const updateStudent = async (req, res, next) => {
                 connect: { id: classId }
             };
         }
-        
+
         if (sectionId) {
             data.section = {
                 connect: { id: sectionId }
             };
         }
-        
+
         if (parentId) {
             data.parent = {
                 connect: { id: parentId }
@@ -669,9 +697,9 @@ export const updateStudent = async (req, res, next) => {
                 disconnect: true
             };
         }
-        
+
         console.log('Updating student with data:', JSON.stringify(data, null, 2));
-        
+
         // Update student data
         const updatedStudent = await prisma.student.update({
             where: { id: studentId },
@@ -696,7 +724,7 @@ export const updateStudent = async (req, res, next) => {
                 address: true
             }
         });
-        
+
         // Format student data for response
         const formattedStudent = {
             id: updatedStudent.id,
@@ -719,14 +747,14 @@ export const updateStudent = async (req, res, next) => {
             address: updatedStudent.address,
             profilePicture: updatedStudent.profilePicture?.url
         };
-        
-        res.status(200).json({
-            status: 'success',
-            message: 'Student updated successfully',
-            data: {
-                student: formattedStudent
-            }
-        });
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { student: formattedStudent },
+                'Student updated successfully'
+            )
+        );
     } catch (error) {
         console.error('Error updating student:', error);
         next(error);
@@ -738,33 +766,33 @@ export const updateParent = async (req, res, next) => {
     try {
         const { id } = req.params;
         const data = { ...req.body };
-        
+
         // Check if user is authorized to update parents
         if (req.user.role !== 'ADMIN') {
-            return next(new AppError(403, 'Only admins can update parents'));
+            return next(new ApiError(403, 'Only admins can update parents'));
         }
-        
+
         // Convert ID to number
         const parentId = Number(id);
-        
+
         // Validate ID
         if (isNaN(parentId)) {
-            return next(new AppError(400, 'Invalid parent ID'));
+            return next(new ApiError(400, 'Invalid parent ID'));
         }
-        
+
         // Check if parent exists
         const parentExists = await prisma.parent.findUnique({
             where: { id: parentId }
         });
-        
+
         if (!parentExists) {
-            return next(new AppError(404, 'Parent not found'));
+            return next(new ApiError(404, 'Parent not found'));
         }
-        
+
         // Extract address data if provided
         const addressData = data.address ? { ...data.address } : undefined;
         delete data.address;
-        
+
         // Extract children data if provided
         const childrenIds = data.children;
         delete data.children;
@@ -804,7 +832,7 @@ export const updateParent = async (req, res, next) => {
                 address: true
             }
         });
-        
+
         // Format parent data for response
         const formattedParent = {
             id: updatedParent.id,
@@ -821,14 +849,14 @@ export const updateParent = async (req, res, next) => {
             address: updatedParent.address,
             profilePicture: updatedParent.profilePicture?.url
         };
-        
-        res.status(200).json({
-            status: 'success',
-            message: 'Parent updated successfully',
-            data: {
-                parent: formattedParent
-            }
-        });
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { parent: formattedParent },
+                'Parent updated successfully'
+            )
+        );
     } catch (error) {
         console.error('Error updating parent:', error);
         next(error);
@@ -840,33 +868,33 @@ export const updateTeacher = async (req, res, next) => {
     try {
         const { id } = req.params;
         const data = { ...req.body };
-        
+
         // Check if user is authorized to update teachers
         if (req.user.role !== 'ADMIN') {
-            return next(new AppError(403, 'Only admins can update teachers'));
+            return next(new ApiError(403, 'Only admins can update teachers'));
         }
-        
+
         // Convert ID to number
         const teacherId = Number(id);
-        
+
         // Validate ID
         if (isNaN(teacherId)) {
-            return next(new AppError(400, 'Invalid teacher ID'));
+            return next(new ApiError(400, 'Invalid teacher ID'));
         }
-        
+
         // Check if teacher exists
         const teacherExists = await prisma.teacher.findUnique({
             where: { id: teacherId }
         });
-        
+
         if (!teacherExists) {
-            return next(new AppError(404, 'Teacher not found'));
+            return next(new ApiError(404, 'Teacher not found'));
         }
-        
+
         // Extract address data if provided
         const addressData = data.address ? { ...data.address } : undefined;
         delete data.address;
-        
+
         // Extract subjects and classes data if provided
         const subjectIds = data.subjects;
         const classIds = data.classes;
@@ -950,7 +978,7 @@ export const updateTeacher = async (req, res, next) => {
                 address: true
             }
         });
-        
+
         // Format teacher data for response
         const formattedTeacher = {
             id: updatedTeacher.id,
@@ -969,14 +997,14 @@ export const updateTeacher = async (req, res, next) => {
             address: updatedTeacher.address,
             profilePicture: updatedTeacher.profilePicture?.url
         };
-        
-        res.status(200).json({
-            status: 'success',
-            message: 'Teacher updated successfully',
-            data: {
-                teacher: formattedTeacher
-            }
-        });
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                { teacher: formattedTeacher },
+                'Teacher updated successfully'
+            )
+        );
     } catch (error) {
         console.error('Error updating teacher:', error);
         next(error);
@@ -987,13 +1015,13 @@ export const updateProfilePictureById = async (req, res, next) => {
     try {
         const { id } = req.params;
         const userRole = req.params.userRole; // STUDENT, PARENT, or TEACHER
-        
+
         if (!req.file) {
-            return next(new AppError(400, 'Please upload a file'));
+            return next(new ApiError(400, 'Please upload a file'));
         }
 
         if (!id || !userRole) {
-            return next(new AppError(400, 'Missing required parameters'));
+            return next(new ApiError(400, 'Missing required parameters'));
         }
 
         console.log(`Updating profile picture for ${userRole} with ID: ${id}`, req.file);
@@ -1001,19 +1029,19 @@ export const updateProfilePictureById = async (req, res, next) => {
         // Validate file type
         const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
         if (!allowedTypes.includes(req.file.mimetype)) {
-            return next(new AppError(400, 'Please upload an image file (jpeg, jpg, or png)'));
+            return next(new ApiError(400, 'Please upload an image file (jpeg, jpg, or png)'));
         }
 
         // Generate a proper URL for the uploaded file
         const host = req.headers.host;
         const protocol = req.secure ? 'https' : 'http';
         const fileUrl = `${protocol}://${host}/uploads/profiles/${req.file.filename}`;
-        
+
         console.log('File URL:', fileUrl);
 
         try {
             let userId;
-            
+
             // Find the user ID based on the role and entity ID
             switch (userRole) {
                 case 'STUDENT':
@@ -1021,44 +1049,47 @@ export const updateProfilePictureById = async (req, res, next) => {
                         where: { id: parseInt(id) },
                         select: { userId: true }
                     });
-                    if (!student) return next(new AppError(404, 'Student not found'));
+                    if (!student) return next(new ApiError(404, 'Student not found'));
                     userId = student.userId;
                     break;
-                
+
                 case 'PARENT':
                     const parent = await prisma.parent.findUnique({
                         where: { id: parseInt(id) },
                         select: { userId: true }
                     });
-                    if (!parent) return next(new AppError(404, 'Parent not found'));
+                    if (!parent) return next(new ApiError(404, 'Parent not found'));
                     userId = parent.userId;
                     break;
-                
+
                 case 'TEACHER':
                     const teacher = await prisma.teacher.findUnique({
                         where: { id: parseInt(id) },
                         select: { userId: true }
                     });
-                    if (!teacher) return next(new AppError(404, 'Teacher not found'));
+                    if (!teacher) return next(new ApiError(404, 'Teacher not found'));
                     userId = teacher.userId;
                     break;
-                
+
                 default:
-                    return next(new AppError(400, 'Invalid user role'));
+                    return next(new ApiError(400, 'Invalid user role'));
             }
-            
+
             console.log(`Found user ID ${userId} for ${userRole} with ID ${id}`);
-            
+
             // Create profile picture and update user
             const profilePicture = await userService.updateProfilePicture(userId, fileUrl);
-            
-            res.status(200).json({
-                status: 'success',
-                data: { profilePicture }
-            });
+
+            return res.status(200).json(
+                new ApiResponse(
+                    200,
+                    { profilePicture },
+                    'Profile picture updated successfully'
+                )
+            );
         } catch (profileError) {
             console.error(`Error updating profile picture for ${userRole} with ID ${id}:`, profileError);
-            return next(new AppError(500, 'Error saving profile picture to database'));
+            return next(new ApiError(500, 'Error saving profile picture to database'));
         }
     } catch (error) {
         console.error('Error in file upload:', error);
@@ -1070,23 +1101,23 @@ export const updateProfilePictureById = async (req, res, next) => {
 export const downloadUserProfile = async (req, res, next) => {
     try {
         const { userRole, id } = req.params;
-        
+
         // Validate user role
         if (!['STUDENT', 'TEACHER', 'PARENT'].includes(userRole)) {
-            return next(new AppError(400, 'Invalid user role'));
+            return next(new ApiError(400, 'Invalid user role'));
         }
-        
+
         // Convert ID to number
         const userId = Number(id);
-        
+
         // Validate ID
         if (isNaN(userId)) {
-            return next(new AppError(400, `Invalid ${userRole.toLowerCase()} ID`));
+            return next(new ApiError(400, `Invalid ${userRole.toLowerCase()} ID`));
         }
-        
+
         // Get profile data based on role
         let profileData;
-        
+
         switch (userRole) {
             case 'STUDENT':
                 const student = await prisma.student.findUnique({
@@ -1100,11 +1131,11 @@ export const downloadUserProfile = async (req, res, next) => {
                         profilePicture: true
                     }
                 });
-                
+
                 if (!student) {
-                    return next(new AppError(404, 'Student not found'));
+                    return next(new ApiError(404, 'Student not found'));
                 }
-                
+
                 profileData = {
                     id: student.id,
                     name: student.name,
@@ -1143,7 +1174,7 @@ export const downloadUserProfile = async (req, res, next) => {
                     profilePicture: student.profilePicture?.url || null
                 };
                 break;
-                
+
             case 'TEACHER':
                 const teacher = await prisma.teacher.findUnique({
                     where: { id: userId },
@@ -1164,11 +1195,11 @@ export const downloadUserProfile = async (req, res, next) => {
                         profilePicture: true
                     }
                 });
-                
+
                 if (!teacher) {
-                    return next(new AppError(404, 'Teacher not found'));
+                    return next(new ApiError(404, 'Teacher not found'));
                 }
-                
+
                 profileData = {
                     id: teacher.id,
                     name: teacher.name,
@@ -1202,7 +1233,7 @@ export const downloadUserProfile = async (req, res, next) => {
                     profilePicture: teacher.profilePicture?.url || null
                 };
                 break;
-                
+
             case 'PARENT':
                 const parent = await prisma.parent.findUnique({
                     where: { id: userId },
@@ -1218,11 +1249,11 @@ export const downloadUserProfile = async (req, res, next) => {
                         profilePicture: true
                     }
                 });
-                
+
                 if (!parent) {
-                    return next(new AppError(404, 'Parent not found'));
+                    return next(new ApiError(404, 'Parent not found'));
                 }
-                
+
                 profileData = {
                     id: parent.id,
                     name: parent.name,
@@ -1233,7 +1264,7 @@ export const downloadUserProfile = async (req, res, next) => {
                         "Gender": parent.gender || "N/A",
                         "Email": parent.email || parent.user.email || "N/A",
                         "Contact Number": parent.contactNo || "N/A",
-                        "Children": parent.children.map(child => 
+                        "Children": parent.children.map(child =>
                             `${child.name} (${child.class?.name || 'N/A'} ${child.section?.name || 'N/A'})`
                         ).join(", ") || "N/A"
                     },
@@ -1259,12 +1290,18 @@ export const downloadUserProfile = async (req, res, next) => {
                 };
                 break;
         }
-        
+
         // Return profile data as JSON with appropriate headers for download
         res.setHeader('Content-Disposition', `attachment; filename=${profileData.name.replace(/\s+/g, '_')}_profile.json`);
         res.setHeader('Content-Type', 'application/json');
-        res.status(200).json(profileData);
-        
+        res.status(200).json(
+            new ApiResponse(
+                200,
+                profileData,
+                'Profile downloaded successfully'
+            )
+        );
+
     } catch (error) {
         console.error(`Error generating profile download:`, error);
         next(error);
@@ -1275,14 +1312,14 @@ export const toggleUserActiveStatus = async (req, res, next) => {
     try {
         // Check if the requesting user is an admin
         if (req.user.role !== 'ADMIN') {
-            return next(new AppError(403, 'Only admins can change user active status'));
+            return next(new ApiError(403, 'Only admins can change user active status'));
         }
 
         const { userId } = req.params;
         const { isActive } = req.body;
 
         if (typeof isActive !== 'boolean') {
-            return next(new AppError(400, 'isActive must be a boolean value'));
+            return next(new ApiError(400, 'isActive must be a boolean value'));
         }
 
         const user = await prisma.user.findUnique({
@@ -1290,12 +1327,12 @@ export const toggleUserActiveStatus = async (req, res, next) => {
         });
 
         if (!user) {
-            return next(new AppError(404, 'User not found'));
+            return next(new ApiError(404, 'User not found'));
         }
 
         // Don't allow deactivating own account
         if (Number(userId) === req.user.id && !isActive) {
-            return next(new AppError(400, 'You cannot deactivate your own account'));
+            return next(new ApiError(400, 'You cannot deactivate your own account'));
         }
 
         const updatedUser = await prisma.user.update({
@@ -1303,18 +1340,20 @@ export const toggleUserActiveStatus = async (req, res, next) => {
             data: { isActive }
         });
 
-        res.status(200).json({
-            status: 'success',
-            message: isActive ? 'User has been activated' : 'User has been deactivated',
-            data: {
-                user: {
-                    id: updatedUser.id,
-                    email: updatedUser.email,
-                    role: updatedUser.role,
-                    isActive: updatedUser.isActive
-                }
-            }
-        });
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                {
+                    user: {
+                        id: updatedUser.id,
+                        email: updatedUser.email,
+                        role: updatedUser.role,
+                        isActive: updatedUser.isActive
+                    }
+                },
+                isActive ? 'User has been activated' : 'User has been deactivated'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -1324,14 +1363,14 @@ export const toggleStudentActiveStatus = async (req, res, next) => {
     try {
         // Check if the requesting user is an admin
         if (req.user.role !== 'ADMIN') {
-            return next(new AppError(403, 'Only admins can change student active status'));
+            return next(new ApiError(403, 'Only admins can change student active status'));
         }
 
         const { studentId } = req.params;
         const { isActive } = req.body;
 
         if (typeof isActive !== 'boolean') {
-            return next(new AppError(400, 'isActive must be a boolean value'));
+            return next(new ApiError(400, 'isActive must be a boolean value'));
         }
 
         // First, get the student to find associated user
@@ -1341,12 +1380,12 @@ export const toggleStudentActiveStatus = async (req, res, next) => {
         });
 
         if (!student) {
-            return next(new AppError(404, 'Student not found'));
+            return next(new ApiError(404, 'Student not found'));
         }
 
         // Don't allow deactivating own account
         if (student.user.id === req.user.id && !isActive) {
-            return next(new AppError(400, 'You cannot deactivate your own account'));
+            return next(new ApiError(400, 'You cannot deactivate your own account'));
         }
 
         // Update the user's active status
@@ -1355,18 +1394,20 @@ export const toggleStudentActiveStatus = async (req, res, next) => {
             data: { isActive }
         });
 
-        res.status(200).json({
-            status: 'success',
-            message: isActive ? 'Student has been activated' : 'Student has been deactivated',
-            data: {
-                student: {
-                    id: student.id,
-                    name: student.name,
-                    email: student.email,
-                    isActive: updatedUser.isActive
-                }
-            }
-        });
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                {
+                    student: {
+                        id: student.id,
+                        name: student.name,
+                        email: student.email,
+                        isActive: updatedUser.isActive
+                    }
+                },
+                isActive ? 'Student has been activated' : 'Student has been deactivated'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -1376,14 +1417,14 @@ export const toggleTeacherActiveStatus = async (req, res, next) => {
     try {
         // Check if the requesting user is an admin
         if (req.user.role !== 'ADMIN') {
-            return next(new AppError(403, 'Only admins can change teacher active status'));
+            return next(new ApiError(403, 'Only admins can change teacher active status'));
         }
 
         const { teacherId } = req.params;
         const { isActive } = req.body;
 
         if (typeof isActive !== 'boolean') {
-            return next(new AppError(400, 'isActive must be a boolean value'));
+            return next(new ApiError(400, 'isActive must be a boolean value'));
         }
 
         // First, get the teacher to find associated user
@@ -1393,12 +1434,12 @@ export const toggleTeacherActiveStatus = async (req, res, next) => {
         });
 
         if (!teacher) {
-            return next(new AppError(404, 'Teacher not found'));
+            return next(new ApiError(404, 'Teacher not found'));
         }
 
         // Don't allow deactivating own account
         if (teacher.user.id === req.user.id && !isActive) {
-            return next(new AppError(400, 'You cannot deactivate your own account'));
+            return next(new ApiError(400, 'You cannot deactivate your own account'));
         }
 
         // Update the user's active status
@@ -1407,18 +1448,21 @@ export const toggleTeacherActiveStatus = async (req, res, next) => {
             data: { isActive }
         });
 
-        res.status(200).json({
-            status: 'success',
-            message: isActive ? 'Teacher has been activated' : 'Teacher has been deactivated',
-            data: {
-                teacher: {
-                    id: teacher.id,
-                    name: teacher.name,
-                    email: teacher.email,
-                    isActive: updatedUser.isActive
-                }
-            }
-        });
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                {
+                    teacher: {
+                        id: teacher.id,
+                        name: teacher.name,
+                        email: teacher.email,
+                        isActive: updatedUser.isActive
+                    }
+
+                },
+                isActive ? 'Teacher has been activated' : 'Teacher has been deactivated'
+            )
+        );
     } catch (error) {
         next(error);
     }
@@ -1428,14 +1472,14 @@ export const toggleParentActiveStatus = async (req, res, next) => {
     try {
         // Check if the requesting user is an admin
         if (req.user.role !== 'ADMIN') {
-            return next(new AppError(403, 'Only admins can change parent active status'));
+            return next(new ApiError(403, 'Only admins can change parent active status'));
         }
 
         const { parentId } = req.params;
         const { isActive } = req.body;
 
         if (typeof isActive !== 'boolean') {
-            return next(new AppError(400, 'isActive must be a boolean value'));
+            return next(new ApiError(400, 'isActive must be a boolean value'));
         }
 
         // First, get the parent to find associated user
@@ -1445,12 +1489,12 @@ export const toggleParentActiveStatus = async (req, res, next) => {
         });
 
         if (!parent) {
-            return next(new AppError(404, 'Parent not found'));
+            return next(new ApiError(404, 'Parent not found'));
         }
 
         // Don't allow deactivating own account
         if (parent.user.id === req.user.id && !isActive) {
-            return next(new AppError(400, 'You cannot deactivate your own account'));
+            return next(new ApiError(400, 'You cannot deactivate your own account'));
         }
 
         // Update the user's active status
@@ -1459,18 +1503,20 @@ export const toggleParentActiveStatus = async (req, res, next) => {
             data: { isActive }
         });
 
-        res.status(200).json({
-            status: 'success',
-            message: isActive ? 'Parent has been activated' : 'Parent has been deactivated',
-            data: {
-                parent: {
-                    id: parent.id,
-                    name: parent.name,
-                    email: parent.email,
-                    isActive: updatedUser.isActive
-                }
-            }
-        });
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                {
+                    parent: {
+                        id: parent.id,
+                        name: parent.name,
+                        email: parent.email,
+                        isActive: updatedUser.isActive
+                    }
+                },
+                isActive ? 'Parent has been activated' : 'Parent has been deactivated'
+            )
+        );
     } catch (error) {
         next(error);
     }

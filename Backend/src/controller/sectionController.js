@@ -1,8 +1,7 @@
 import { sectionService } from '../services/sectionService.js';
 import { ApiResponse } from '../utils/apiResponse.js';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../databases/prismaClient.js';
 
-const prisma = new PrismaClient();
 
 export const createSection = async (req, res, next) => {
     try {

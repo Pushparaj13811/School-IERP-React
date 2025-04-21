@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../databases/prismaClient.js';
 import { ApiError } from '../utils/apiError.js';
-
-const prisma = new PrismaClient();
 
 class TimetableService {
     /**
