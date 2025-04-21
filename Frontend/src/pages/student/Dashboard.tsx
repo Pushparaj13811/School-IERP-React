@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dashboardService from '../../services/dashboardService';
 import { StudentDashboardData } from '../../services/api';
@@ -10,20 +10,33 @@ interface StatCardProps {
   icon: string;
   color: string;
   onClick?: () => void;
+  cardId?: string;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color, onClick }) => {
+const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color, onClick, cardId }) => {
+  const handleKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      onClick();
+    }
+  };
+
   return (
     <div 
-      className="overflow-hidden rounded-md shadow-sm cursor-pointer" 
+      className="overflow-hidden rounded-md shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" 
       onClick={onClick}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label={`${title}: ${value}`}
+      id={cardId}
     >
       <div className={`flex items-center justify-between p-4 ${color}`}>
         <div className="flex-1">
           <div className="text-xs text-white">{title}</div>
           <div className="text-3xl font-bold text-white">{value}</div>
         </div>
-        <div className="text-4xl text-white">
+        <div className="text-4xl text-white" aria-hidden="true">
           <i className={`bi ${icon}`}></i>
         </div>
       </div>
@@ -97,8 +110,8 @@ const Dashboard: React.FC = () => {
   
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64 bg-[#EEF5FF] p-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="flex justify-center items-center h-64 bg-[#EEF5FF] p-4" aria-live="polite">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" aria-label="Loading dashboard data"></div>
       </div>
     );
   }
@@ -106,7 +119,7 @@ const Dashboard: React.FC = () => {
   if (error) {
     return (
       <div className="p-4 bg-[#EEF5FF]">
-        <div className="p-6 bg-red-100 rounded-lg text-red-800">
+        <div className="p-6 bg-red-100 rounded-lg text-red-800" role="alert" aria-live="assertive">
           <h3 className="text-xl font-semibold mb-2">Error Loading Dashboard</h3>
           <p>{error}</p>
         </div>
@@ -117,13 +130,20 @@ const Dashboard: React.FC = () => {
   if (!dashboardData) {
     return (
       <div className="p-4 bg-[#EEF5FF]">
-        <div className="p-6 bg-yellow-100 rounded-lg text-yellow-800">
+        <div className="p-6 bg-yellow-100 rounded-lg text-yellow-800" role="alert">
           <h3 className="text-xl font-semibold mb-2">No Dashboard Data</h3>
           <p>No student dashboard data available.</p>
         </div>
       </div>
     );
   }
+
+  const handleProfileKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      navigateProfileSection();
+    }
+  };
 
   return (
     <div className="p-4 bg-[#EEF5FF]">
@@ -135,13 +155,14 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-2 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-2 md:grid-cols-4" role="region" aria-label="Dashboard Statistics">
         <StatCard
           title="Attendance"
           value={`${Math.round(dashboardData.attendancePercentage)}%`}
           icon="bi-calendar-check"
           color="bg-[#AA9839]"
           onClick={() => navigate('/attendance')}
+          cardId="attendance-card"
         />
         <StatCard
           title="Exam Results"
@@ -149,6 +170,7 @@ const Dashboard: React.FC = () => {
           icon="bi-clipboard-data"
           color="bg-[#62C25E]"
           onClick={() => navigate('/result')}
+          cardId="results-card"
         />
         <StatCard
           title="Holidays"
@@ -156,6 +178,7 @@ const Dashboard: React.FC = () => {
           icon="bi-calendar-event"
           color="bg-[#5096FF]"
           onClick={() => navigate('/holiday')}
+          cardId="holidays-card"
         />
         <StatCard
           title="Achievements"
@@ -163,6 +186,7 @@ const Dashboard: React.FC = () => {
           icon="bi-trophy"
           color="bg-[#5E479B]"
           onClick={() => navigate('/achievement')}
+          cardId="achievements-card"
         />
       </div>
 
@@ -170,15 +194,22 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-12 mb-6">
         {/* Student details */}
         <div className="p-6 bg-white rounded-lg shadow-sm md:col-span-5">
-          <h3 className="mb-4 text-xl font-bold">My Details</h3>
+          <h3 className="mb-4 text-xl font-bold" id="student-details-heading">My Details</h3>
           <hr className="mb-4" />
 
           <div className="flex mb-6">
             <div className="mr-6">
-              <div className="overflow-hidden border-4 border-blue-100 rounded-full cursor-pointer w-36 h-36" onClick={navigateProfileSection}>
+              <div 
+                className="overflow-hidden border-4 border-blue-100 rounded-full cursor-pointer w-36 h-36 focus:outline-none focus:ring-2 focus:ring-blue-300" 
+                onClick={navigateProfileSection}
+                onKeyDown={handleProfileKeyDown}
+                role="button"
+                tabIndex={0}
+                aria-label="View profile"
+              >
                 <img
                   src={dashboardData.student.profilePicture || "https://via.placeholder.com/150?text=Student"}
-                  alt="Profile"
+                  alt={`${dashboardData.student.name || 'Student'}'s profile picture`}
                   className="object-cover w-full h-full"
                   onError={(e) => {
                     console.error('Profile image failed to load');
@@ -188,15 +219,16 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="flex justify-center mt-4 space-x-2">
                 <button 
-                  className="bg-[#292648] text-white px-4 py-2 rounded text-sm"
+                  className="bg-[#292648] text-white px-4 py-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#292648]"
                   onClick={navigateProfileSection}
+                  aria-label="View full profile"
                 >
-                  Edit Profile
+                  View Full Profile
                 </button>
               </div>
             </div>
 
-            <div className="flex-1">
+            <div className="flex-1" role="region" aria-labelledby="student-details-heading">
               {studentDetails.map((detail, index) => (
                 <StudentDetail key={index} label={detail.label} value={detail.value} />
               ))}
@@ -206,29 +238,33 @@ const Dashboard: React.FC = () => {
 
         {/* Today's Timetable */}
         <div className="p-6 bg-white rounded-lg shadow-sm md:col-span-7">
-          <h3 className="mb-4 text-xl font-bold">Today's Timetable</h3>
+          <h3 className="mb-4 text-xl font-bold" id="timetable-heading">Today's Timetable</h3>
           <hr className="mb-4" />
 
           {dashboardData.todayTimetable?.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table 
+                className="min-w-full divide-y divide-gray-200"
+                role="table"
+                aria-labelledby="timetable-heading"
+              >
                 <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
-                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teacher</th>
+                  <tr role="row">
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" role="columnheader">Time</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" role="columnheader">Subject</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" role="columnheader">Teacher</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {dashboardData.todayTimetable.map((period) => (
-                    <tr key={period.id}>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <tr key={period.id} role="row">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900" role="cell">
                         {formatTime(period.timeSlot.startTime)} - {formatTime(period.timeSlot.endTime)}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700" role="cell">
                         {period.subject.name} ({period.subject.code})
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700" role="cell">
                         {period.teacher.name}
                       </td>
                     </tr>
@@ -237,7 +273,7 @@ const Dashboard: React.FC = () => {
               </table>
             </div>
           ) : (
-            <div className="p-4 text-center text-gray-500">
+            <div className="p-4 text-center text-gray-500" aria-live="polite">
               No classes scheduled for today.
             </div>
           )}

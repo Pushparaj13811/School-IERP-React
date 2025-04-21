@@ -12,6 +12,7 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
   const { isAuthenticated, logout } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [userMenuOpen, setUserMenuOpen] = useState<boolean>(false);
   
   // Fetch user profile when authenticated
   useEffect(() => {
@@ -40,6 +41,37 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
   const handleLogout = () => {
     userService.clearCache();
     logout();
+  };
+
+  // Toggle user dropdown menu
+  const toggleUserMenu = () => {
+    setUserMenuOpen(!userMenuOpen);
+  };
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (userMenuOpen && !target.closest('#user-menu-container')) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [userMenuOpen]);
+
+  // Handle key press on toggle button
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleUserMenu();
+    } else if (e.key === 'Escape' && userMenuOpen) {
+      e.preventDefault();
+      setUserMenuOpen(false);
+    }
   };
 
   // Get profile image URL
@@ -76,11 +108,16 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
   };
   
   return (
-    <div className="fixed top-0 left-0 right-0 bg-[#EEF5FF] z-20 shadow-md">
+    <nav className="fixed top-0 left-0 right-0 bg-[#EEF5FF] z-20 shadow-md" role="navigation">
       <div className="flex items-center justify-between px-4 py-2">
         {/* Left side - Logo and title */}
         <div className="flex items-center">
-          <Link to="/" className="flex items-center">
+          <Link 
+            to="/" 
+            className="flex items-center" 
+            aria-label="Home"
+            tabIndex={0}
+          >
             <div className="font-bold text-xl text-[#292648] mr-2">JST</div>
             <div className="text-[#292648] font-bold text-xl">ERP</div>
           </Link>
@@ -95,18 +132,32 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
             <>
               {/* Search box - Only show when authenticated */}
               <div className="relative items-center hidden md:flex">
+                <label htmlFor="navbar-search" className="sr-only">Search</label>
                 <input
+                  id="navbar-search"
                   type="text"
                   placeholder="Search Here"
-                  className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md pl-9 focus:outline-none"
+                  className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md pl-9 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  aria-label="Search"
                 />
-                <i className="absolute text-gray-500 bi bi-search left-3"></i>
+                <i className="absolute text-gray-500 bi bi-search left-3" aria-hidden="true"></i>
               </div>
 
               {/* Language selector - Only show when authenticated */}
-              <div className="items-center hidden text-gray-700 cursor-pointer md:flex">
+              <div 
+                className="items-center hidden text-gray-700 cursor-pointer md:flex"
+                role="button"
+                tabIndex={0}
+                aria-label="Change language"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    // Language change functionality would go here
+                  }
+                }}
+              >
                 <span>Language</span>
-                <i className="ml-1 bi bi-chevron-down"></i>
+                <i className="ml-1 bi bi-chevron-down" aria-hidden="true"></i>
               </div>
             </>
           )}
@@ -117,20 +168,23 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
               <>
                 {/* User Profile Dropdown */}
                 {isAuthenticated && !loading && userProfile && (
-                  <div>
+                  <div id="user-menu-container">
                     <button
                       type="button"
-                      className="flex text-sm bg-gray-800 rounded-full focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600"
+                      className="flex text-sm bg-gray-800 rounded-full focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600 focus:outline-none"
                       id="user-menu-button"
-                      aria-expanded="false"
-                      data-dropdown-toggle="user-dropdown"
-                      data-dropdown-placement="bottom"
+                      aria-expanded={userMenuOpen}
+                      aria-haspopup="true"
+                      aria-controls="user-dropdown"
+                      aria-label="User menu"
+                      onClick={toggleUserMenu}
+                      onKeyDown={handleKeyDown}
                     >
                       <span className="sr-only">Open user menu</span>
                       <img
                         className="w-8 h-8 rounded-full"
                         src={getProfileImage(userProfile)}
-                        alt="user photo"
+                        alt={`${userProfile.displayName || 'User'} profile`}
                         crossOrigin="anonymous"
                         onError={(e) => {
                           console.error('Error loading profile image');
@@ -138,47 +192,69 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
                         }}
                       />
                     </button>
-                    <div
-                      className="z-50 hidden my-4 text-base list-none bg-white divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600"
-                      id="user-dropdown"
-                    >
-                      <div className="px-4 py-3">
-                        <span className="block text-sm text-gray-900 dark:text-white">
-                          {userProfile.displayName}
-                        </span>
-                        <span className="block text-sm text-gray-500 truncate dark:text-gray-400">
-                          {userProfile.email}
-                        </span>
-                        <span className="block text-sm font-medium text-gray-500 truncate dark:text-gray-400">
-                          {userProfile.role ? userService.getRoleDisplayName(userProfile.role) : 'User'}
-                        </span>
+                    
+                    {userMenuOpen && (
+                      <div
+                        className="absolute right-4 mt-2 w-48 text-base list-none bg-white divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600"
+                        id="user-dropdown"
+                        role="menu"
+                        aria-orientation="vertical"
+                        aria-labelledby="user-menu-button"
+                      >
+                        <div className="px-4 py-3">
+                          <span className="block text-sm text-gray-900 dark:text-white">
+                            {userProfile.displayName}
+                          </span>
+                          <span className="block text-sm text-gray-500 truncate dark:text-gray-400">
+                            {userProfile.email}
+                          </span>
+                          <span className="block text-sm font-medium text-gray-500 truncate dark:text-gray-400">
+                            {userProfile.role ? userService.getRoleDisplayName(userProfile.role) : 'User'}
+                          </span>
+                        </div>
+                        <ul className="py-2" role="none">
+                          <li role="none">
+                            <Link
+                              to="/profile"
+                              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white focus:bg-gray-100 focus:outline-none"
+                              role="menuitem"
+                              tabIndex={0}
+                              onClick={() => setUserMenuOpen(false)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setUserMenuOpen(false);
+                                }
+                              }}
+                            >
+                              Profile
+                            </Link>
+                          </li>
+                          <li role="none">
+                            <button
+                              onClick={handleLogout}
+                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white focus:bg-gray-100 focus:outline-none"
+                              role="menuitem"
+                              tabIndex={0}
+                            >
+                              Sign out
+                            </button>
+                          </li>
+                        </ul>
                       </div>
-                      <ul className="py-2" aria-labelledby="user-menu-button">
-                        <li>
-                          <Link
-                            to="/profile"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white"
-                          >
-                            Profile
-                          </Link>
-                        </li>
-                        <li>
-                          <button
-                            onClick={handleLogout}
-                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white"
-                          >
-                            Sign out
-                          </button>
-                        </li>
-                      </ul>
-                    </div>
+                    )}
                   </div>
                 )}
               </>
             ) : (
-              <Link to="/login" className="flex items-center">
+              <Link 
+                to="/login" 
+                className="flex items-center focus:outline-none focus:underline" 
+                tabIndex={0}
+                aria-label="Login"
+              >
                 <span className="text-[#292648] font-semibold">Login</span>
-                <i className="ml-1 text-lg bi bi-box-arrow-in-right"></i>
+                <i className="ml-1 text-lg bi bi-box-arrow-in-right" aria-hidden="true"></i>
               </Link>
             )}
           </div>
@@ -187,14 +263,17 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
           {isAuthenticated && (
             <button
               onClick={toggleSidebar}
-              className="bg-[#D9E4FF] md:hidden focus:outline-none"
+              className="bg-[#D9E4FF] md:hidden focus:outline-none focus:ring-2 focus:ring-primary/50 p-2 rounded"
+              aria-label="Toggle sidebar menu"
+              aria-expanded="false"
+              tabIndex={0}
             >
-              <i className="text-2xl bi bi-list"></i>
+              <i className="text-2xl bi bi-list" aria-hidden="true"></i>
             </button>
           )}
         </div>
       </div>
-    </div>
+    </nav>
   );
 };
 

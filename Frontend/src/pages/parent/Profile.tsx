@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import { userService, UserProfile } from '../../services/userService';
 import { userAPI } from '../../services/api';
 import { Parent, Student } from '../../types/api';
+import Button from '../../components/ui/Button';
+import { toast } from 'react-toastify';
 
 // Create a simple spinner component since we couldn't find the import
 const Spinner: React.FC = () => (
@@ -60,6 +62,34 @@ const ParentProfile: React.FC = () => {
 
     fetchParentData();
   }, [id]);
+
+  const handleDownloadProfile = async () => {
+    try {
+      if (!parent) {
+        toast.error("Parent data not found");
+        return;
+      }
+      
+      let parentId: number;
+      if (isOwnProfile) {
+        const profile = parent as UserProfile;
+        if (profile.roleSpecificData && 'id' in profile.roleSpecificData) {
+          parentId = profile.roleSpecificData.id as number;
+        } else {
+          toast.error("Parent ID not found");
+          return;
+        }
+      } else {
+        parentId = (parent as Parent).id;
+      }
+        
+      await userService.downloadProfile('PARENT', parentId);
+      toast.success("Profile download initiated");
+    } catch (error) {
+      console.error("Error downloading profile:", error);
+      toast.error("Failed to download profile");
+    }
+  };
 
   if (loading) {
     return <Spinner />;
@@ -145,14 +175,13 @@ const ParentProfile: React.FC = () => {
               <h2 className="text-xl font-semibold">{displayName}</h2>
               <p className="text-gray-600">{isOwnProfile ? userService.getRoleDisplayName((parent as UserProfile).role) : 'Parent'}</p>
               <div className="mt-4 space-y-2">
-                <button className="w-full px-4 py-2 bg-[#292648] text-white rounded-md ">
-                  Download Pdf
-                </button>
-                {isOwnProfile && (
-                  <button className="w-full px-4 py-2 border bg-[#292648] text-white rounded-md">
-                    Edit Profile
-                  </button>
-                )}
+                <Button 
+                  variant="primary"
+                  className="w-full"
+                  onClick={handleDownloadProfile}
+                >
+                  Download Profile
+                </Button>
               </div>
             </div>
 

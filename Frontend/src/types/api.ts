@@ -77,6 +77,7 @@ export interface Student {
     country: string;
     postalCode?: string;
   };
+  isActive?: boolean;
 }
 
 export interface Teacher {
@@ -107,6 +108,7 @@ export interface Teacher {
     country: string;
     postalCode?: string;
   };
+  isActive?: boolean;
 }
 
 export interface Parent {
@@ -130,6 +132,7 @@ export interface Parent {
     country: string;
     postalCode?: string;
   };
+  isActive?: boolean;
 }
 
 // API response types

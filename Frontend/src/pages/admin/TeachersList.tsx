@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { FaEdit, FaTrash } from 'react-icons/fa';
+import { FaEdit, FaToggleOn, FaToggleOff } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { userAPI } from '../../services/api';
 import { toast } from 'react-toastify';
 import { Teacher } from '../../types/api';
+import Button from '../../components/ui/Button';
 
 const TeachersList: React.FC = () => {
   const navigate = useNavigate();
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [actionModalOpen, setActionModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [actionType, setActionType] = useState<'activate' | 'deactivate'>('deactivate');
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,8 +47,7 @@ const TeachersList: React.FC = () => {
     navigate('add-teacher');
   };
 
-  const handleEditClick = (e: React.MouseEvent, teacher: Teacher) => {
-    e.stopPropagation();
+  const handleEditClick = (teacher: Teacher) => {
     // Navigate to add teacher form with teacher data
     navigate('add-teacher', { 
       state: { 
@@ -56,17 +57,42 @@ const TeachersList: React.FC = () => {
     });
   };
 
-  const handleDeleteClick = (e: React.MouseEvent, teacher: Teacher) => {
-    e.stopPropagation();
+
+  const handleToggleActiveClick = (teacher: Teacher) => {
+    const newAction = teacher.isActive ? 'deactivate' : 'activate';
+    setActionType(newAction);
     setSelectedTeacher(teacher);
-    setDeleteModalOpen(true);
+    setActionModalOpen(true);
   };
 
-  const handleDeleteConfirm = () => {
-    // Implement delete logic here
-    console.log('Deleting teacher:', selectedTeacher?.id);
-    setDeleteModalOpen(false);
-    setSelectedTeacher(null);
+
+  const handleActionConfirm = async () => {
+    if (!selectedTeacher) return;
+    
+    try {
+      // Toggle active status based on current status
+      const isActive = actionType === 'activate';
+      const response = await userAPI.toggleTeacherActiveStatus(selectedTeacher.id, isActive);
+      
+      if (response.data?.status === 'success') {
+        toast.success(`${selectedTeacher.name} has been ${isActive ? 'activated' : 'deactivated'} successfully`);
+        
+        // Update the teacher in the list with the new active status
+        setTeachers(teachers.map(teacher => 
+          teacher.id === selectedTeacher.id 
+            ? { ...teacher, isActive: isActive } 
+            : teacher
+        ));
+      } else {
+        toast.error(response.data?.message || `Failed to ${actionType} teacher. Please try again.`);
+      }
+    } catch (error) {
+      console.error(`Error ${actionType}ing teacher:`, error);
+      toast.error(`Failed to ${actionType} teacher. Please try again.`);
+    } finally {
+      setActionModalOpen(false);
+      setSelectedTeacher(null);
+    }
   };
 
   if (loading) {
@@ -77,12 +103,12 @@ const TeachersList: React.FC = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">All Teachers</h1>
-        <button 
-          className="bg-indigo-900 text-white px-4 py-2 rounded-md hover:bg-indigo-800"
+        <Button 
+          variant="primary"
           onClick={handleAddTeacher}
         >
           Add Teacher
-        </button>
+        </Button>
       </div>
 
       {teachers.length === 0 ? (
@@ -103,6 +129,7 @@ const TeachersList: React.FC = () => {
                 <th className="px-6 py-3 text-left text-sm font-medium">Subjects</th>
                 <th className="px-6 py-3 text-left text-sm font-medium">Classes</th>
                 <th className="px-6 py-3 text-left text-sm font-medium">Sections</th>
+                <th className="px-6 py-3 text-left text-sm font-medium">Status</th>
                 <th className="px-6 py-3 text-left text-sm font-medium">Action</th>
               </tr>
             </thead>
@@ -156,20 +183,25 @@ const TeachersList: React.FC = () => {
                       : '-'
                     }
                   </td>
+                  <td className="px-6 py-4 text-sm">
+                    <span className={`px-2 py-1 rounded-full text-xs ${teacher.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {teacher.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 text-sm text-gray-900">
                     <div className="flex space-x-3" onClick={(e) => e.stopPropagation()}>
-                      <button 
-                        className="text-green-600 hover:text-green-800"
-                        onClick={(e) => handleEditClick(e, teacher)}
+                      <Button 
+                        variant="outline"
+                        onClick={() => handleEditClick(teacher)}
                       >
                         <FaEdit />
-                      </button>
-                      <button 
-                        className="text-red-600 hover:text-red-800"
-                        onClick={(e) => handleDeleteClick(e, teacher)}
+                      </Button>
+                      <Button 
+                        variant={teacher.isActive ? "danger" : "primary"}
+                        onClick={() => handleToggleActiveClick(teacher)}
                       >
-                        <FaTrash />
-                      </button>
+                        {teacher.isActive ? <FaToggleOff /> : <FaToggleOn />}
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -180,11 +212,17 @@ const TeachersList: React.FC = () => {
       )}
 
       <ConfirmationModal
-        isOpen={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        onConfirm={handleDeleteConfirm}
-        title="Delete Teacher"
-        message={`Are you sure you want to delete ${selectedTeacher?.name}? This action cannot be undone.`}
+        isOpen={actionModalOpen}
+        onClose={() => setActionModalOpen(false)}
+        onConfirm={handleActionConfirm}
+        title={actionType === 'activate' ? "Activate Teacher" : "Deactivate Teacher"}
+        message={`Are you sure you want to ${actionType} ${selectedTeacher?.name}? ${
+          actionType === 'deactivate' 
+            ? "They will no longer be able to log in or access any features."
+            : "This will restore their access to the system."
+        }`}
+        confirmLabel={actionType === 'activate' ? "Activate" : "Deactivate"}
+        cancelLabel="Cancel"
       />
     </div>
   );

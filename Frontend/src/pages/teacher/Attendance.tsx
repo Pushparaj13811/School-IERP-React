@@ -89,7 +89,7 @@ const Attendance: React.FC = () => {
         }
 
         // Fetch the class teacher assignments for this teacher
-        const assignmentsRes = await teacherAPI.getClassTeacherAssignments();
+        const assignmentsRes = await teacherAPI.getClassTeacherAssignments(user.teacher.id);
 
         if (assignmentsRes.data?.status !== 'success' || !assignmentsRes.data?.data?.assignments?.length) {
           setError('You are not assigned as class teacher to any class');
@@ -216,59 +216,68 @@ const Attendance: React.FC = () => {
         sectionId: student.sectionId
       }));
       
-      // Fetch attendance for each class/section
-      const attendancePromises = assignments.map(async (assignment) => {
-        try {
-          const attendanceRes = await attendanceAPI.getDailyAttendance({
-            date: selectedDate,
-            classId: assignment.classId,
-            sectionId: assignment.sectionId
-          });
-          
-          if (attendanceRes.data?.status === 'success' && 
-              attendanceRes.data.data.attendance && 
-              attendanceRes.data.data.attendance.length > 0) {
-            
-            // Get student IDs for this class/section
-            const classStudentsIds = studentsList
-              .filter(s => s.classId === assignment.classId && s.sectionId === assignment.sectionId)
-              .map(s => s.id);
-            
-            // Update records for students in this class/section
-            attendanceRes.data.data.attendance.forEach((record: {
-              studentId: number;
-              status: 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'EXCUSED';
-              remarks?: string;
-            }) => {
-              if (classStudentsIds.includes(record.studentId)) {
-                // Update the record in our initial records array
-                initialRecords = initialRecords.map(r => 
-                  r.studentId === record.studentId 
-                    ? { 
-                        ...r, 
-                        status: record.status, 
-                        remarks: record.remarks || '' 
-                      } 
-                    : r
-                );
-              }
+      // Only fetch attendance for assignments from class teacher assignments
+      // This ensures we only try to fetch data for classes where the teacher is assigned as a class teacher
+      if (assignments.length > 0) {
+        console.log('Fetching attendance for class teacher assignments:', assignments);
+        
+        const attendancePromises = assignments.map(async (assignment) => {
+          try {
+            console.log(`Fetching attendance for class ${assignment.classId}, section ${assignment.sectionId}`);
+            const attendanceRes = await attendanceAPI.getDailyAttendance({
+              date: selectedDate,
+              classId: assignment.classId,
+              sectionId: assignment.sectionId
             });
+            
+            if (attendanceRes.data?.status === 'success' && 
+                attendanceRes.data.data?.attendance && 
+                attendanceRes.data.data.attendance.length > 0) {
+              
+              // Get student IDs for this class/section
+              const classStudentsIds = studentsList
+                .filter(s => s.classId === assignment.classId && s.sectionId === assignment.sectionId)
+                .map(s => s.id);
+              
+              // Update records for students in this class/section
+              attendanceRes.data.data.attendance.forEach((record: {
+                studentId: number;
+                status: 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'EXCUSED';
+                remarks?: string;
+              }) => {
+                if (classStudentsIds.includes(record.studentId)) {
+                  // Update the record in our initial records array
+                  initialRecords = initialRecords.map(r => 
+                    r.studentId === record.studentId 
+                      ? { 
+                          ...r, 
+                          status: record.status, 
+                          remarks: record.remarks || '' 
+                        }
+                      : r
+                  );
+                }
+              });
+            }
+          } catch (err) {
+            console.error(`Error fetching attendance for class ${assignment.classId}, section ${assignment.sectionId}:`, err);
+            // Don't set global error here as we want to continue with other classes
           }
-        } catch (err) {
-          console.error(`Error fetching attendance for class ${assignment.classId}, section ${assignment.sectionId}:`, err);
-        }
-      });
-      
-      await Promise.all(attendancePromises);
+        });
+        
+        await Promise.all(attendancePromises);
+      } else {
+        console.log('No class teacher assignments found');
+      }
       
       setAttendanceForm({
         date: selectedDate,
         records: initialRecords
       });
       
-    } catch (error) {
-      console.error('Error fetching attendance data:', error);
-      setError('Failed to load attendance data.');
+    } catch (err) {
+      console.error('Error fetching attendance data:', err);
+      setError('Failed to load attendance data. Please try again.');
     } finally {
       setLoading(false);
     }

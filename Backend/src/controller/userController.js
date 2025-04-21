@@ -39,7 +39,7 @@ export const updatePassword = async (req, res, next) => {
         }
 
         // Validate password strength
-        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$/;
         if (!passwordRegex.test(newPassword)) {
             return next(new AppError(400, 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character'));
         }
@@ -219,7 +219,8 @@ export const getStudents = async (req, res, next) => {
             class: student.class,
             section: student.section,
             parent: student.parent,
-            profilePicture: student.profilePicture?.url
+            profilePicture: student.profilePicture?.url,
+            isActive: student.user.isActive
         }));
         
         res.status(200).json({
@@ -261,7 +262,8 @@ export const getParents = async (req, res, next) => {
                 class: child.class?.name,
                 section: child.section?.name
             })),
-            profilePicture: parent.profilePicture?.url
+            profilePicture: parent.profilePicture?.url,
+            isActive: parent.user.isActive
         }));
         
         res.status(200).json({
@@ -315,7 +317,8 @@ export const getTeachers = async (req, res, next) => {
             subjects: teacher.subjects.map(s => s.subject),
             classes: teacher.classes.map(c => c.class),
             sections: teacher.sections.map(s => s.section),
-            profilePicture: teacher.profilePicture?.url
+            profilePicture: teacher.profilePicture?.url,
+            isActive: teacher.user.isActive
         }));
         
         res.status(200).json({
@@ -1059,6 +1062,416 @@ export const updateProfilePictureById = async (req, res, next) => {
         }
     } catch (error) {
         console.error('Error in file upload:', error);
+        next(error);
+    }
+};
+
+// Download user profile as PDF
+export const downloadUserProfile = async (req, res, next) => {
+    try {
+        const { userRole, id } = req.params;
+        
+        // Validate user role
+        if (!['STUDENT', 'TEACHER', 'PARENT'].includes(userRole)) {
+            return next(new AppError(400, 'Invalid user role'));
+        }
+        
+        // Convert ID to number
+        const userId = Number(id);
+        
+        // Validate ID
+        if (isNaN(userId)) {
+            return next(new AppError(400, `Invalid ${userRole.toLowerCase()} ID`));
+        }
+        
+        // Get profile data based on role
+        let profileData;
+        
+        switch (userRole) {
+            case 'STUDENT':
+                const student = await prisma.student.findUnique({
+                    where: { id: userId },
+                    include: {
+                        user: true,
+                        class: true,
+                        section: true,
+                        parent: true,
+                        address: true,
+                        profilePicture: true
+                    }
+                });
+                
+                if (!student) {
+                    return next(new AppError(404, 'Student not found'));
+                }
+                
+                profileData = {
+                    id: student.id,
+                    name: student.name,
+                    email: student.user.email,
+                    role: 'Student',
+                    profileDetails: {
+                        "Name": student.name,
+                        "Name As Per Birth Certificate": student.nameAsPerBirth || "N/A",
+                        "Father's Name": student.fatherName || "N/A",
+                        "Mother's Name": student.motherName || "N/A",
+                        "Gender": student.gender || "N/A",
+                        "Date of Birth": student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : "N/A",
+                        "DOB No": student.dobNo || "N/A",
+                        "Blood Group": student.bloodGroup || "N/A",
+                        "Nationality": student.nationality || "N/A",
+                        "Religion": student.religion || "N/A",
+                        "Roll No": student.rollNo || "N/A",
+                        "Email": student.email || student.user.email || "N/A",
+                        "Contact Number": student.contactNo || "N/A",
+                        "Emergency Contact": student.emergencyContact || "N/A",
+                        "Class": student.class?.name || "N/A",
+                        "Section": student.section?.name || "N/A"
+                    },
+                    addressDetails: student.address ? {
+                        "Address Line 1": student.address.addressLine1 || "N/A",
+                        "Address Line 2": student.address.addressLine2 || "N/A",
+                        "Street": student.address.street || "N/A",
+                        "City": student.address.city || "N/A",
+                        "Ward": student.address.ward || "N/A",
+                        "Municipality": student.address.municipality || "N/A",
+                        "District": student.address.district || "N/A",
+                        "Province": student.address.province || "N/A",
+                        "Country": student.address.country || "N/A",
+                        "Postal Code": student.address.postalCode || "N/A"
+                    } : {},
+                    profilePicture: student.profilePicture?.url || null
+                };
+                break;
+                
+            case 'TEACHER':
+                const teacher = await prisma.teacher.findUnique({
+                    where: { id: userId },
+                    include: {
+                        user: true,
+                        designation: true,
+                        subjects: {
+                            include: {
+                                subject: true
+                            }
+                        },
+                        classes: {
+                            include: {
+                                class: true
+                            }
+                        },
+                        address: true,
+                        profilePicture: true
+                    }
+                });
+                
+                if (!teacher) {
+                    return next(new AppError(404, 'Teacher not found'));
+                }
+                
+                profileData = {
+                    id: teacher.id,
+                    name: teacher.name,
+                    email: teacher.user.email,
+                    role: 'Teacher',
+                    profileDetails: {
+                        "Name": teacher.name,
+                        "Designation": teacher.designation?.name || "N/A",
+                        "Gender": teacher.gender || "N/A",
+                        "Date of Birth": teacher.dateOfBirth ? new Date(teacher.dateOfBirth).toLocaleDateString() : "N/A",
+                        "Join Date": teacher.joinDate ? new Date(teacher.joinDate).toLocaleDateString() : "N/A",
+                        "Email": teacher.email || teacher.user.email || "N/A",
+                        "Contact Number": teacher.contactNo || "N/A",
+                        "Emergency Contact": teacher.emergencyContact || "N/A",
+                        "Bio": teacher.bio || "N/A",
+                        "Subjects": teacher.subjects.map(s => s.subject.name).join(", ") || "N/A",
+                        "Classes": teacher.classes.map(c => c.class.name).join(", ") || "N/A"
+                    },
+                    addressDetails: teacher.address ? {
+                        "Address Line 1": teacher.address.addressLine1 || "N/A",
+                        "Address Line 2": teacher.address.addressLine2 || "N/A",
+                        "Street": teacher.address.street || "N/A",
+                        "City": teacher.address.city || "N/A",
+                        "Ward": teacher.address.ward || "N/A",
+                        "Municipality": teacher.address.municipality || "N/A",
+                        "District": teacher.address.district || "N/A",
+                        "Province": teacher.address.province || "N/A",
+                        "Country": teacher.address.country || "N/A",
+                        "Postal Code": teacher.address.postalCode || "N/A"
+                    } : {},
+                    profilePicture: teacher.profilePicture?.url || null
+                };
+                break;
+                
+            case 'PARENT':
+                const parent = await prisma.parent.findUnique({
+                    where: { id: userId },
+                    include: {
+                        user: true,
+                        children: {
+                            include: {
+                                class: true,
+                                section: true
+                            }
+                        },
+                        address: true,
+                        profilePicture: true
+                    }
+                });
+                
+                if (!parent) {
+                    return next(new AppError(404, 'Parent not found'));
+                }
+                
+                profileData = {
+                    id: parent.id,
+                    name: parent.name,
+                    email: parent.user.email,
+                    role: 'Parent',
+                    profileDetails: {
+                        "Name": parent.name,
+                        "Gender": parent.gender || "N/A",
+                        "Email": parent.email || parent.user.email || "N/A",
+                        "Contact Number": parent.contactNo || "N/A",
+                        "Children": parent.children.map(child => 
+                            `${child.name} (${child.class?.name || 'N/A'} ${child.section?.name || 'N/A'})`
+                        ).join(", ") || "N/A"
+                    },
+                    addressDetails: parent.address ? {
+                        "Address Line 1": parent.address.addressLine1 || "N/A",
+                        "Address Line 2": parent.address.addressLine2 || "N/A",
+                        "Street": parent.address.street || "N/A",
+                        "City": parent.address.city || "N/A",
+                        "Ward": parent.address.ward || "N/A",
+                        "Municipality": parent.address.municipality || "N/A",
+                        "District": parent.address.district || "N/A",
+                        "Province": parent.address.province || "N/A",
+                        "Country": parent.address.country || "N/A",
+                        "Postal Code": parent.address.postalCode || "N/A"
+                    } : {},
+                    childrenDetails: parent.children.map(child => ({
+                        "Name": child.name,
+                        "Class": child.class?.name || "N/A",
+                        "Section": child.section?.name || "N/A",
+                        "Roll No": child.rollNo || "N/A"
+                    })),
+                    profilePicture: parent.profilePicture?.url || null
+                };
+                break;
+        }
+        
+        // Return profile data as JSON with appropriate headers for download
+        res.setHeader('Content-Disposition', `attachment; filename=${profileData.name.replace(/\s+/g, '_')}_profile.json`);
+        res.setHeader('Content-Type', 'application/json');
+        res.status(200).json(profileData);
+        
+    } catch (error) {
+        console.error(`Error generating profile download:`, error);
+        next(error);
+    }
+};
+
+export const toggleUserActiveStatus = async (req, res, next) => {
+    try {
+        // Check if the requesting user is an admin
+        if (req.user.role !== 'ADMIN') {
+            return next(new AppError(403, 'Only admins can change user active status'));
+        }
+
+        const { userId } = req.params;
+        const { isActive } = req.body;
+
+        if (typeof isActive !== 'boolean') {
+            return next(new AppError(400, 'isActive must be a boolean value'));
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: Number(userId) }
+        });
+
+        if (!user) {
+            return next(new AppError(404, 'User not found'));
+        }
+
+        // Don't allow deactivating own account
+        if (Number(userId) === req.user.id && !isActive) {
+            return next(new AppError(400, 'You cannot deactivate your own account'));
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { id: Number(userId) },
+            data: { isActive }
+        });
+
+        res.status(200).json({
+            status: 'success',
+            message: isActive ? 'User has been activated' : 'User has been deactivated',
+            data: {
+                user: {
+                    id: updatedUser.id,
+                    email: updatedUser.email,
+                    role: updatedUser.role,
+                    isActive: updatedUser.isActive
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const toggleStudentActiveStatus = async (req, res, next) => {
+    try {
+        // Check if the requesting user is an admin
+        if (req.user.role !== 'ADMIN') {
+            return next(new AppError(403, 'Only admins can change student active status'));
+        }
+
+        const { studentId } = req.params;
+        const { isActive } = req.body;
+
+        if (typeof isActive !== 'boolean') {
+            return next(new AppError(400, 'isActive must be a boolean value'));
+        }
+
+        // First, get the student to find associated user
+        const student = await prisma.student.findUnique({
+            where: { id: Number(studentId) },
+            include: { user: true }
+        });
+
+        if (!student) {
+            return next(new AppError(404, 'Student not found'));
+        }
+
+        // Don't allow deactivating own account
+        if (student.user.id === req.user.id && !isActive) {
+            return next(new AppError(400, 'You cannot deactivate your own account'));
+        }
+
+        // Update the user's active status
+        const updatedUser = await prisma.user.update({
+            where: { id: student.userId },
+            data: { isActive }
+        });
+
+        res.status(200).json({
+            status: 'success',
+            message: isActive ? 'Student has been activated' : 'Student has been deactivated',
+            data: {
+                student: {
+                    id: student.id,
+                    name: student.name,
+                    email: student.email,
+                    isActive: updatedUser.isActive
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const toggleTeacherActiveStatus = async (req, res, next) => {
+    try {
+        // Check if the requesting user is an admin
+        if (req.user.role !== 'ADMIN') {
+            return next(new AppError(403, 'Only admins can change teacher active status'));
+        }
+
+        const { teacherId } = req.params;
+        const { isActive } = req.body;
+
+        if (typeof isActive !== 'boolean') {
+            return next(new AppError(400, 'isActive must be a boolean value'));
+        }
+
+        // First, get the teacher to find associated user
+        const teacher = await prisma.teacher.findUnique({
+            where: { id: Number(teacherId) },
+            include: { user: true }
+        });
+
+        if (!teacher) {
+            return next(new AppError(404, 'Teacher not found'));
+        }
+
+        // Don't allow deactivating own account
+        if (teacher.user.id === req.user.id && !isActive) {
+            return next(new AppError(400, 'You cannot deactivate your own account'));
+        }
+
+        // Update the user's active status
+        const updatedUser = await prisma.user.update({
+            where: { id: teacher.userId },
+            data: { isActive }
+        });
+
+        res.status(200).json({
+            status: 'success',
+            message: isActive ? 'Teacher has been activated' : 'Teacher has been deactivated',
+            data: {
+                teacher: {
+                    id: teacher.id,
+                    name: teacher.name,
+                    email: teacher.email,
+                    isActive: updatedUser.isActive
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const toggleParentActiveStatus = async (req, res, next) => {
+    try {
+        // Check if the requesting user is an admin
+        if (req.user.role !== 'ADMIN') {
+            return next(new AppError(403, 'Only admins can change parent active status'));
+        }
+
+        const { parentId } = req.params;
+        const { isActive } = req.body;
+
+        if (typeof isActive !== 'boolean') {
+            return next(new AppError(400, 'isActive must be a boolean value'));
+        }
+
+        // First, get the parent to find associated user
+        const parent = await prisma.parent.findUnique({
+            where: { id: Number(parentId) },
+            include: { user: true }
+        });
+
+        if (!parent) {
+            return next(new AppError(404, 'Parent not found'));
+        }
+
+        // Don't allow deactivating own account
+        if (parent.user.id === req.user.id && !isActive) {
+            return next(new AppError(400, 'You cannot deactivate your own account'));
+        }
+
+        // Update the user's active status
+        const updatedUser = await prisma.user.update({
+            where: { id: parent.userId },
+            data: { isActive }
+        });
+
+        res.status(200).json({
+            status: 'success',
+            message: isActive ? 'Parent has been activated' : 'Parent has been deactivated',
+            data: {
+                parent: {
+                    id: parent.id,
+                    name: parent.name,
+                    email: parent.email,
+                    isActive: updatedUser.isActive
+                }
+            }
+        });
+    } catch (error) {
         next(error);
     }
 }; 

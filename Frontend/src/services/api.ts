@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from '../utils/axios';
 import { 
   ApiResponse, 
   ClassesResponse, 
@@ -281,68 +281,16 @@ interface UpcomingHoliday {
   recurrencePattern: string | null;
 }
 
-// Create axios instance with default config
-const api = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1', // Update this with your backend URL
-    headers: {
-        'Content-Type': 'application/json',
-    },
-});
-
-// Add request interceptor for authentication
-api.interceptors.request.use(
-    (config) => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            config.headers = {
-                ...config.headers,
-                Authorization: `Bearer ${token}`
-            };
-        }
-        console.log(`Request [${config.method?.toUpperCase()}] ${config.url}`, config.params || config.data);
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
-    }
-);
-
-// Add response interceptor for error handling
-api.interceptors.response.use(
-    (response) => {
-        console.log(`Response [${response.config.method?.toUpperCase()}] ${response.config.url}:`, response.status, response.data);
-        return response;
-    },
-    (error) => {
-        console.error(`API Error:`, error.response?.status, error.response?.data);
-        
-        // Don't redirect on auth-related endpoints
-        if (error.config.url === '/auth/refresh-token' || 
-            error.config.url === '/auth/login' ||
-            error.config.url === '/auth/register') {
-            return Promise.reject(error);
-        }
-
-        if (error.response?.status === 401) {
-            // Handle unauthorized access for non-auth endpoints
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            
-            // Only redirect if not already on the login page
-            if (!window.location.pathname.includes('login')) {
-                window.location.href = '/login';
-            }
-        }
-        return Promise.reject(error);
-    }
-);
-
 // Auth API
 export const authAPI = {
     login: (email: string, password: string) => 
         api.post<ApiResponse<{ token: string; user: UserResponse }>>('/auth/login', { email, password }),
     logout: () => api.post<ApiResponse<object>>('/auth/logout'),
     refreshToken: () => api.post<ApiResponse<{ token: string }>>('/auth/refresh-token'),
+    forgotPassword: (email: string) => 
+        api.post<ApiResponse<{ message: string }>>('/auth/forgot-password', { email }),
+    resetPassword: (token: string, newPassword: string) => 
+        api.post<ApiResponse<{ message: string }>>(`/auth/reset-password/${token}`, { newPassword }),
 };
 
 // User API
@@ -399,6 +347,69 @@ export const userAPI = {
     updateStudent: (id: number, data: Partial<StudentFormData>) => api.patch<ApiResponse<{ student: Student }>>(`/users/students/${id}`, data),
     updateParent: (id: number, data: Partial<ParentFormData>) => api.patch<ApiResponse<{ parent: Parent }>>(`/users/parents/${id}`, data),
     updateTeacher: (id: number, data: Partial<TeacherFormData>) => api.patch<ApiResponse<{ teacher: Teacher }>>(`/users/teachers/${id}`, data),
+    toggleUserActiveStatus: (userId: number, isActive: boolean) => 
+        api.patch<ApiResponse<{ user: { id: number; email: string; role: string; isActive: boolean } }>>
+        (`/users/users/${userId}/status`, { isActive }),
+    toggleStudentActiveStatus: (studentId: number, isActive: boolean) => 
+        api.patch<ApiResponse<{ student: { id: number; name: string; email: string; isActive: boolean } }>>
+        (`/users/students/${studentId}/status`, { isActive }),
+    toggleTeacherActiveStatus: (teacherId: number, isActive: boolean) => 
+        api.patch<ApiResponse<{ teacher: { id: number; name: string; email: string; isActive: boolean } }>>
+        (`/users/teachers/${teacherId}/status`, { isActive }),
+    toggleParentActiveStatus: (parentId: number, isActive: boolean) => 
+        api.patch<ApiResponse<{ parent: { id: number; name: string; email: string; isActive: boolean } }>>
+        (`/users/parents/${parentId}/status`, { isActive }),
+    downloadProfile: (userRole: string, id: number) => {
+        const url = `/users/download-profile/${userRole}/${id}`;
+        
+        // Create a temporary anchor element
+        const link = document.createElement('a');
+        
+        // Set the href to have the full URL with the token in authorization header
+        link.href = api.defaults.baseURL + url;
+        
+        // Append a timestamp to avoid caching issues
+        link.href += `?timestamp=${new Date().getTime()}`;
+        
+        // Set the download attribute to force download
+        link.setAttribute('download', `${userRole.toLowerCase()}_profile_${id}.json`);
+        
+        // Hide the link
+        link.style.display = 'none';
+        
+        // Add to body
+        document.body.appendChild(link);
+        
+        // Fetch the content with proper authorization
+        api.get(url, { 
+            responseType: 'blob',
+            headers: {
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        })
+        .then(response => {
+            // Create blob link to download
+            const blob = new Blob([response.data as BlobPart], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            link.href = url;
+            
+            // Trigger download
+            link.click();
+            
+            // Clean up
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(link);
+        })
+        .catch(error => {
+            document.body.removeChild(link);
+            console.error('Download error:', error);
+            throw error;
+        });
+        
+        // Return a resolved promise to maintain consistent API
+        return Promise.resolve({ data: { status: 'success' } });
+    },
 };
 
 // Academic API
@@ -737,8 +748,10 @@ export const teacherAPI = {
   // Class teacher assignment endpoints
   assignClassTeacher: (data: { teacherId: number; classId: number; sectionId: number }) => 
     api.post<ApiResponse<{ assignment: ClassTeacherAssignment }>>('/teachers/class-teacher', data),
-  getClassTeacherAssignments: () => 
-    api.get<ApiResponse<{ assignments: ClassTeacherAssignment[] }>>(`/teachers/class-teacher/assignments`),
+  getClassTeacherAssignments: (teacherId?: number) => 
+    api.get<ApiResponse<{ assignments: ClassTeacherAssignment[] }>>(`/teachers/class-teacher/assignments`, {
+      params: { teacherId }
+    }),
   removeClassTeacherAssignment: (id: number) => 
     api.delete<ApiResponse<{ message: string }>>(`/teachers/class-teacher/assignments/${id}`),
 };

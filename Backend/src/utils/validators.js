@@ -9,8 +9,10 @@ export const validateEmail = (email) => {
 };
 
 export const validatePassword = (password) => {
-    if (!password || password.length < 8) {
-        throw new AppError(400, 'Password must be at least 8 characters long');
+    // Check if password is at least 8 chars and contains uppercase, lowercase, number, and special character
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$/;
+    if (!password || !passwordRegex.test(password)) {
+        throw new AppError(400, 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character');
     }
     return true;
 };

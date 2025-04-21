@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { FaEdit, FaTrash } from 'react-icons/fa';
+import { FaEdit, FaToggleOn, FaToggleOff } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { userAPI } from '../../services/api';
 import { toast } from 'react-toastify';
 import { Student } from '../../types/api';
+import Button from '../../components/ui/Button';
 
 const StudentsList: React.FC = () => {
     const navigate = useNavigate();
-    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [actionModalOpen, setActionModalOpen] = useState(false);
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+    const [actionType, setActionType] = useState<'activate' | 'deactivate'>('deactivate');
     const [students, setStudents] = useState<Student[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
 
@@ -45,8 +47,7 @@ const StudentsList: React.FC = () => {
         navigate('add-students');
     };
 
-    const handleEditClick = (e: React.MouseEvent, student: Student) => {
-        e.stopPropagation();
+    const handleEditClick = (student: Student) => {
         // Navigate to add student form with student data
         navigate('add-students', { 
             state: { 
@@ -56,17 +57,40 @@ const StudentsList: React.FC = () => {
         });
     };
 
-    const handleDeleteClick = (e: React.MouseEvent, student: Student) => {
-        e.stopPropagation();
+    const handleToggleActiveClick = (student: Student) => {
+        const newAction = student.isActive ? 'deactivate' : 'activate';
+        setActionType(newAction);
         setSelectedStudent(student);
-        setDeleteModalOpen(true);
+        setActionModalOpen(true);
     };
 
-    const handleDeleteConfirm = () => {
-        // Implement delete logic here
-        console.log('Deleting student:', selectedStudent?.id);
-        setDeleteModalOpen(false);
-        setSelectedStudent(null);
+    const handleActionConfirm = async () => {
+        if (!selectedStudent) return;
+        
+        try {
+            // Toggle active status based on current status
+            const isActive = actionType === 'activate';
+            const response = await userAPI.toggleStudentActiveStatus(selectedStudent.id, isActive);
+            
+            if (response.data?.status === 'success') {
+                toast.success(`${selectedStudent.name} has been ${isActive ? 'activated' : 'deactivated'} successfully`);
+                
+                // Update the student in the list with the new active status
+                setStudents(students.map(student => 
+                    student.id === selectedStudent.id 
+                        ? { ...student, isActive: isActive } 
+                        : student
+                ));
+            } else {
+                toast.error(response.data?.message || `Failed to ${actionType} student. Please try again.`);
+            }
+        } catch (error) {
+            console.error(`Error ${actionType}ing student:`, error);
+            toast.error(`Failed to ${actionType} student. Please try again.`);
+        } finally {
+            setActionModalOpen(false);
+            setSelectedStudent(null);
+        }
     };
 
     if (loading) {
@@ -77,12 +101,12 @@ const StudentsList: React.FC = () => {
         <div className="p-6">
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold">All Students</h1>
-                <button 
-                    className="bg-indigo-900 text-white px-4 py-2 rounded-md hover:bg-indigo-800"
+                <Button 
+                    variant="primary"
                     onClick={handleAddStudent}
-                >
+                >   
                     Add Student
-                </button>
+                </Button>
             </div>
 
             {students.length === 0 ? (
@@ -102,6 +126,7 @@ const StudentsList: React.FC = () => {
                                 <th className="px-6 py-3 text-left text-sm font-medium">Gender</th>
                                 <th className="px-6 py-3 text-left text-sm font-medium">Email</th>
                                 <th className="px-6 py-3 text-left text-sm font-medium">Contact No.</th>
+                                <th className="px-6 py-3 text-left text-sm font-medium">Status</th>
                                 <th className="px-6 py-3 text-left text-sm font-medium">Action</th>
                             </tr>
                         </thead>
@@ -120,20 +145,25 @@ const StudentsList: React.FC = () => {
                                     <td className="px-6 py-4 text-sm text-gray-900">{student.gender}</td>
                                     <td className="px-6 py-4 text-sm text-gray-900">{student.email}</td>
                                     <td className="px-6 py-4 text-sm text-gray-900">{student.contactNo}</td>
+                                    <td className="px-6 py-4 text-sm">
+                                        <span className={`px-2 py-1 rounded-full text-xs ${student.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                            {student.isActive ? 'Active' : 'Inactive'}
+                                        </span>
+                                    </td>
                                     <td className="px-6 py-4 text-sm text-gray-900">
                                         <div className="flex space-x-3" onClick={(e) => e.stopPropagation()}>
-                                            <button 
-                                                className="text-green-600 hover:text-green-800"
-                                                onClick={(e) => handleEditClick(e, student)}
+                                            <Button 
+                                                variant="outline"   
+                                                onClick={() => handleEditClick(student)}
                                             >
                                                 <FaEdit />
-                                            </button>
-                                            <button 
-                                                className="text-red-600 hover:text-red-800"
-                                                onClick={(e) => handleDeleteClick(e, student)}
+                                            </Button>
+                                            <Button 
+                                                variant={student.isActive ? "danger" : "primary"}
+                                                onClick={() => handleToggleActiveClick(student)}
                                             >
-                                                <FaTrash />
-                                            </button>
+                                                {student.isActive ? <FaToggleOff /> : <FaToggleOn />}
+                                            </Button>
                                         </div>
                                     </td>
                                 </tr>
@@ -144,11 +174,17 @@ const StudentsList: React.FC = () => {
             )}
 
             <ConfirmationModal
-                isOpen={deleteModalOpen}
-                onClose={() => setDeleteModalOpen(false)}
-                onConfirm={handleDeleteConfirm}
-                title="Delete Student"
-                message={`Are you sure you want to delete ${selectedStudent?.name}? This action cannot be undone.`}
+                isOpen={actionModalOpen}
+                onClose={() => setActionModalOpen(false)}
+                onConfirm={handleActionConfirm}
+                title={actionType === 'activate' ? "Activate Student" : "Deactivate Student"}
+                message={`Are you sure you want to ${actionType} ${selectedStudent?.name}? ${
+                    actionType === 'deactivate' 
+                        ? "They will no longer be able to log in or access any features."
+                        : "This will restore their access to the system."
+                }`}
+                confirmLabel={actionType === 'activate' ? "Activate" : "Deactivate"}
+                cancelLabel="Cancel"
             />
         </div>
     );

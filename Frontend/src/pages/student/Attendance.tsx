@@ -6,11 +6,12 @@ import { format } from 'date-fns';
 import { useAuth } from '../../context/AuthContext';
 import { useParams } from 'react-router-dom';
 import { UserRole } from '../../utils/roles';
+import Button from '../../components/ui/Button';
 
 interface DailyAttendance {
   id: number;
   date: string;
-  status: 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'EXCUSED';
+  status: 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'EXCUSED' | 'REMAINING';
   remarks?: string;
 }
 
@@ -24,7 +25,7 @@ interface MonthlyAttendance {
 
 interface CalendarDay {
   date: Date;
-  status?: 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'EXCUSED';
+  status?: 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'EXCUSED' | 'REMAINING';
   isCurrentMonth: boolean;
   isWeekend: boolean;
   isHoliday: boolean;
@@ -67,8 +68,10 @@ const Attendance: React.FC = () => {
       setIsLoading(true);
       setError(null);
       
-      // Get current date and first day of this month
+      // Use 2025 as the academic year - what the backend expects
       const today = new Date();
+      const currentYear = 2025; // Fixed academic year that backend accepts
+      today.setFullYear(currentYear);
       
       // Determine which student ID to use
       const targetStudentId = studentId ? parseInt(studentId) : user?.student?.id;
@@ -98,7 +101,7 @@ const Attendance: React.FC = () => {
       try {
         const monthlyResponse = await attendanceAPI.getMonthlyAttendance({
           month: today.getMonth() + 1,
-          year: today.getFullYear(),
+          year: currentYear,
           studentId: targetStudentId
         });
         
@@ -122,7 +125,7 @@ const Attendance: React.FC = () => {
             setMonthlyAttendance([
               {
                 month: format(today, 'MMMM yyyy'),
-                year: today.getFullYear(),
+                year: currentYear,
                 presentCount: 0,
                 absentCount: 0,
                 percentage: 0
@@ -134,7 +137,7 @@ const Attendance: React.FC = () => {
           setMonthlyAttendance([
             {
               month: format(today, 'MMMM yyyy'),
-              year: today.getFullYear(),
+              year: currentYear,
               presentCount: 0,
               absentCount: 0,
               percentage: 0
@@ -147,7 +150,7 @@ const Attendance: React.FC = () => {
         setMonthlyAttendance([
           {
             month: format(today, 'MMMM yyyy'),
-            year: today.getFullYear(),
+            year: currentYear,
             presentCount: 0,
             absentCount: 0,
             percentage: 0
@@ -157,18 +160,49 @@ const Attendance: React.FC = () => {
       
       // Fetch last 30 days of attendance
       try {
+        // Calculate a date 30 days ago, ensuring we don't use future years
         const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setFullYear(currentYear);
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
-        const dailyResponse = await attendanceAPI.getDailyAttendance({
-          startDate: format(thirtyDaysAgo, 'yyyy-MM-dd'),
-          endDate: format(today, 'yyyy-MM-dd'),
-          studentId: targetStudentId
-        });
+        // Log the date range we're using for debugging
+        console.log(`Fetching attendance for studentId ${targetStudentId} from ${format(thirtyDaysAgo, 'yyyy-MM-dd')} to ${format(today, 'yyyy-MM-dd')}`);
         
-        if (dailyResponse.data?.status === 'success' && Array.isArray(dailyResponse.data?.data?.attendance)) {
-          setRecentAttendance(dailyResponse.data.data.attendance);
+        // First, attempt to get student class and section since backend requires them
+        const student = await userAPI.getStudentById(targetStudentId);
+        if (student?.data?.status === 'success' && student?.data?.data?.student) {
+          const studentData = student.data.data.student;
+          const classId = studentData.classId || studentData.class?.id;
+          const sectionId = studentData.sectionId || studentData.section?.id;
+          
+          // Check if we have the required class and section IDs
+          if (classId && sectionId) {
+            // Use the class/section approach since student-specific endpoint needs these
+            const dailyResponse = await attendanceAPI.getDailyAttendance({
+              date: format(today, 'yyyy-MM-dd'), // Use current date
+              classId,
+              sectionId,
+              studentId: targetStudentId // Include studentId for filtering
+            });
+            
+            if (dailyResponse.data?.status === 'success' && Array.isArray(dailyResponse.data?.data?.attendance)) {
+              // Filter attendance for this specific student if needed
+              const studentAttendance = dailyResponse.data.data.attendance.filter(
+                record => record.studentId === targetStudentId || record.student?.id === targetStudentId
+              ).map(record => {
+                // If no status is recorded, mark as REMAINING
+                if (!record.status) {
+                  return { ...record, status: 'REMAINING' as const };
+                }
+                return record;
+              });
+              setRecentAttendance(studentAttendance as DailyAttendance[]);
+            } else {
+              setRecentAttendance([]);
+            }
+          }
         } else {
+          console.error('Could not fetch student class/section data');
           setRecentAttendance([]);
         }
       } catch (dailyErr) {
@@ -185,8 +219,13 @@ const Attendance: React.FC = () => {
   };
   
   const generateCalendarDays = (month: Date) => {
-    const year = month.getFullYear();
-    const monthIndex = month.getMonth();
+    // Use 2025 academic year instead of system current year
+    const currentYear = 2025;
+    const correctedMonth = new Date(month);
+    correctedMonth.setFullYear(currentYear);
+    
+    const year = correctedMonth.getFullYear();
+    const monthIndex = correctedMonth.getMonth();
     
     // First day of the month
     const firstDay = new Date(year, monthIndex, 1);
@@ -282,6 +321,7 @@ const Attendance: React.FC = () => {
       case 'LATE': return 'bg-yellow-100 text-yellow-800';
       case 'HALF_DAY': return 'bg-orange-100 text-orange-800';
       case 'EXCUSED': return 'bg-blue-100 text-blue-800';
+      case 'REMAINING': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100';
     }
   };
@@ -343,7 +383,7 @@ const Attendance: React.FC = () => {
           </div>
           
           {/* Stats */}
-          <div className="flex space-x-4">
+          <div className="flex space-x-4" role="region" aria-label="Attendance Statistics">
             {monthlyAttendance[0] && (
               <>
                 <div className="text-center">
@@ -364,9 +404,9 @@ const Attendance: React.FC = () => {
         </div>
         
         {isLoading ? (
-          <div className="text-center py-8">Loading attendance data...</div>
+          <div className="text-center py-8" aria-live="polite">Loading attendance data...</div>
         ) : error ? (
-          <div className="bg-red-100 p-4 rounded-md text-red-800 mb-6">{error}</div>
+          <div className="bg-red-100 p-4 rounded-md text-red-800 mb-6" role="alert">{error}</div>
         ) : (
           <>
             {/* Attendance Summary */}
@@ -379,31 +419,35 @@ const Attendance: React.FC = () => {
             </div>
             
             {/* Calendar View */}
-            <div className="mb-8">
+            <div className="mb-8" role="region" aria-label="Attendance Calendar">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium">Attendance Calendar</h3>
-                <div className="flex items-center space-x-2">
-                  <button 
+                <h3 className="text-lg font-medium" id="calendar-heading">Attendance Calendar</h3>
+                <div className="flex items-center space-x-2" role="group" aria-label="Calendar navigation">
+                  <Button 
+                    variant="outline"
                     onClick={previousMonth}
                     className="p-2 rounded-md hover:bg-gray-100"
+                    ariaLabel="Previous month"
                   >
                     ◀
-                  </button>
-                  <span className="text-md font-medium">
+                  </Button>
+                  <span className="text-md font-medium" aria-live="polite">
                     {format(currentMonth, 'MMMM yyyy')}
                   </span>
-                  <button 
+                  <Button 
+                    variant="outline"
                     onClick={nextMonth}
                     className="p-2 rounded-md hover:bg-gray-100"
+                    ariaLabel="Next month"
                   >
                     ▶
-                  </button>
+                  </Button>
                 </div>
               </div>
               
-              <div className="grid grid-cols-7 gap-1">
+              <div className="grid grid-cols-7 gap-1" role="grid" aria-labelledby="calendar-heading">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="text-center p-2 font-medium">
+                  <div key={day} className="text-center p-2 font-medium" role="columnheader">
                     {day}
                   </div>
                 ))}
@@ -414,10 +458,13 @@ const Attendance: React.FC = () => {
                     className={`
                       p-2 rounded-md text-center min-h-[3rem] flex flex-col items-center justify-center
                       ${!day.isCurrentMonth ? 'text-gray-400' : ''}
-                      ${day.isWeekend ? 'bg-gray-50' : ''}
-                      ${day.isHoliday ? 'bg-blue-50' : ''}
+                      ${day.isWeekend ? 'bg-blue-50' : ''}
+                      ${day.isHoliday ? 'bg-red-50' : ''}
                       ${day.status ? getStatusColor(day.status) : ''}
                     `}
+                    role="gridcell"
+                    aria-label={`${format(day.date, 'EEEE, MMMM d, yyyy')}${day.status ? `, ${day.status}` : ''}`}
+                    tabIndex={day.isCurrentMonth ? 0 : -1}
                   >
                     <span className="text-sm">{format(day.date, 'd')}</span>
                     {day.status && (
@@ -425,7 +472,8 @@ const Attendance: React.FC = () => {
                         {day.status === 'PRESENT' ? 'P' : 
                           day.status === 'ABSENT' ? 'A' : 
                           day.status === 'LATE' ? 'L' : 
-                          day.status === 'HALF_DAY' ? 'H' : 'E'}
+                          day.status === 'HALF_DAY' ? 'H' : 
+                          day.status === 'REMAINING' ? 'R' : 'E'}
                       </span>
                     )}
                   </div>

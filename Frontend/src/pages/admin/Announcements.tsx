@@ -137,6 +137,10 @@ const Announcements: React.FC = () => {
     navigate(`/announcements/create-announcement?id=${id}`);
   };
 
+  const handleView = (id: number) => {
+    navigate(`/announcements/${id}`);
+  };
+
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'URGENT':
@@ -285,26 +289,27 @@ const Announcements: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
+                        variant="outline"
+                        onClick={() => handleView(announcement.id)}
                         className="text-blue-600 hover:text-blue-800"
-                        title="View"
                       >
                         <FaEye />
-                      </button>
-                      <button
-                        className="text-yellow-600 hover:text-yellow-800"
-                        title="Edit"
+                      </Button>
+                      <Button
+                        variant="outline"
                         onClick={() => handleEdit(announcement.id)}
+                        className="text-yellow-600 hover:text-yellow-800"
                       >
                         <FaEdit />
-                      </button>
-                      <button
-                        className="text-red-600 hover:text-red-800"
-                        title="Delete"
+                      </Button>
+                      <Button
+                        variant="outline"
                         onClick={() => handleDelete(announcement.id)}
+                        className="text-red-600 hover:text-red-800"
                       >
                         <FaTrash />
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>

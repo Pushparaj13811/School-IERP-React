@@ -23,14 +23,28 @@
             padding: 20px;
             border-radius: 0 0 5px 5px;
         }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
         .button {
             display: inline-block;
-            padding: 10px 20px;
+            padding: 14px 24px;
             background-color: #292648;
-            color: white;
+            color: #ffffff !important;
             text-decoration: none;
             border-radius: 5px;
-            margin-top: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+            border: none;
+        }
+        .button:hover {
+            background-color: #3a3769;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+            color: #ffffff !important;
         }
         .footer {
             margin-top: 20px;
@@ -49,9 +63,11 @@
         <p>Welcome to School ERP! We're excited to have you on board.</p>
         <p>Your account has been successfully created. You can now access all the features of our platform.</p>
         <p>To get started, please click the button below to log in to your account:</p>
-        <p style="text-align: center;">
-            <a href="{{loginUrl}}" class="button">Login to Your Account</a>
-        </p>
+        
+        <div class="button-container">
+            <a href="{{loginUrl}}" class="button" style="color: #ffffff; font-weight: bold;">Login to Your Account</a>
+        </div>
+        
         <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
         <p>Best regards,<br>School ERP Team</p>
     </div>
