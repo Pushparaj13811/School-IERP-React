@@ -66,9 +66,32 @@ export const forgotPassword = async (req, res, next) => {
 export const resetPassword = async (req, res, next) => {
     try {
         const { token } = req.params;
-        const { password } = req.body;
-        const user = await authService.resetPassword(token, password);
-        createSendToken(user, 200, res);
+        const { newPassword } = req.body;
+        
+        // Validate password strength
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$/;
+        if (!passwordRegex.test(newPassword)) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character'
+            });
+        }
+        
+        const user = await authService.resetPassword(token, newPassword);
+
+        
+        return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                {
+                    status: 'success',
+                    data: { user: { id: user.id, email: user.email } },
+                    message: 'Password has been reset successfully'
+                }
+            )
+        )
     } catch (error) {
         next(error);
     }

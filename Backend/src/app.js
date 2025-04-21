@@ -23,6 +23,7 @@ import teacherRoutes from './routes/teacherRoutes.js';
 import timetableRoutes from './routes/timetableRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import { fileURLToPath } from 'url';
+import reportRoutes from "./routes/reportRoutes.js";
 
 // Get directory name in ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -71,6 +72,7 @@ app.use('/api/v1/leaves', leaveRoutes);
 app.use('/api/v1/teachers', teacherRoutes);
 app.use('/api/v1/timetables', timetableRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
+app.use('/api/v1/reports', reportRoutes);
 
 // Error handling
 app.use(notFoundHandler);
