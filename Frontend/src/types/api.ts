@@ -271,4 +271,45 @@ export interface TeacherFormData {
     country: string;
     postalCode?: string;
   };
+}
+
+// Add this interface for pending attendance days
+export interface PendingAttendanceDays {
+  pendingCount: number;
+  pendingDates: Array<{
+    date: string;
+    classId: number;
+    sectionId: number;
+    className: string;
+    sectionName: string;
+  }>;
+}
+
+// Update AttendanceStats interface to include dailyStats
+export interface AttendanceStats {
+  totalStudents: number;
+  presentCount: number;
+  absentCount: number;
+  lateCount: number;
+  excusedCount: number;
+  halfDayCount: number;
+  presentPercentage: number;
+  dailyStats?: Array<{
+    date: string;
+    present: number;
+    absent: number;
+    percentage: number;
+  }>;
+  dailyTrend?: Array<{
+    date: string;
+    present: number;
+    absent: number;
+    percentage: number;
+  }>;
+  classWiseStats?: Array<{
+    className: string;
+    present: number;
+    absent: number;
+    percentage: number;
+  }>;
 } 

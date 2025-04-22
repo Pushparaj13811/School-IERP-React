@@ -15,6 +15,7 @@ import {
   StudentFormData,
   ParentFormData,
   Subject,
+  PendingAttendanceDays,
 } from '../types/api';
 import { TeacherTimetable } from './timetableService';
 
@@ -49,6 +50,19 @@ interface Announcement {
   createdAt: string;
   updatedAt: string;
   createdBy: number;
+  priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+  expiresAt?: string | null;
+  isActive?: boolean;
+  targetClasses?: { id: number; name: string }[];
+  targetSections?: { id: number; name: string }[];
+  targetRoles?: string[];
+  attachments?: {
+    id: number;
+    name: string;
+    url: string;
+    type: string;
+    size: number;
+  }[];
 }
 
 interface Attendance {
@@ -431,7 +445,7 @@ export const academicAPI = {
 // Announcement API
 export const announcementAPI = {
     getAll: () => api.get<ApiResponse<{ announcements: Announcement[] }>>('/announcements'),
-    getById: (id: string) => api.get<ApiResponse<{ announcement: Announcement }>>(`/announcements/${id}`),
+    getById: (id: string) => api.get<ApiResponse<Announcement>>(`/announcements/${id}`),
     create: (data: FormData | Record<string, unknown>) => {
         // If data is FormData, set proper content type for multipart/form-data
         const config = data instanceof FormData ? {
@@ -441,14 +455,18 @@ export const announcementAPI = {
         } : {};
         return api.post<ApiResponse<{ announcement: Announcement }>>('/announcements', data, config);
     },
-    update: (id: string, data: FormData | Record<string, unknown>) => {
-        // If data is FormData, set proper content type for multipart/form-data
-        const config = data instanceof FormData ? {
+    update: (id: string, data: Record<string, unknown>) => {
+        // Always use JSON for update requests because FormData doesn't handle nested arrays well
+        return api.put<ApiResponse<{ announcement: Announcement }>>(`/announcements/${id}`, data);
+    },
+    updateWithFiles: (id: string, formData: FormData) => {
+        // Special method for updating with file attachments
+        // Uses FormData with multipart/form-data content type
+        return api.put<ApiResponse<{ announcement: Announcement }>>(`/announcements/${id}`, formData, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
-        } : {};
-        return api.put<ApiResponse<{ announcement: Announcement }>>(`/announcements/${id}`, data, config);
+        });
     },
     delete: (id: string) => api.delete<ApiResponse<object>>(`/announcements/${id}`),
 };
@@ -478,6 +496,9 @@ export const attendanceAPI = {
     
     // Statistics
     getAttendanceStats: (params?: Record<string, unknown>) => api.get<ApiResponse<AttendanceStats>>('/attendance/stats', { params }),
+
+    // Pending attendance days
+    getPendingAttendanceDays: (params?: Record<string, unknown>) => api.get<ApiResponse<PendingAttendanceDays>>('/attendance/pending', { params }),
 };
 
 // Result API

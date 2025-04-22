@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { format, isAfter, parseISO } from 'date-fns';
+import { format, isAfter, parseISO,  addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameMonth } from 'date-fns';
 import { attendanceAPI, userAPI, teacherAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { Student as ApiStudent } from '../../types/api';
@@ -54,6 +54,14 @@ interface GroupedStudents {
   }
 }
 
+// New interface for calendar days
+interface CalendarDay {
+  date: Date;
+  status: 'pending' | 'marked' | 'weekend' | 'holiday' | 'future' | 'other';
+  className?: string;
+  sectionName?: string;
+}
+
 const Attendance: React.FC = () => {
   const { user } = useAuth();
   const [assignedClasses, setAssignedClasses] = useState<ClassTeacherAssignment[]>([]);
@@ -75,6 +83,11 @@ const Attendance: React.FC = () => {
   const [isHoliday, setIsHoliday] = useState<boolean>(false);
   const [holidayName, setHolidayName] = useState<string>('');
   const [isSaturday, setIsSaturday] = useState<boolean>(false);
+  // New states for calendar
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
+  const [pendingDays, setPendingDays] = useState<string[]>([]);
+  const [markedDays, setMarkedDays] = useState<string[]>([]);
 
   // Fetch classes assigned to the teacher as class teacher and their students
   useEffect(() => {
@@ -413,6 +426,10 @@ const Attendance: React.FC = () => {
       
       setSuccess('Attendance saved successfully!');
       
+      // Refresh calendar data after saving attendance
+      fetchPendingAttendanceDays();
+      fetchMarkedAttendanceDays();
+      
       // Hide success message after 3 seconds
       setTimeout(() => {
         setSuccess(null);
@@ -442,11 +459,281 @@ const Attendance: React.FC = () => {
     }
   };
 
+  // New function to fetch pending attendance days
+  const fetchPendingAttendanceDays = async () => {
+    try {
+      const response = await attendanceAPI.getPendingAttendanceDays({
+        month: currentMonth.getMonth() + 1,
+        year: currentMonth.getFullYear()
+      });
+      if (response.data?.status === 'success') {
+        const pendingDates = response.data.data.pendingDates.map((item: {
+          date: string;
+          classId: number;
+          sectionId: number;
+          className: string;
+          sectionName: string;
+        }) => item.date);
+        setPendingDays(pendingDates);
+      }
+    } catch (err) {
+      console.error('Error fetching pending attendance days:', err);
+    }
+  };
+
+  // New function to fetch marked attendance days
+  const fetchMarkedAttendanceDays = async () => {
+    // We'll use the existing assignments to check for marked days in the current month
+    if (!assignedClasses || assignedClasses.length === 0) return;
+
+    try {
+      const markedDatesSet = new Set<string>();
+
+      for (const assignment of assignedClasses) {
+        try {
+          // We'll use the stats endpoint to get attendance days for the class
+          const statsRes = await attendanceAPI.getAttendanceStats({
+            classId: assignment.classId,
+            sectionId: assignment.sectionId,
+            month: currentMonth.getMonth() + 1,
+            year: currentMonth.getFullYear()
+          });
+
+          // Type assertion for the response data to include dailyStats
+          type StatsResponseData = {
+            dailyStats?: Array<{
+              date: string;
+              present: number;
+              absent: number;
+              percentage: number;
+            }>;
+          };
+
+          if (statsRes.data?.status === 'success' && (statsRes.data.data as StatsResponseData)?.dailyStats) {
+            (statsRes.data.data as StatsResponseData).dailyStats?.forEach((stat) => {
+              markedDatesSet.add(stat.date);
+            });
+          }
+        } catch (err) {
+          console.error(`Error fetching attendance stats for class ${assignment.classId}, section ${assignment.sectionId}:`, err);
+        }
+      }
+
+      setMarkedDays(Array.from(markedDatesSet));
+    } catch (err) {
+      console.error('Error fetching marked attendance days:', err);
+    }
+  };
+
+  // Effect to generate calendar days when current month changes
+  useEffect(() => {
+    generateCalendarDays();
+  }, [currentMonth, pendingDays, markedDays]);
+
+  // Effect to fetch attendance data when month changes
+  useEffect(() => {
+    fetchPendingAttendanceDays();
+    fetchMarkedAttendanceDays();
+  }, [currentMonth]);
+
+  // Effect to fetch pending days on load
+  useEffect(() => {
+    fetchPendingAttendanceDays();
+  }, []);
+
+  // Generate calendar days for the current month
+  const generateCalendarDays = () => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    const startDate = monthStart;
+    const endDate = monthEnd;
+
+    // Get all days in the month
+    const days = eachDayOfInterval({ start: startDate, end: endDate });
+
+    // Get the first day of the month in the week
+    const startDayOfWeek = getDay(startDate);
+
+    // Add leading days from the previous month to make the calendar start on Sunday
+    const leadingDays = [];
+    for (let i = startDayOfWeek; i > 0; i--) {
+      const prevDate = new Date(startDate);
+      prevDate.setDate(prevDate.getDate() - i);
+      leadingDays.push(prevDate);
+    }
+
+    // Determine the last day of the month in the week
+    const endDayOfWeek = getDay(endDate);
+
+    // Add trailing days from the next month to make the calendar end on Saturday
+    const trailingDays = [];
+    for (let i = 1; i < 7 - endDayOfWeek; i++) {
+      const nextDate = new Date(endDate);
+      nextDate.setDate(nextDate.getDate() + i);
+      trailingDays.push(nextDate);
+    }
+
+    // Combine all days
+    const allDays = [...leadingDays, ...days, ...trailingDays];
+
+    // Map days to calendar day objects
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const calendarDaysArray: CalendarDay[] = allDays.map(date => {
+      const dateString = format(date, 'yyyy-MM-dd');
+      // Only Saturday is considered a weekend day
+      const isWeekend = getDay(date) === 6;
+      const isCurrentMonth = isSameMonth(date, currentMonth);
+      const isFuture = date > today;
+      const isPending = pendingDays.includes(dateString);
+      const isMarked = markedDays.includes(dateString);
+      const isHoliday = holidays.some(h => h.date === dateString);
+
+      let status: CalendarDay['status'] = 'other';
+
+      if (!isCurrentMonth) {
+        status = 'other';
+      } else if (isWeekend) {
+        status = 'weekend';
+      } else if (isHoliday) {
+        status = 'holiday';
+      } else if (isFuture) {
+        status = 'future';
+      } else if (isPending) {
+        status = 'pending';
+      } else if (isMarked) {
+        status = 'marked';
+      } else if (!isFuture && isCurrentMonth) {
+        // If it's a past or current day that's not marked and not specifically in pendingDays
+        // it should still be considered pending
+        status = 'pending';
+      }
+
+      return { date, status };
+    });
+
+    setCalendarDays(calendarDaysArray);
+  };
+
+  // Navigation functions for the calendar
+  const previousMonth = () => {
+    setCurrentMonth(prevMonth => subMonths(prevMonth, 1));
+  };
+
+  const nextMonth = () => {
+    setCurrentMonth(prevMonth => addMonths(prevMonth, 1));
+  };
+
+  // Function to get CSS class for calendar day
+  const getCalendarDayClass = (day: CalendarDay) => {
+    if (!day.status || day.status === 'other') {
+      return 'text-gray-300 bg-gray-50';
+    }
+    if (day.status === 'weekend') {
+      return 'text-gray-500 bg-gray-100';
+    }
+    if (day.status === 'holiday') {
+      return 'text-red-600 bg-red-100';
+    }
+    if (day.status === 'future') {
+      return 'text-gray-400';
+    }
+    if (day.status === 'pending') {
+      return 'text-orange-600 bg-orange-100 cursor-pointer';
+    }
+    if (day.status === 'marked') {
+      return 'text-green-600 bg-green-100 cursor-pointer';
+    }
+    return '';
+  };
+
   return (
     <div className="container mx-auto px-4 py-6">
       <h1 className="text-2xl font-bold mb-6">Attendance Management</h1>
       
-      {/* Filters - Only date selection remains */}
+      {/* Calendar Section */}
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold">Attendance Calendar</h2>
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              onClick={previousMonth}
+              className="p-2 rounded-md hover:bg-gray-100"
+            >
+              &lt;
+            </Button>
+            <span className="text-md font-medium">
+              {format(currentMonth, 'MMMM yyyy')}
+            </span>
+            <Button
+              variant="outline"
+              onClick={nextMonth}
+              className="p-2 rounded-md hover:bg-gray-100"
+            >
+              &gt;
+            </Button>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className="text-center p-2 font-medium text-gray-700">
+              {day}
+            </div>
+          ))}
+        </div>
+        
+        <div className="grid grid-cols-7 gap-1">
+          {calendarDays.map((day, index) => (
+            <div
+              key={index}
+              className={`p-2 rounded-md text-center min-h-[3rem] flex flex-col items-center justify-center ${getCalendarDayClass(day)}`}
+              onClick={() => {
+                if (day.status === 'pending' || day.status === 'marked') {
+                  setSelectedDate(format(day.date, 'yyyy-MM-dd'));
+                }
+              }}
+            >
+              <span className="text-sm">{format(day.date, 'd')}</span>
+              {day.status === 'pending' && (
+                <span className="text-xs mt-1 font-medium">Pending</span>
+              )}
+              {day.status === 'marked' && (
+                <span className="text-xs mt-1 font-medium">Marked</span>
+              )}
+              {day.status === 'weekend' && (
+                <span className="text-xs mt-1 font-medium">Weekend</span>
+              )}
+              {day.status === 'holiday' && (
+                <span className="text-xs mt-1 font-medium">Holiday</span>
+              )}
+            </div>
+          ))}
+        </div>
+        
+        <div className="mt-2 flex justify-center space-x-4 text-sm">
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-orange-100 mr-1 rounded-sm"></div>
+            <span>Pending</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-green-100 mr-1 rounded-sm"></div>
+            <span>Marked</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-gray-100 mr-1 rounded-sm"></div>
+            <span>Weekend</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-red-100 mr-1 rounded-sm"></div>
+            <span>Holiday</span>
+          </div>
+        </div>
+      </div>
+      
+      {/* Filters - Date selection */}
       <div className="bg-white p-4 rounded-lg shadow mb-6">
         <div className="flex items-center justify-between">
           <div className="flex-1 max-w-xs">

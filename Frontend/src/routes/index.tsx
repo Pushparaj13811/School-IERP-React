@@ -28,6 +28,7 @@ const TimeTable = lazy(() => import('../pages/student/TimeTable'));
 const TeacherTimetable = lazy(() => import('../pages/teacher/Timetable'));
 const ManageTimetable = lazy(() => import('../pages/admin/ManageTimetable'));
 const Announcements = lazy(() => import('../pages/shared/AnnouncementView'));
+const AnnouncementDetail = lazy(() => import('../pages/shared/AnnouncementDetail'));
 const Logout = lazy(() => import('../pages/Logout'));
 
 // Admin pages
@@ -195,6 +196,11 @@ export const routes: Route[] = [
     roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN, UserRole.PARENT],
   },
   {
+    path: '/announcements/:id',
+    component: AnnouncementDetail,
+    roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN, UserRole.PARENT],
+  },
+  {
     path: '/logout',
     component: Logout,
     roles: [UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN, UserRole.PARENT],
@@ -251,7 +257,7 @@ export const routes: Route[] = [
     roles: [UserRole.ADMIN],
   },
   {
-    path: 'announcements/create-announcement',
+    path: '/announcements/create-announcement',
     component: CreateAnnouncement,
     roles: [UserRole.ADMIN],
   },

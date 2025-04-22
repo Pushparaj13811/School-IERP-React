@@ -21,12 +21,15 @@ interface AnnouncementData {
     name: string;
     role: string;
   };
-  targetClasses?: string[];
-  targetSections?: string[];
+  targetClasses?: string[] | { id: number; name: string }[];
+  targetSections?: string[] | { id: number; name: string }[];
+  targetRoles?: string[];
   attachments?: Array<{
+    id: number;
     name: string;
     url: string;
     type: string;
+    size: number;
   }>;
 }
 
@@ -43,9 +46,11 @@ interface Announcement {
     name: string;
     role: string;
   };
-  targetClasses: string[];
-  targetSections: string[];
+  targetClasses: string[] | { id: number; name: string }[];
+  targetSections: string[] | { id: number; name: string }[];
+  targetRoles?: string[];
   attachments: {
+    id: number;
     name: string;
     url: string;
     type: string;
@@ -143,7 +148,7 @@ const AnnouncementView: React.FC = () => {
                     {user?.role === UserRole.ADMIN && (
                         <Button
                             variant="primary"
-                            onClick={() => navigate('/admin/announcements/create-announcement')}
+                            onClick={() => navigate('/announcements/create-announcement')}
                         >
                             Create Announcement
                         </Button>
@@ -275,7 +280,7 @@ const AnnouncementView: React.FC = () => {
                                     <p className="text-gray-700 whitespace-pre-line">{selectedAnnouncement.content}</p>
                                 </div>
 
-                                {selectedAnnouncement.attachments.length > 0 && (
+                                {selectedAnnouncement.attachments && selectedAnnouncement.attachments.length > 0 && (
                                     <div className="border-t pt-4">
                                         <h3 className="text-lg font-medium text-gray-900 mb-2">Attachments</h3>
                                         <div className="space-y-2">
@@ -283,6 +288,8 @@ const AnnouncementView: React.FC = () => {
                                                 <a
                                                     key={index}
                                                     href={attachment.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
                                                     className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
                                                 >
                                                     <FaPaperclip />
