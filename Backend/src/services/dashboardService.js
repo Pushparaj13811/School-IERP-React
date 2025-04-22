@@ -1,4 +1,9 @@
 import { prisma } from '../databases/prismaClient.js';
+import { AttendanceService } from './attendanceService.js';
+import { ApiError } from '../utils/apiError.js';
+
+// Initialize attendance service
+const attendanceService = new AttendanceService();
 
 /**
  * Service for fetching admin dashboard data
@@ -160,7 +165,7 @@ export const getAdminDashboardData = async () => {
  */
 export const getTeacherDashboardData = async (teacherId) => {
   if (!teacherId) {
-    throw new Error("Teacher ID is required");
+    throw new ApiError(400, "Teacher ID is required");
   }
   
   // Get teacher details with all relations
@@ -197,7 +202,7 @@ export const getTeacherDashboardData = async (teacherId) => {
   });
 
   if (!teacher) {
-    throw new Error("Teacher not found");
+    throw new ApiError(404, "Teacher not found");
   }
 
   // Get today's timetable
@@ -363,7 +368,7 @@ export const getTeacherDashboardData = async (teacherId) => {
   });
 
   // Count total students and classes
-  const [totalStudents, totalClasses, pendingAttendances] = await Promise.all([
+  const [totalStudents, totalClasses] = await Promise.all([
     prisma.student.count({
       where: {
         classId: {
@@ -374,10 +379,13 @@ export const getTeacherDashboardData = async (teacherId) => {
         }
       }
     }),
-    teacher.classes.length,
-    // Estimate pending attendances - assume one per day for each class-section combo
-    Math.min(5, teacher.classes.length * teacher.sections.length)
+    teacher.classes.length
   ]);
+
+  // Get pending attendance days using the new method
+  const pendingAttendance = await attendanceService.getPendingAttendanceDays(teacherId);
+  const pendingAttendances = pendingAttendance.pendingCount;
+  const pendingAttendanceDates = pendingAttendance.pendingDates;
 
   return {
     teacher: {
@@ -398,6 +406,7 @@ export const getTeacherDashboardData = async (teacherId) => {
     totalStudents,
     totalClasses,
     pendingAttendances,
+    pendingAttendanceDates,
     pendingLeaveRequests: pendingLeaveApplications.length,
     todayTimetable: timetable,
     pendingLeaves,
@@ -430,7 +439,7 @@ export const getTeacherDashboardData = async (teacherId) => {
  */
 export const getStudentDashboardData = async (studentId) => {
   if (!studentId) {
-    throw new Error("Student ID is required");
+    throw new ApiError(400, "Student ID is required");
   }
 
   // Get student details with all relations
@@ -447,7 +456,7 @@ export const getStudentDashboardData = async (studentId) => {
   });
 
   if (!student) {
-    throw new Error("Student not found");
+    throw new ApiError(404, "Student not found");
   }
 
   // Get today's timetable
@@ -605,7 +614,7 @@ export const getStudentDashboardData = async (studentId) => {
  */
 export const getParentDashboardData = async (parentId) => {
   if (!parentId) {
-    throw new Error("Parent ID is required");
+    throw new ApiError(400, "Parent ID is required");
   }
 
   // Get parent details with children
@@ -626,7 +635,7 @@ export const getParentDashboardData = async (parentId) => {
   });
 
   if (!parent) {
-    throw new Error("Parent not found");
+    throw new ApiError(404, "Parent not found");
   }
 
   // For each child, get attendance and recent results

@@ -7,7 +7,8 @@ import {
     getClassAttendance,
     markDailyAttendance, 
     getDailyAttendance, 
-    getAttendanceStats 
+    getAttendanceStats,
+    getPendingAttendanceDays
 } from '../controller/attendanceController.js';
 
 const router = express.Router();
@@ -33,5 +34,8 @@ router.get('/class', restrictTo('TEACHER'), getClassAttendance);
 
 // Statistics
 router.get('/stats', getAttendanceStats);
+
+// Pending attendance days route (teacher only)
+router.get('/pending', restrictTo('TEACHER'), getPendingAttendanceDays);
 
 export default router; 

@@ -861,6 +861,8 @@ export class AttendanceService {
             
             // Get daily attendance counts for each day in the month
             const dailyStats = [];
+            const classAttendanceDates = new Set(); // Track days where attendance was recorded
+            
             for (let day = 1; day <= monthEnd.getDate(); day++) {
                 const date = new Date(targetYear, targetMonth, day);
                 
@@ -897,33 +899,82 @@ export class AttendanceService {
                     }
                 });
                 
-                const presentCount = dailyAttendance.filter(record => 
-                    record.status === 'PRESENT' || record.status === 'LATE' || record.status === 'HALF_DAY').length;
-                const absentCount = dailyAttendance.filter(record => 
-                    record.status === 'ABSENT' || record.status === 'EXCUSED').length;
-                const totalStudentsCount = students.length;
-                const attendancePercentage = totalStudentsCount > 0 ? (presentCount / totalStudentsCount) * 100 : 0;
-                
-                dailyStats.push({
-                    date: new Date(targetYear, targetMonth, day),
-                    presentCount,
-                    absentCount,
-                    totalStudents: totalStudentsCount,
-                    percentage: parseFloat(attendancePercentage.toFixed(2))
-                });
+                // Only consider days where attendance was actually recorded
+                if (dailyAttendance.length > 0) {
+                    classAttendanceDates.add(date.toISOString().split('T')[0]);
+                    
+                    const presentCount = dailyAttendance.filter(record => 
+                        record.status === 'PRESENT' || record.status === 'LATE' || record.status === 'HALF_DAY').length;
+                    const absentCount = dailyAttendance.filter(record => 
+                        record.status === 'ABSENT').length;
+                    const percentage = students.length > 0 ? (presentCount / students.length) * 100 : 0;
+                    
+                    dailyStats.push({
+                        date: date.toISOString().split('T')[0],
+                        present: presentCount,
+                        absent: absentCount,
+                        percentage: percentage
+                    });
+                }
             }
             
+            // Calculate pending attendance days (working days where attendance wasn't recorded)
+            const pendingDates = [];
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            for (let day = 1; day <= monthEnd.getDate(); day++) {
+                const date = new Date(targetYear, targetMonth, day);
+                
+                // Skip future dates
+                if (date > today) {
+                    continue;
+                }
+                
+                // Skip weekends (Saturday and Sunday)
+                if (date.getDay() === 0 || date.getDay() === 6) {
+                    continue;
+                }
+                
+                // Check if this is a holiday
+                const isHoliday = await prisma.holiday.findFirst({
+                    where: {
+                        fromDate: {
+                            lte: date
+                        },
+                        toDate: {
+                            gte: date
+                        }
+                    }
+                });
+                
+                if (isHoliday) {
+                    continue;
+                }
+                
+                const dateString = date.toISOString().split('T')[0];
+                if (!classAttendanceDates.has(dateString)) {
+                    pendingDates.push(dateString);
+                }
+            }
+            
+            // Prepare statistics to return
             return {
-                classId: parseInt(classId),
-                sectionId: parseInt(sectionId),
-                month: targetMonth + 1,
-                year: targetYear,
-                workingDays,
                 totalStudents: students.length,
-                averageAttendance: parseFloat(averagePercentage.toFixed(2)),
-                dailyStats
+                averageAttendancePercentage: averagePercentage,
+                workingDays: workingDays.length,
+                markedDays: classAttendanceDates.size,
+                pendingDays: pendingDates.length,
+                pendingDates: pendingDates,
+                dailyStats: dailyStats,
+                students: students.map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    attendance: monthlyAttendance.find(a => a.studentId === s.id) || null
+                }))
             };
         } catch (error) {
+            console.error(`Error in getAttendanceStats: ${error.message}`);
             throw error;
         }
     }
@@ -1123,6 +1174,130 @@ export class AttendanceService {
             };
         } catch (error) {
             console.error(`Error in getStudentAttendance: ${error.message}`);
+            throw error;
+        }
+    }
+
+    // New method to get pending attendance days for a teacher
+    async getPendingAttendanceDays(teacherId, month, year) {
+        try {
+            if (!teacherId) {
+                throw new ApiError(400, 'Teacher ID is required');
+            }
+            
+            // Get class teacher assignments for this teacher
+            const assignments = await prisma.classTeacherAssignment.findMany({
+                where: {
+                    teacherId: parseInt(teacherId)
+                },
+                include: {
+                    class: true,
+                    section: true
+                }
+            });
+            
+            if (!assignments || assignments.length === 0) {
+                return {
+                    pendingCount: 0,
+                    pendingDates: []
+                };
+            }
+            
+            // Get current date and set to beginning of day
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            // Use provided month and year or current month and year
+            const targetMonth = month !== undefined ? month - 1 : today.getMonth();
+            const targetYear = year !== undefined ? year : today.getFullYear();
+            
+            // Get first day of the target month
+            const startOfMonth = new Date(targetYear, targetMonth, 1);
+            
+            // Get last day of the target month
+            const endOfMonth = new Date(targetYear, targetMonth + 1, 0);
+            
+            // If month and year are future, return empty results
+            if (startOfMonth > today) {
+                return {
+                    pendingCount: 0,
+                    pendingDates: []
+                };
+            }
+            
+            // If month and year are in the past, use the whole month
+            // If it's the current month, only use days up to today
+            const endDate = endOfMonth > today ? today : endOfMonth;
+            
+            const pendingAttendance = [];
+            
+            // For each class-section assignment, check for missing attendance
+            for (const assignment of assignments) {
+                // Get working days in this month up to today/end of month
+                const workingDays = [];
+                const currentDate = new Date(startOfMonth);
+                
+                while (currentDate <= endDate) {
+                    // Skip weekends (only Saturday as per requirement)
+                    if (currentDate.getDay() !== 6) {
+                        // Check if this is a holiday
+                        const isHoliday = await prisma.holiday.findFirst({
+                            where: {
+                                fromDate: {
+                                    lte: currentDate
+                                },
+                                toDate: {
+                                    gte: currentDate
+                                }
+                            }
+                        });
+                        
+                        if (!isHoliday) {
+                            workingDays.push(new Date(currentDate));
+                        }
+                    }
+                    
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+                
+                // For each working day, check if attendance was marked
+                for (const workingDay of workingDays) {
+                    const dateStart = new Date(workingDay);
+                    dateStart.setHours(0, 0, 0, 0);
+                    
+                    const dateEnd = new Date(workingDay);
+                    dateEnd.setHours(23, 59, 59, 999);
+                    
+                    // Check if attendance exists for this day
+                    const attendanceExists = await prisma.dailyAttendance.findFirst({
+                        where: {
+                            classId: assignment.classId,
+                            sectionId: assignment.sectionId,
+                            date: {
+                                gte: dateStart,
+                                lt: dateEnd
+                            }
+                        }
+                    });
+                    
+                    if (!attendanceExists) {
+                        pendingAttendance.push({
+                            date: workingDay.toISOString().split('T')[0],
+                            classId: assignment.classId,
+                            sectionId: assignment.sectionId,
+                            className: assignment.class.name,
+                            sectionName: assignment.section.name
+                        });
+                    }
+                }
+            }
+            
+            return {
+                pendingCount: pendingAttendance.length,
+                pendingDates: pendingAttendance
+            };
+        } catch (error) {
+            console.error(`Error in getPendingAttendanceDays: ${error.message}`);
             throw error;
         }
     }

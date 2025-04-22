@@ -207,23 +207,24 @@ export const createAnnouncement = async (req, res, next) => {
             targetRoles = [],
         } = req.body;
 
-        const attachments = req.files;
+        const files = req.files;
+        const processedAttachments = [];
 
-        const { id: userId, role: userRole } = req.user;
-
-        if (attachments) {
-            for (const attachment of attachments) {
+        if (files && files.length > 0) {
+            for (const file of files) {
                 const host = req.headers.host;
                 const protocol = req.secure ? 'https' : 'http';
-                const fileUrl = `${protocol}://${host}/uploads/announcements/${attachment.filename}`;
-                attachments.push({
-                    fileName: attachment.originalname,
-                    fileUrl,
-                    fileType: attachment.mimetype,
-                    fileSize: attachment.size
+                const fileUrl = `${protocol}://${host}/uploads/announcements/${file.filename}`;
+                processedAttachments.push({
+                    name: file.originalname,
+                    url: fileUrl,
+                    type: file.mimetype,
+                    size: file.size
                 });
             }
         }
+
+        const { id: userId, role: userRole } = req.user;
 
         // Get creator IDs based on role
         let teacherId = null;
@@ -293,7 +294,7 @@ export const createAnnouncement = async (req, res, next) => {
                     }))
                 },
                 attachments: {
-                    create: attachments.map(attachment => ({
+                    create: processedAttachments.map(attachment => ({
                         fileName: attachment.name,
                         fileUrl: attachment.url,
                         fileType: attachment.type,
@@ -381,6 +382,24 @@ export const updateAnnouncement = async (req, res, next) => {
             targetRoles = [],
             attachments = []
         } = req.body;
+
+        // Process new file uploads
+        const files = req.files;
+        const newAttachments = [];
+
+        if (files && files.length > 0) {
+            for (const file of files) {
+                const host = req.headers.host;
+                const protocol = req.secure ? 'https' : 'http';
+                const fileUrl = `${protocol}://${host}/uploads/announcements/${file.filename}`;
+                newAttachments.push({
+                    name: file.originalname,
+                    url: fileUrl,
+                    type: file.mimetype,
+                    size: file.size
+                });
+            }
+        }
 
         // Check if the announcement exists
         const announcementExists = await prisma.announcement.findUnique({
@@ -476,6 +495,45 @@ export const updateAnnouncement = async (req, res, next) => {
                             }
                         })
                     ));
+                }
+            }
+
+            // Process file attachments if there are any new ones
+            if (newAttachments.length > 0) {
+                // Create new attachments
+                await Promise.all(newAttachments.map(attachment =>
+                    tx.announcementAttachment.create({
+                        data: {
+                            announcementId: Number(id),
+                            fileName: attachment.name,
+                            fileUrl: attachment.url,
+                            fileType: attachment.type,
+                            fileSize: attachment.size
+                        }
+                    })
+                ));
+            }
+
+            // Handle existing attachments that should be kept
+            if (attachments && attachments.length > 0) {
+                // First get all current attachment IDs
+                const currentAttachments = await tx.announcementAttachment.findMany({
+                    where: { announcementId: Number(id) },
+                    select: { id: true }
+                });
+                
+                const currentAttachmentIds = currentAttachments.map(a => a.id);
+                const keepAttachmentIds = attachments.map(a => Number(a.id));
+                
+                // Delete attachments that are no longer needed
+                const attachmentsToDelete = currentAttachmentIds.filter(id => !keepAttachmentIds.includes(id));
+                
+                if (attachmentsToDelete.length > 0) {
+                    await tx.announcementAttachment.deleteMany({
+                        where: {
+                            id: { in: attachmentsToDelete }
+                        }
+                    });
                 }
             }
 
