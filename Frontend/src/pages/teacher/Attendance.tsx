@@ -311,10 +311,14 @@ const Attendance: React.FC = () => {
   const handleDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newDate = event.target.value;
     
+    // Parse and format the date consistently
+    const selectedDateObj = parseISO(newDate);
+    // Use the same format as in the rest of the application
+    const formattedDate = format(selectedDateObj, 'yyyy-MM-dd');
+    
     // Validate date is not in the future
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const selectedDateObj = parseISO(newDate);
     
     if (isAfter(selectedDateObj, today)) {
       setError('Cannot mark attendance for future dates');
@@ -322,7 +326,7 @@ const Attendance: React.FC = () => {
       setError(null);
     }
     
-    setSelectedDate(newDate);
+    setSelectedDate(formattedDate);
   };
 
   const handleStatusChange = (studentId: number, status: 'PRESENT' | 'ABSENT' | 'LATE' | 'HALF_DAY' | 'EXCUSED') => {
@@ -495,7 +499,11 @@ const Attendance: React.FC = () => {
 
           if (statsRes.data?.status === 'success' && (statsRes.data.data as StatsResponseData)?.dailyStats) {
             (statsRes.data.data as StatsResponseData).dailyStats?.forEach((stat) => {
-              markedDatesSet.add(stat.date);
+              // Ensure consistent date formatting by parsing the date and reformatting
+              const parsedDate = new Date(stat.date);
+              // Ensure we're using local time zone (not UTC) for date string
+              const localDateString = format(parsedDate, 'yyyy-MM-dd');
+              markedDatesSet.add(localDateString);
             });
           }
         } catch (err) {
@@ -525,7 +533,16 @@ const Attendance: React.FC = () => {
             if (attendanceRes.data?.status === 'success' && 
                 attendanceRes.data.data?.attendance && 
                 attendanceRes.data.data.attendance.length > 0) {
-              markedDatesSet.add(dateString);
+              
+              // Check if at least one student has a non-REMAINING status
+              const hasMarkedAttendance = attendanceRes.data.data.attendance.some(
+                (record: { status: string }) => record.status !== 'REMAINING'
+              );
+              
+              // Only mark the day if at least one student has real attendance
+              if (hasMarkedAttendance) {
+                markedDatesSet.add(dateString);
+              }
             }
           } catch {
             // Ignore errors for individual dates
@@ -554,7 +571,11 @@ const Attendance: React.FC = () => {
           sectionId: number;
           className: string;
           sectionName: string;
-        }) => item.date);
+        }) => {
+          // Ensure consistent date formatting
+          const parsedDate = new Date(item.date);
+          return format(parsedDate, 'yyyy-MM-dd');
+        });
         return pendingDates;
       }
       return [];
@@ -679,15 +700,39 @@ const Attendance: React.FC = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // Debug logging - helpful to diagnose date issues
+    if (pendingDays.length > 0 || markedDays.length > 0) {
+      console.log('Calendar data:', { 
+        pendingDays: pendingDays.slice(0, 3), 
+        markedDays: markedDays.slice(0, 3) 
+      });
+    }
+
     const calendarDaysArray: CalendarDay[] = allDays.map(date => {
-      const dateString = format(date, 'yyyy-MM-dd');
+      // Ensure date is using local time (not UTC)
+      const localDate = new Date(date);
+      // Format date consistently with how we handle dates from API
+      const dateString = format(localDate, 'yyyy-MM-dd');
+      
+      // Debug specific dates if needed
+      if (localDate.getDate() === 23 || localDate.getDate() === 24) {
+        console.log(`Checking date ${dateString}:`, {
+          isPending: pendingDays.includes(dateString),
+          isMarked: markedDays.includes(dateString)
+        });
+      }
+      
       // Only Saturday is considered a weekend day
-      const isWeekend = getDay(date) === 6;
-      const isCurrentMonth = isSameMonth(date, currentMonth);
-      const isFuture = date > today;
+      const isWeekend = getDay(localDate) === 6;
+      const isCurrentMonth = isSameMonth(localDate, currentMonth);
+      const isFuture = localDate > today;
       const isPending = pendingDays.includes(dateString);
       const isMarked = markedDays.includes(dateString);
-      const isHoliday = holidays.some(h => h.date === dateString);
+      const isHoliday = holidays.some(h => {
+        // Parse holiday date to ensure consistent comparison
+        const holidayDate = format(new Date(h.date), 'yyyy-MM-dd');
+        return holidayDate === dateString;
+      });
 
       let status: CalendarDay['status'] = 'other';
 
@@ -699,17 +744,14 @@ const Attendance: React.FC = () => {
         status = 'holiday';
       } else if (isFuture) {
         status = 'future';
-      } else if (isPending) {
-        status = 'pending';
       } else if (isMarked) {
         status = 'marked';
-      } else if (!isFuture && isCurrentMonth) {
-        // If it's a past or current day that's not marked and not specifically in pendingDays
-        // it should still be considered pending
+      } else if (isPending || (!isFuture && isCurrentMonth)) {
+        // If it's a past or current day that's not marked, consider it pending
         status = 'pending';
       }
 
-      return { date, status };
+      return { date: localDate, status };
     });
 
     setCalendarDays(calendarDaysArray);
@@ -791,7 +833,9 @@ const Attendance: React.FC = () => {
               className={`p-2 rounded-md text-center min-h-[3rem] flex flex-col items-center justify-center ${getCalendarDayClass(day)}`}
               onClick={() => {
                 if (day.status === 'pending' || day.status === 'marked') {
-                  setSelectedDate(format(day.date, 'yyyy-MM-dd'));
+                  // Use consistent date formatting
+                  const formattedDate = format(day.date, 'yyyy-MM-dd');
+                  setSelectedDate(formattedDate);
                 }
               }}
             >
