@@ -74,9 +74,9 @@ const CreateAnnouncement: React.FC = () => {
                     setIsLoading(true);
                     const response = await announcementAPI.getById(announcementId);
                     
-                    if (response.data?.status === 'success' && response.data?.data?.announcement) {
+                    if (response.data?.status === 'success' && response.data?.data) {
                         // Convert to unknown first, then to AnnouncementData
-                        const announcement = response.data.data.announcement as unknown as AnnouncementData;
+                        const announcement = response.data.data as unknown as AnnouncementData;
                         
                         // Set basic announcement data
                         setTitle(announcement.title);
@@ -282,49 +282,99 @@ const CreateAnnouncement: React.FC = () => {
             // Convert from lowercase (e.g., 'student') to uppercase (e.g., 'STUDENT')
             const formattedRoles = selectedRoles.map(role => role.toUpperCase());
             
-            // Create FormData for multipart file upload
-            const formData = new FormData();
-            
-            // Add basic announcement data
-            formData.append('title', title);
-            formData.append('content', content);
-            formData.append('priority', priority);
-            
-            if (expiresAt) {
-                formData.append('expiresAt', expiresAt);
-            }
-            
-            // Add target classes and sections
-            selectedClasses.forEach(classId => {
-                formData.append('targetClassIds', classId.toString());
-            });
-            
-            selectedSections.forEach(sectionId => {
-                formData.append('targetSectionIds', sectionId.toString());
-            });
-            
-            // Add target roles
-            formattedRoles.forEach(role => {
-                formData.append('targetRoles', role);
-            });
-            
-            // Add attachments
-            attachments.forEach(attachment => {
-                // Only append new files (not existing ones with URLs)
-                if (!attachment.url || !attachment.url.startsWith('http')) {
-                    formData.append('attachments', attachment.file);
-                }
-            });
-            
             let response;
             
             if (isEditMode && announcementId) {
-                // Update existing announcement
-                response = await announcementAPI.update(announcementId, formData);
+                // Check if there are new attachments to upload (without URLs)
+                const newAttachments = attachments.filter(a => !a.url || !a.url.startsWith('http'));
+                
+                if (newAttachments.length > 0) {
+                    // If there are new files to upload, use FormData but with special handling for arrays
+                    const formData = new FormData();
+                    
+                    // Add basic announcement data
+                    formData.append('title', title);
+                    formData.append('content', content);
+                    formData.append('priority', priority);
+                    
+                    if (expiresAt) {
+                        formData.append('expiresAt', expiresAt);
+                    }
+                    
+                    // For arrays, append each item individually with array notation in the key
+                    // This is the correct way to handle arrays in FormData for most backends
+                    selectedClasses.forEach((classId, index) => {
+                        formData.append(`targetClassIds[${index}]`, classId.toString());
+                    });
+                    
+                    selectedSections.forEach((sectionId, index) => {
+                        formData.append(`targetSectionIds[${index}]`, sectionId.toString());
+                    });
+                    
+                    formattedRoles.forEach((role, index) => {
+                        formData.append(`targetRoles[${index}]`, role);
+                    });
+                    
+                    // Add new attachment files
+                    newAttachments.forEach(attachment => {
+                        formData.append('attachments', attachment.file);
+                    });
+                    
+                    // Update existing announcement with files
+                    response = await announcementAPI.updateWithFiles(announcementId, formData);
+                } else {
+                    // No new files, use regular JSON
+                    const updateData = {
+                        title,
+                        content,
+                        priority,
+                        expiresAt: expiresAt || undefined,
+                        targetClassIds: selectedClasses,
+                        targetSectionIds: selectedSections,
+                        targetRoles: formattedRoles
+                    };
+                    
+                    // Update existing announcement without files
+                    response = await announcementAPI.update(announcementId, updateData);
+                }
+                
                 if (response.data?.status === 'success') {
                     toast.success('Announcement updated successfully!');
                 }
             } else {
+                // For create requests, use FormData as before
+                const formData = new FormData();
+                
+                // Add basic announcement data
+                formData.append('title', title);
+                formData.append('content', content);
+                formData.append('priority', priority);
+                
+                if (expiresAt) {
+                    formData.append('expiresAt', expiresAt);
+                }
+                
+                // For create requests, append each item separately
+                selectedClasses.forEach(classId => {
+                    formData.append('targetClassIds', classId.toString());
+                });
+                
+                selectedSections.forEach(sectionId => {
+                    formData.append('targetSectionIds', sectionId.toString());
+                });
+                
+                formattedRoles.forEach(role => {
+                    formData.append('targetRoles', role);
+                });
+                
+                // Add attachments
+                attachments.forEach(attachment => {
+                    // Only append new files (not existing ones with URLs)
+                    if (!attachment.url || !attachment.url.startsWith('http')) {
+                        formData.append('attachments', attachment.file);
+                    }
+                });
+                
                 // Create new announcement
                 response = await announcementAPI.create(formData);
                 if (response.data?.status === 'success') {

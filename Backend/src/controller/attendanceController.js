@@ -289,10 +289,47 @@ export const getAttendanceStats = async (req, res, next) => {
     }
 };
 
+// Get pending attendance days for a teacher
+export const getPendingAttendanceDays = async (req, res, next) => {
+    try {
+        // Ensure user is a teacher
+        if (req.user.role !== 'TEACHER') {
+            return next(new ApiError(403, 'Only teachers can access pending attendance information'));
+        }
+
+        // Get the teacher's ID
+        const teacherId = req.user.teacher.id;
+
+        // Get month and year from query parameters if provided
+        const { month, year } = req.query;
+
+        // Use service method to get pending attendance days
+        const pendingData = await attendanceService.getPendingAttendanceDays(
+            teacherId,
+            month ? parseInt(month) : undefined,
+            year ? parseInt(year) : undefined
+        );
+
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    pendingData,
+                    'Pending attendance days fetched successfully'
+                )
+            );
+    } catch (error) {
+        console.error('Error fetching pending attendance days:', error);
+        next(error);
+    }
+};
+
 // Export all controllers
 export default {
     markDailyAttendance,
     getDailyAttendance,
     getMonthlyAttendance,
-    getAttendanceStats
+    getAttendanceStats,
+    getPendingAttendanceDays
 }; 
