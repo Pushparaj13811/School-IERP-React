@@ -666,7 +666,7 @@ export class AttendanceService {
                         name: student.name,
                         rollNo: student.rollNo
                     },
-                    status: 'ABSENT', // Default status
+                    status: 'REMAINING', // Changed from 'ABSENT' to 'REMAINING'
                     date: attendanceDate,
                     classId: parseInt(classId),
                     sectionId: parseInt(sectionId),
