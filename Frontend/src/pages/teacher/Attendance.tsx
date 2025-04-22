@@ -88,6 +88,8 @@ const Attendance: React.FC = () => {
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [pendingDays, setPendingDays] = useState<string[]>([]);
   const [markedDays, setMarkedDays] = useState<string[]>([]);
+  // Add a new state to track data loading completion
+  const [dataLoaded, setDataLoaded] = useState<boolean>(false);
 
   // Fetch classes assigned to the teacher as class teacher and their students
   useEffect(() => {
@@ -426,9 +428,13 @@ const Attendance: React.FC = () => {
       
       setSuccess('Attendance saved successfully!');
       
-      // Refresh calendar data after saving attendance
-      fetchPendingAttendanceDays();
-      fetchMarkedAttendanceDays();
+      // Refresh calendar data after saving
+      const [pendingResults, markedResults] = await Promise.all([
+        fetchPendingAttendanceDays(),
+        fetchMarkedAttendanceDays()
+      ]);
+      setPendingDays(pendingResults);
+      setMarkedDays(markedResults);
       
       // Hide success message after 3 seconds
       setTimeout(() => {
@@ -459,32 +465,10 @@ const Attendance: React.FC = () => {
     }
   };
 
-  // New function to fetch pending attendance days
-  const fetchPendingAttendanceDays = async () => {
-    try {
-      const response = await attendanceAPI.getPendingAttendanceDays({
-        month: currentMonth.getMonth() + 1,
-        year: currentMonth.getFullYear()
-      });
-      if (response.data?.status === 'success') {
-        const pendingDates = response.data.data.pendingDates.map((item: {
-          date: string;
-          classId: number;
-          sectionId: number;
-          className: string;
-          sectionName: string;
-        }) => item.date);
-        setPendingDays(pendingDates);
-      }
-    } catch (err) {
-      console.error('Error fetching pending attendance days:', err);
-    }
-  };
-
-  // New function to fetch marked attendance days
+  // Modify the fetchMarkedAttendanceDays function to be more reliable
   const fetchMarkedAttendanceDays = async () => {
     // We'll use the existing assignments to check for marked days in the current month
-    if (!assignedClasses || assignedClasses.length === 0) return;
+    if (!assignedClasses || assignedClasses.length === 0) return [];
 
     try {
       const markedDatesSet = new Set<string>();
@@ -519,27 +503,142 @@ const Attendance: React.FC = () => {
         }
       }
 
-      setMarkedDays(Array.from(markedDatesSet));
+      // Also directly check recent dates
+      const monthStart = startOfMonth(currentMonth);
+      const monthEnd = endOfMonth(currentMonth);
+      const allDates = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+      for (const assignment of assignedClasses) {
+        for (const date of allDates) {
+          const dateString = format(date, 'yyyy-MM-dd');
+          
+          // Skip if already marked or if it's a weekend
+          if (markedDatesSet.has(dateString) || getDay(date) === 6) continue;
+          
+          try {
+            const attendanceRes = await attendanceAPI.getDailyAttendance({
+              date: dateString,
+              classId: assignment.classId,
+              sectionId: assignment.sectionId
+            });
+
+            if (attendanceRes.data?.status === 'success' && 
+                attendanceRes.data.data?.attendance && 
+                attendanceRes.data.data.attendance.length > 0) {
+              markedDatesSet.add(dateString);
+            }
+          } catch {
+            // Ignore errors for individual dates
+          }
+        }
+      }
+
+      return Array.from(markedDatesSet);
     } catch (err) {
       console.error('Error fetching marked attendance days:', err);
+      return [];
     }
   };
 
-  // Effect to generate calendar days when current month changes
-  useEffect(() => {
-    generateCalendarDays();
-  }, [currentMonth, pendingDays, markedDays]);
+  // Modify fetchPendingAttendanceDays to return the results
+  const fetchPendingAttendanceDays = async () => {
+    try {
+      const response = await attendanceAPI.getPendingAttendanceDays({
+        month: currentMonth.getMonth() + 1,
+        year: currentMonth.getFullYear()
+      });
+      if (response.data?.status === 'success') {
+        const pendingDates = response.data.data.pendingDates.map((item: {
+          date: string;
+          classId: number;
+          sectionId: number;
+          className: string;
+          sectionName: string;
+        }) => item.date);
+        return pendingDates;
+      }
+      return [];
+    } catch (err) {
+      console.error('Error fetching pending attendance days:', err);
+      return [];
+    }
+  };
 
-  // Effect to fetch attendance data when month changes
+  // Effect for initial data loading and when month changes
   useEffect(() => {
-    fetchPendingAttendanceDays();
-    fetchMarkedAttendanceDays();
-  }, [currentMonth]);
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        console.log(`Loading data for month: ${currentMonth.getMonth() + 1}/${currentMonth.getFullYear()}`);
+        
+        // Clear current data
+        setPendingDays([]);
+        setMarkedDays([]);
+        
+        // Fetch both sets of data in parallel
+        const [pendingResults, markedResults] = await Promise.all([
+          fetchPendingAttendanceDays(),
+          fetchMarkedAttendanceDays()
+        ]);
+        
+        console.log("Data loaded:", {
+          pendingDays: pendingResults.length,
+          markedDays: markedResults.length
+        });
+        
+        // Update state with the results
+        setPendingDays(pendingResults);
+        setMarkedDays(markedResults);
+        
+        // Mark data as loaded
+        setDataLoaded(true);
+      } catch (error) {
+        console.error("Error loading data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    // Load data when component mounts or month changes
+    loadData();
+  }, [currentMonth, assignedClasses.length]);
 
-  // Effect to fetch pending days on load
+  // Effect to generate calendar days when data changes
   useEffect(() => {
-    fetchPendingAttendanceDays();
-  }, []);
+    if (dataLoaded) {
+      generateCalendarDays();
+    }
+  }, [pendingDays, markedDays, dataLoaded]);
+
+  // Effect to update calendar if class data changes
+  useEffect(() => {
+    if (assignedClasses.length > 0) {
+      // Only refetch if we have assignments and data was previously loaded
+      if (dataLoaded) {
+        const loadData = async () => {
+          try {
+            setLoading(true);
+            
+            // Fetch both sets of data in parallel
+            const [pendingResults, markedResults] = await Promise.all([
+              fetchPendingAttendanceDays(),
+              fetchMarkedAttendanceDays()
+            ]);
+            
+            // Update state with the results
+            setPendingDays(pendingResults);
+            setMarkedDays(markedResults);
+          } catch (error) {
+            console.error("Error reloading attendance data:", error);
+          } finally {
+            setLoading(false);
+          }
+        };
+        
+        loadData();
+      }
+    }
+  }, [assignedClasses]);
 
   // Generate calendar days for the current month
   const generateCalendarDays = () => {
