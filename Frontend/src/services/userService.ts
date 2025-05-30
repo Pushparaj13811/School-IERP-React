@@ -160,52 +160,69 @@ class UserService {
   }
   
   // Get the profile picture URL
-  getProfileImageUrl(profilePicture?: string | { id: number; url: string } | null): string {
+  getProfileImageUrl(profilePicture?: string | { id: number; url: string } | null, gender?: string): string {
     console.log('getProfileImageUrl received:', profilePicture);
     
     try {
-      // Check if profilePicture is an object with url property
+      // If no profile picture, return gender-specific default avatar
+      if (!profilePicture) {
+        if (gender === "Male") {
+          return "/assets/Student-male.jpg";
+        } else if (gender === "Female") {
+          return "/assets/student-female.jpg";
+        }
+        return "/assets/Student-male.jpg"; // Default fallback
+      }
+
+      // Handle object format (used by admin profiles)
       if (typeof profilePicture === 'object' && profilePicture !== null) {
-        console.log('Profile picture is an object:', profilePicture);
-        
-        // If it's an admin profile picture with defined structure
         if ('url' in profilePicture && profilePicture.url) {
-          console.log('Found url property:', profilePicture.url);
-          
-          // Check if the URL is already absolute
+          // If it's already an absolute URL, return as is
           if (profilePicture.url.startsWith('http://') || profilePicture.url.startsWith('https://')) {
             return profilePicture.url;
           }
           
-          const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+          // Otherwise, prepend the base URL
+          const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/v1$/, '') || 'http://localhost:3000';
           return `${baseUrl}${profilePicture.url.startsWith('/') ? '' : '/'}${profilePicture.url}`;
         }
-        
-        console.log('No url property found in object');
-        return "/default-avatar.png";
+        // Return gender-specific default avatar if object has no url
+        if (gender === "Male") {
+          return "/assets/Student-male.jpg";
+        } else if (gender === "Female") {
+          return "/assets/student-female.jpg";
+        }
+        return "/assets/Student-male.jpg"; // Default fallback
       }
       
-      // If it's a string
+      // Handle string format
       if (typeof profilePicture === 'string') {
-        console.log('Profile picture is a string:', profilePicture);
-        
-        // Check if it's already a full URL
+        // If it's already an absolute URL, return as is
         if (profilePicture.startsWith('http://') || profilePicture.startsWith('https://')) {
-          console.log('Already a full URL');
           return profilePicture;
         }
         
-        // Otherwise, prepend the API base URL
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-        const fullUrl = `${baseUrl}${profilePicture.startsWith('/') ? '' : '/'}${profilePicture}`;
-        console.log('Created full URL:', fullUrl);
-        return fullUrl;
+        // Otherwise, prepend the base URL
+        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/v1$/, '') || 'http://localhost:3000';
+        return `${baseUrl}${profilePicture.startsWith('/') ? '' : '/'}${profilePicture}`;
       }
 
-      return "/default-avatar.png";
+      // Return gender-specific default avatar as final fallback
+      if (gender === "Male") {
+        return "/assets/Student-male.jpg";
+      } else if (gender === "Female") {
+        return "/assets/student-female.jpg";
+      }
+      return "/assets/Student-male.jpg"; // Default fallback
     } catch (error) {
       console.error("Error processing profile picture:", error);
-      return "/default-avatar.png";
+      // Return gender-specific default avatar on error
+      if (gender === "Male") {
+        return "/assets/Student-male.jpg";
+      } else if (gender === "Female") {
+        return "/assets/student-female.jpg";
+      }
+      return "/assets/Student-male.jpg"; // Default fallback
     }
   }
   

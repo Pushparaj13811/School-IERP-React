@@ -80,10 +80,9 @@ export const updateProfilePicture = async (req, res, next) => {
         }
 
         // Generate a proper URL for the uploaded file
-        // Use absolute path with protocol for better cross-origin compatibility
         const host = req.headers.host;
         const protocol = req.secure ? 'https' : 'http';
-        const fileUrl = `${protocol}://${host}/uploads/profile/${req.file.filename}`;
+        const fileUrl = `${protocol}://${host}/uploads/profile-pictures/${req.file.filename}`;
 
         console.log('File URL:', fileUrl);
 
@@ -1035,7 +1034,7 @@ export const updateProfilePictureById = async (req, res, next) => {
         // Generate a proper URL for the uploaded file
         const host = req.headers.host;
         const protocol = req.secure ? 'https' : 'http';
-        const fileUrl = `${protocol}://${host}/uploads/profiles/${req.file.filename}`;
+        const fileUrl = `${protocol}://${host}/uploads/profile-pictures/${req.file.filename}`;
 
         console.log('File URL:', fileUrl);
 

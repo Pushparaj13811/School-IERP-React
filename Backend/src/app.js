@@ -54,6 +54,8 @@ app.use('/uploads', express.static(uploadsPath, {
         // Set CORS headers for images and other static files
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+        res.setHeader('X-Content-Type-Options', 'nosniff');
     }
 }));
 

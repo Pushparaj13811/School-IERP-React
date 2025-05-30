@@ -560,23 +560,33 @@ class ProfileService {
   }
   
   // Get image URL for display
-  getProfileImageUrl(profilePicture?: { id: number; url: string } | null): string {
+  getProfileImageUrl(profilePicture?: { id: number; url: string } | null, gender?: string): string {
     if (!profilePicture || !profilePicture.url) {
-      return "https://via.placeholder.com/300?text=No+Image";
+      if (gender === "Male") {
+        return "/assets/Student-male.jpg";
+      } else if (gender === "Female") {
+        return "/assets/student-female.jpg";
+      }
+      return "/assets/Student-male.jpg"; // Default fallback
     }
     
     try {
-      // Handle relative vs absolute URLs
+      // If it's already an absolute URL, return as is
       if (profilePicture.url.startsWith('http://') || profilePicture.url.startsWith('https://')) {
         return profilePicture.url;
       }
       
-      // Build full URL
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+      // Otherwise, prepend the base URL
+      const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/v1$/, '') || 'http://localhost:3000';
       return `${baseUrl}${profilePicture.url.startsWith('/') ? '' : '/'}${profilePicture.url}`;
     } catch (error) {
       console.error('Error processing profile picture URL:', error);
-      return "https://via.placeholder.com/300?text=Error+Loading";
+      if (gender === "Male") {
+        return "/assets/Student-male.jpg";
+      } else if (gender === "Female") {
+        return "/assets/student-female.jpg";
+      }
+      return "/assets/Student-male.jpg"; // Default fallback
     }
   }
   

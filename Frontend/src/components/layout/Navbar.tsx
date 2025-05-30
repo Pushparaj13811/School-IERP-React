@@ -78,32 +78,43 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
   const getProfileImage = (profile: UserProfile | null) => {
     if (!profile) {
       console.log('No profile available');
-      return "https://static.vecteezy.com/system/resources/previews/036/594/092/non_2x/man-empty-avatar-photo-placeholder-for-social-networks-resumes-forums-and-dating-sites-male-and-female-no-photo-images-for-unfilled-user-profile-free-vector.jpg";
+      return "/assets/Student-male.jpg";
     }
     
     console.log('Profile data in Navbar:', profile);
     
-    if (!profile.profilePicture) {
-      console.log('No profile picture available');
-      return "https://static.vecteezy.com/system/resources/previews/036/594/092/non_2x/man-empty-avatar-photo-placeholder-for-social-networks-resumes-forums-and-dating-sites-male-and-female-no-photo-images-for-unfilled-user-profile-free-vector.jpg";
-    }
-    
-    console.log('Profile picture data in Navbar:', profile.profilePicture);
-    
     try {
-      let imageUrl;
-      // If it's an object with url property (used by admin profiles)
-      if (typeof profile.profilePicture === 'object' && profile.profilePicture !== null && 'url' in profile.profilePicture) {
-        imageUrl = profileService.getProfileImageUrl(profile.profilePicture);
-      } else {
-        // Otherwise use the userService
-        imageUrl = userService.getProfileImageUrl(profile.profilePicture);
+      // Get gender from role-specific data and ensure it's a string
+      const gender = typeof profile.roleSpecificData?.gender === 'string' ? profile.roleSpecificData.gender : undefined;
+      
+      // If no profile picture, return gender-specific default
+      if (!profile.profilePicture) {
+        console.log('No profile picture available');
+        return userService.getProfileImageUrl(null, gender);
       }
-      console.log('Image URL resolved to:', imageUrl);
-      return imageUrl;
+      
+      console.log('Profile picture data in Navbar:', profile.profilePicture);
+      
+      // Handle object format (used by admin profiles)
+      if (typeof profile.profilePicture === 'object' && profile.profilePicture !== null) {
+        if ('url' in profile.profilePicture && profile.profilePicture.url) {
+          return profileService.getProfileImageUrl(profile.profilePicture, gender);
+        }
+        // If object has no url property, return gender-specific default
+        return userService.getProfileImageUrl(null, gender);
+      }
+      
+      // Handle string format
+      if (typeof profile.profilePicture === 'string') {
+        return userService.getProfileImageUrl(profile.profilePicture, gender);
+      }
+      
+      // Return gender-specific default as fallback
+      return userService.getProfileImageUrl(null, gender);
     } catch (error) {
       console.error('Error getting profile image URL:', error);
-      return "https://via.placeholder.com/150?text=User";
+      const gender = typeof profile.roleSpecificData?.gender === 'string' ? profile.roleSpecificData.gender : undefined;
+      return userService.getProfileImageUrl(null, gender);
     }
   };
   
@@ -188,7 +199,8 @@ const Navbar: React.FC<NavbarProps> = ({ toggleSidebar }) => {
                         crossOrigin="anonymous"
                         onError={(e) => {
                           console.error('Error loading profile image');
-                          (e.target as HTMLImageElement).src = "https://via.placeholder.com/150?text=User";
+                          const gender = typeof userProfile.roleSpecificData?.gender === 'string' ? userProfile.roleSpecificData.gender : undefined;
+                          (e.target as HTMLImageElement).src = userService.getProfileImageUrl(null, gender);
                         }}
                       />
                     </button>
