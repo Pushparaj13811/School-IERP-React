@@ -247,7 +247,7 @@ export const routes: Route[] = [
     roles: [UserRole.ADMIN],
   },
   {
-    path: 'parents/add-parents',
+    path: 'parents/add-parent',
     component: AddParents,
     roles: [UserRole.ADMIN],
   },

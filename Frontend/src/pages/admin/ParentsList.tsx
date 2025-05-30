@@ -44,12 +44,12 @@ const ParentsList: React.FC = () => {
     };
 
     const handleAddParent = () => {
-        navigate('add-parent');
+        navigate('/parents/add-parent');
     };
 
     const handleEditClick = (parent: Parent) => {
         // Navigate to add parent form with parent data
-        navigate('add-parent', { 
+        navigate('/parents/add-parent', { 
             state: { 
                 editMode: true,
                 parentData: parent 

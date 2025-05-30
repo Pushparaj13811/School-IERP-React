@@ -23,9 +23,12 @@ const PublicLayout: React.FC = () => {
   // Render children content
   return (
     <div className="w-full min-h-screen flex items-center justify-center relative">
-      {/* Background with gradient overlay */}
-      <div className="absolute inset-0 z-0 bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100">
-        <div className="absolute inset-0 bg-[#EEF5FF]/50 bg-opacity-70 z-10"></div>
+      {/* Background with Home.jpg image */}
+      <div 
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/assets/Home.jpg')" }}
+      >
+        <div className="absolute inset-0 bg-black/30 z-10"></div>
       </div>
      
       {/* School name header */}
