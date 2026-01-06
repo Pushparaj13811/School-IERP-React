@@ -14,7 +14,6 @@ import {
   PageLoadingState,
   InlineLoadingState,
   PageErrorState,
-  ProfileCard,
   ProfileDetailItem,
   ProfileDetailsGrid,
   StatusBadge

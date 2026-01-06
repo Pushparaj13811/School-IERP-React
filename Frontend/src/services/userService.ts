@@ -541,6 +541,48 @@ class UserService {
       throw error;
     }) as Promise<void>;
   }
+
+  // Get student by ID
+  async getStudentById(id: number | string): Promise<Student> {
+    try {
+      const response = await userAPI.getStudentById(Number(id));
+      if (response.data?.status === 'success' && response.data?.data?.student) {
+        return response.data.data.student;
+      }
+      throw new Error('Failed to fetch student data');
+    } catch (error) {
+      console.error('Error fetching student by ID:', error);
+      throw error;
+    }
+  }
+
+  // Get teacher by ID
+  async getTeacherById(id: number | string): Promise<Teacher> {
+    try {
+      const response = await userAPI.getTeacherById(Number(id));
+      if (response.data?.status === 'success' && response.data?.data?.teacher) {
+        return response.data.data.teacher;
+      }
+      throw new Error('Failed to fetch teacher data');
+    } catch (error) {
+      console.error('Error fetching teacher by ID:', error);
+      throw error;
+    }
+  }
+
+  // Get parent by ID
+  async getParentById(id: number | string): Promise<Parent> {
+    try {
+      const response = await userAPI.getParentById(Number(id));
+      if (response.data?.status === 'success' && response.data?.data?.parent) {
+        return response.data.data.parent;
+      }
+      throw new Error('Failed to fetch parent data');
+    } catch (error) {
+      console.error('Error fetching parent by ID:', error);
+      throw error;
+    }
+  }
 }
 
 export const userService = new UserService();

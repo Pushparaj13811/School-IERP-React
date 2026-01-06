@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../../services/api';
 import Table from '../../components/ui/Table';
@@ -23,7 +22,6 @@ interface Class {
 }
 
 const ClassesManagement: React.FC = () => {
-    const navigate = useNavigate();
     const [classes, setClasses] = useState<Class[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -41,8 +39,8 @@ const ClassesManagement: React.FC = () => {
     const fetchClasses = async () => {
         try {
             setLoading(true);
-            const response = await api.get('/academic/classes');
-            if (response.data?.data?.classes) {
+            const response: { data: { data: { classes: Class[] } | Class[] } } = await api.get('/academic/classes');
+            if (response.data?.data && 'classes' in response.data.data) {
                 setClasses(response.data.data.classes);
             } else if (Array.isArray(response.data?.data)) {
                 setClasses(response.data.data);

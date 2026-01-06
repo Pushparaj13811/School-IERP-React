@@ -419,7 +419,7 @@ const ReportPage: React.FC = () => {
 
     if (reportType === 'exam' && 'lineColor' in chartData) {
       const data = chartData as ExamChartData;
-      const maxValue = Math.max(...data.data);
+      // const maxValue = Math.max(...data.data);
 
       return (
         <div className="w-full px-4">

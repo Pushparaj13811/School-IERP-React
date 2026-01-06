@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * Gradient color configurations for stat cards
  */
-export type StatCardColor = 'blue' | 'emerald' | 'amber' | 'purple' | 'red' | 'indigo' | 'teal' | 'orange' | 'pink';
+export type StatCardColor = 'blue' | 'emerald' | 'amber' | 'purple' | 'red' | 'indigo' | 'teal' | 'orange' | 'pink' | 'green';
 
 interface StatCardProps {
   title: string;
@@ -92,6 +92,13 @@ const colorConfig: Record<StatCardColor, {
     hoverBorder: 'hover:border-pink-200',
     lightBg: 'bg-pink-100',
     text: 'text-pink-600'
+  },
+  green: {
+    gradient: 'from-green-500 to-emerald-600',
+    shadow: 'shadow-green-200',
+    hoverBorder: 'hover:border-green-200',
+    lightBg: 'bg-green-100',
+    text: 'text-green-600'
   }
 };
 

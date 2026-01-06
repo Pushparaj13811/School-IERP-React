@@ -46,16 +46,20 @@ const SubjectsManagement: React.FC = () => {
                 api.get('/academic/classes')
             ]);
 
-            if (subjectsRes.data?.data?.subjects) {
-                setSubjects(subjectsRes.data.data.subjects);
-            } else if (Array.isArray(subjectsRes.data?.data)) {
-                setSubjects(subjectsRes.data.data);
+            // Type the responses properly
+            const subjectsResponse = subjectsRes as { data: { data: { subjects: Subject[] } | Subject[] } };
+            const classesResponse = classesRes as { data: { data: { classes: Class[] } | Class[] } };
+
+            if (subjectsResponse.data?.data && 'subjects' in subjectsResponse.data.data) {
+                setSubjects(subjectsResponse.data.data.subjects);
+            } else if (Array.isArray(subjectsResponse.data?.data)) {
+                setSubjects(subjectsResponse.data.data);
             }
 
-            if (classesRes.data?.data?.classes) {
-                setClasses(classesRes.data.data.classes);
-            } else if (Array.isArray(classesRes.data?.data)) {
-                setClasses(classesRes.data.data);
+            if (classesResponse.data?.data && 'classes' in classesResponse.data.data) {
+                setClasses(classesResponse.data.data.classes);
+            } else if (Array.isArray(classesResponse.data?.data)) {
+                setClasses(classesResponse.data.data);
             }
         } catch (error) {
             console.error('Error fetching data:', error);

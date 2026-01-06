@@ -102,7 +102,7 @@ export const AddressForm: React.FC<AddressFormProps> = ({
             name={field.name}
             value={address[field.name]}
             onChange={(value) => onFieldChange(field.name, value)}
-            required={'required' in field ? field.required : false}
+            required={Boolean('required' in field ? field.required : false)}
             disabled={disabled}
           />
         ))}

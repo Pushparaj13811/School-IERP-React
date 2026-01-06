@@ -35,7 +35,7 @@ const Feedback: React.FC = () => {
   const fetchMyFeedbacks = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/feedback");
+      const response: { data: { data: { feedbacks: FeedbackItem[] } } } = await api.get("/feedback");
       if (response.data?.data?.feedbacks) {
         setMyFeedbacks(response.data.data.feedbacks);
       }

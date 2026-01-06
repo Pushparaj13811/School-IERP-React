@@ -82,12 +82,9 @@ export function useProfileData<T extends BaseProfile>({
         response = await userService.getUserProfile();
       }
 
-      if (response?.data?.data) {
-        // Handle nested data structure
-        const profileData = response.data.data[role] || response.data.data;
-        setData(profileData as T);
-      } else if (response?.data) {
-        setData(response.data as T);
+      if (response) {
+        // The userService methods return the actual data directly
+        setData(response as T);
       } else {
         throw new Error('Invalid response format');
       }

@@ -113,8 +113,15 @@ const AddTeacher: React.FC = () => {
           if (!classSubjects[classId]) {
             try {
               const response = await academicAPI.getSubjectsByClass(classId);
-              if (response.data?.success && response.data?.data) {
-                const fetchedSubjects = response.data.data;
+              let fetchedSubjects: Subject[] = [];
+              
+              if ('success' in response.data && response.data.success && response.data.data) {
+                fetchedSubjects = response.data.data;
+              } else if ('status' in response.data && response.data.status === 'success' && response.data.data?.subjects) {
+                fetchedSubjects = response.data.data.subjects;
+              }
+              
+              if (fetchedSubjects.length > 0) {
                 // Store subjects for this class
                 setClassSubjects(prev => ({
                   ...prev,

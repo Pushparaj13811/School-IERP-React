@@ -232,7 +232,7 @@ class ProfileService {
   }
   
   // Get profile data based on user role
-  async getProfileData(role?: string): Promise<ProfileData | null> {
+  async getProfileData(_role?: string): Promise<ProfileData | null> {
     try {
       const response = await userAPI.getProfile();
 
