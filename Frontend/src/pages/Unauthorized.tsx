@@ -30,14 +30,14 @@ const Unauthorized: React.FC = () => {
             <>
               <button
                 onClick={() => navigate('/')}
-                className="w-full px-4 py-2 text-white bg-[#292648] rounded-md hover:bg-[#1D1B48] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2 text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Return to Dashboard
               </button>
               
               <button
                 onClick={() => navigate(-1)}
-                className="w-full mt-2 px-4 py-2 text-[#292648] bg-white border border-[#292648] rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="w-full mt-2 px-4 py-2 text-indigo-600 bg-white border border-indigo-600 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 Go Back
               </button>
@@ -45,7 +45,7 @@ const Unauthorized: React.FC = () => {
           ) : (
             <button
               onClick={() => navigate('/login')}
-              className="w-full px-4 py-2 text-white bg-[#292648] rounded-md hover:bg-[#1D1B48] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="w-full px-4 py-2 text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               Go to Login
             </button>

@@ -50,15 +50,13 @@ class UserService {
     
     try {
       const response = await userAPI.getProfile();
-      console.log('API response:', response.data);
-      
+
       // Cast to our specific response structure which includes the nested user
       const profileResponse = response.data as unknown as ProfileApiResponse;
-      
+
       if (profileResponse?.status === 'success' && profileResponse?.data?.user) {
         const userData = profileResponse.data.user;
-        console.log('User data from API:', userData);
-        
+
         // Initialize with default values
         const userProfile: UserProfile = {
           id: userData.id,
@@ -68,46 +66,39 @@ class UserService {
           displayName: userData.email,
           isActive: true // Default to active
         };
-        
+
         // Extract role-specific data and update name accordingly
         if (userData.role === 'STUDENT' && userData.student) {
-          console.log('Processing student data:', userData.student);
           userProfile.name = userData.student.name || userData.email;
           userProfile.profilePicture = userData.student.profilePicture;
           // Store as roleSpecificData but don't try to convert to Student type
           userProfile.roleSpecificData = userData.student;
           userProfile.displayName = this.formatStudentDisplayName(userData.student as ApiStudent);
         } else if (userData.role === 'TEACHER' && userData.teacher) {
-          console.log('Processing teacher data:', userData.teacher);
           userProfile.name = userData.teacher.name || userData.email;
           userProfile.profilePicture = userData.teacher.profilePicture;
           userProfile.roleSpecificData = userData.teacher;
           userProfile.displayName = userData.teacher.name || userData.email;
         } else if (userData.role === 'PARENT' && userData.parent) {
-          console.log('Processing parent data:', userData.parent);
           userProfile.name = userData.parent.name || userData.email;
           userProfile.profilePicture = userData.parent.profilePicture;
           userProfile.roleSpecificData = userData.parent;
           userProfile.displayName = userData.parent.name || userData.email;
         } else if (userData.role === 'ADMIN' && userData.admin) {
-          console.log('Processing admin data:', userData.admin);
           userProfile.name = userData.admin.fullName || userData.email;
           // For admin, we need to pass the whole profilePicture object to maintain the URL structure
           userProfile.profilePicture = userData.admin.profilePicture;
           userProfile.roleSpecificData = userData.admin;
           userProfile.displayName = userData.admin.fullName || userData.email;
         }
-        
-        console.log('Processed user profile:', userProfile);
-        
+
         // Cache the processed user profile
         this.userCache = userProfile;
         return userProfile;
       }
-      
+
       return null;
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
+    } catch {
       return null;
     }
   }
@@ -161,8 +152,6 @@ class UserService {
   
   // Get the profile picture URL
   getProfileImageUrl(profilePicture?: string | { id: number; url: string } | null, gender?: string): string {
-    console.log('getProfileImageUrl received:', profilePicture);
-    
     try {
       // If no profile picture, return gender-specific default avatar
       if (!profilePicture) {
@@ -183,7 +172,8 @@ class UserService {
           }
           
           // Otherwise, prepend the base URL
-          const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/v1$/, '') || 'http://localhost:3000';
+          // In production, use relative URL; in development, use env var or empty string
+          const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/v1$/, '') || '';
           return `${baseUrl}${profilePicture.url.startsWith('/') ? '' : '/'}${profilePicture.url}`;
         }
         // Return gender-specific default avatar if object has no url
@@ -203,7 +193,8 @@ class UserService {
         }
         
         // Otherwise, prepend the base URL
-        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/v1$/, '') || 'http://localhost:3000';
+        // In production, use relative URL; in development, use env var or empty string
+        const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/api\/v1$/, '') || '';
         return `${baseUrl}${profilePicture.startsWith('/') ? '' : '/'}${profilePicture}`;
       }
 
@@ -214,8 +205,7 @@ class UserService {
         return "/assets/student-female.jpg";
       }
       return "/assets/Student-male.jpg"; // Default fallback
-    } catch (error) {
-      console.error("Error processing profile picture:", error);
+    } catch {
       // Return gender-specific default avatar on error
       if (gender === "Male") {
         return "/assets/Student-male.jpg";
@@ -350,7 +340,7 @@ class UserService {
             }).then(canvas => {
               // Remove the temporary container
               document.body.removeChild(container);
-              
+
               // Create PDF
               const pdf = new jsPDF('p', 'mm', 'a4');
               const imgData = canvas.toDataURL('image/png');
@@ -375,7 +365,6 @@ class UserService {
               const pdfBlob = pdf.output('blob');
               resolve(pdfBlob);
             }).catch(error => {
-              console.error("Error generating PDF:", error);
               reject(error);
             });
           }, 500); // Small delay to ensure rendering is complete
@@ -425,12 +414,10 @@ class UserService {
           
           // Handle image loading errors
           img.onerror = () => {
-            console.warn('Failed to load profile image:', profileImageUrl);
             // Try with a default avatar
             img.src = '/default-avatar.png';
             // If that also fails, continue without an image
             img.onerror = () => {
-              console.warn('Failed to load default avatar, continuing without image');
               continueWithPdfGeneration();
             };
           };
@@ -442,7 +429,6 @@ class UserService {
           continueWithPdfGeneration();
         }
       } catch (error) {
-        console.error("Error setting up PDF generation:", error);
         reject(error);
       }
     });
@@ -532,8 +518,7 @@ class UserService {
         document.body.removeChild(link);
         
         toast.success('Profile PDF downloaded successfully!');
-      } catch (error) {
-        console.error('Error generating PDF:', error);
+      } catch {
         toast.error('Failed to generate PDF. Downloading JSON instead.');
         
         // Fallback to JSON download if PDF generation fails
@@ -552,7 +537,6 @@ class UserService {
       }
     })
     .catch(error => {
-      console.error('Error downloading profile:', error);
       toast.error('Failed to download profile. Please try again.');
       throw error;
     }) as Promise<void>;

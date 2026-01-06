@@ -28,9 +28,9 @@ const AchievementDetailModal: React.FC<AchievementDetailModalProps> = ({ isOpen,
       <div className="w-full max-w-4xl p-6 bg-[#EEF5FF] rounded-lg">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-800">Achievement Details</h2>
-          <button 
+          <button
             onClick={onClose}
-            className="bg-[#292648] text-white px-6 py-2 rounded-md"
+            className="bg-gray-200 text-gray-700 hover:bg-gray-300 px-6 py-2 rounded-md transition-colors"
           >
             Close
           </button>
@@ -81,8 +81,8 @@ const AchievementDetailModal: React.FC<AchievementDetailModalProps> = ({ isOpen,
         </div>
 
         <div className="flex justify-end gap-4 mt-6">
-          <button className="bg-[#292648] text-white px-6 py-2 rounded-md">Download</button>
-          <button className="bg-[#292648] text-white px-6 py-2 rounded-md">Edit</button>
+          <button className="bg-indigo-600 text-white hover:bg-indigo-700 px-6 py-2 rounded-md transition-colors">Download</button>
+          <button className="bg-indigo-600 text-white hover:bg-indigo-700 px-6 py-2 rounded-md transition-colors">Edit</button>
         </div>
       </div>
     </div>

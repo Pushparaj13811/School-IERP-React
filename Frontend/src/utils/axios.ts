@@ -1,12 +1,32 @@
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
+// Get API base URL from environment - fail loudly in production if not set
+const getApiBaseUrl = (): string => {
+    const envUrl = import.meta.env.VITE_API_BASE_URL;
+
+    if (envUrl) {
+        return envUrl;
+    }
+
+    // In production, require explicit configuration
+    if (import.meta.env.PROD) {
+        console.error('VITE_API_BASE_URL is not configured. API calls will fail.');
+        return '/api/v1'; // Use relative URL as fallback in production
+    }
+
+    // Development fallback
+    return '/api/v1';
+};
+
 // Create API instance
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1',
+    baseURL: getApiBaseUrl(),
     headers: {
         'Content-Type': 'application/json',
     },
+    timeout: 30000, // 30 second timeout
+    withCredentials: true, // Include credentials for CORS
 });
 
 // Add request interceptor for authentication
@@ -14,15 +34,21 @@ api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
         if (token) {
-            // Make sure headers exists before setting Authorization
             config.headers = config.headers || {};
             config.headers.Authorization = `Bearer ${token}`;
         }
-        console.log(`Request [${config.method?.toUpperCase()}] ${config.url}`, config.params || config.data);
+
+        // Only log in development
+        if (import.meta.env.DEV) {
+            console.debug(`[API] ${config.method?.toUpperCase()} ${config.url}`);
+        }
+
         return config;
     },
     (error) => {
-        console.error('Request error:', error);
+        if (import.meta.env.DEV) {
+            console.error('[API] Request error:', error);
+        }
         return Promise.reject(error);
     }
 );
@@ -30,24 +56,37 @@ api.interceptors.request.use(
 // Add response interceptor for error handling
 api.interceptors.response.use(
     (response) => {
-        console.log(`Response [${response.config.method?.toUpperCase()}] ${response.config.url}:`, response.status, response.data);
+        if (import.meta.env.DEV) {
+            console.debug(`[API] Response ${response.status} from ${response.config.url}`);
+        }
         return response;
     },
     (error) => {
         const errorMessage = error.response?.data?.message || 'An error occurred';
-        console.error(`API Error:`, error.response?.status, error.response?.data);
-        
+
+        if (import.meta.env.DEV) {
+            console.error(`[API] Error ${error.response?.status}:`, errorMessage);
+        }
+
         // Show toast notification for errors unless it's an auth error
-        if (!error.config.url?.includes('/auth/')) {
+        if (!error.config?.url?.includes('/auth/')) {
             toast.error(errorMessage);
         }
-        
+
         // Don't redirect on auth-related endpoints
-        if (error.config.url === '/auth/refresh-token' || 
-            error.config.url === '/auth/login' ||
-            error.config.url === '/auth/register' ||
-            error.config.url?.includes('/auth/reset-password') ||
-            error.config.url?.includes('/auth/forgot-password')) {
+        const authEndpoints = [
+            '/auth/refresh-token',
+            '/auth/login',
+            '/auth/register',
+            '/auth/reset-password',
+            '/auth/forgot-password'
+        ];
+
+        const isAuthEndpoint = authEndpoints.some(endpoint =>
+            error.config?.url?.includes(endpoint)
+        );
+
+        if (isAuthEndpoint) {
             return Promise.reject(error);
         }
 
@@ -55,12 +94,13 @@ api.interceptors.response.use(
             // Handle unauthorized access for non-auth endpoints
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            
+
             // Only redirect if not already on the login page
             if (!window.location.pathname.includes('login')) {
                 window.location.href = '/login';
             }
         }
+
         return Promise.reject(error);
     }
 );

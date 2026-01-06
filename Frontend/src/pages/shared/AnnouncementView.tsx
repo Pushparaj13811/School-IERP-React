@@ -223,7 +223,7 @@ const AnnouncementView: React.FC = () => {
                                 className="mb-4 cursor-pointer transition-transform hover:scale-[1.02]"
                                 onClick={() => setSelectedAnnouncement(announcement)}
                             >
-                                <div className="bg-[#292648] text-white p-3 rounded-t">
+                                <div className="bg-indigo-600 text-white p-3 rounded-t">
                                     <h3 className="font-medium">{announcement.title}</h3>
                                 </div>
 

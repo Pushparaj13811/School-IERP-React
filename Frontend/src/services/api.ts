@@ -303,8 +303,8 @@ export const authAPI = {
     refreshToken: () => api.post<ApiResponse<{ token: string }>>('/auth/refresh-token'),
     forgotPassword: (email: string) => 
         api.post<ApiResponse<{ message: string }>>('/auth/forgot-password', { email }),
-    resetPassword: (token: string, newPassword: string) => 
-        api.post<ApiResponse<{ message: string }>>(`/auth/reset-password/${token}`, { newPassword }),
+    resetPassword: (token: string, newPassword: string, confirmPassword: string) =>
+        api.post<ApiResponse<{ message: string }>>(`/auth/reset-password/${token}`, { newPassword, confirmPassword }),
 };
 
 // User API

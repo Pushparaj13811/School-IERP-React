@@ -10,6 +10,7 @@ interface ApiError {
     data?: {
       message?: string;
       error?: string;
+      errors?: string[];
     };
   };
   message?: string;
@@ -18,74 +19,100 @@ interface ApiError {
 const ResetPassword: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [token, setToken] = useState('');
-  
+
   const location = useLocation();
   const navigate = useNavigate();
   const params = useParams<{ token?: string }>();
-  
+
   // Extract token from URL when component mounts
   useEffect(() => {
     // First check if token is in the URL path params
     const pathToken = params.token;
-    
+
     // If not, check if it's in the query params
     const queryParams = new URLSearchParams(location.search);
     const queryToken = queryParams.get('token');
-    
+
     // Use whichever token is available
     const resetToken = pathToken || queryToken;
-    
+
     if (!resetToken) {
       setError('Reset token is missing. Please use the link from your email.');
       return;
     }
-    
+
     setToken(resetToken);
   }, [location, params]);
-  
-  const validatePasswordStrength = (password: string): boolean => {
-    // Password must be at least 8 characters long and contain at least one uppercase letter,
-    // one lowercase letter, one number, and one special character
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$/;
-    return passwordRegex.test(password);
+
+  const validatePasswordStrength = (pwd: string): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+
+    if (pwd.length < 8) {
+      errors.push('At least 8 characters');
+    }
+    if (!/[a-z]/.test(pwd)) {
+      errors.push('One lowercase letter');
+    }
+    if (!/[A-Z]/.test(pwd)) {
+      errors.push('One uppercase letter');
+    }
+    if (!/\d/.test(pwd)) {
+      errors.push('One number');
+    }
+    if (!/[^a-zA-Z0-9]/.test(pwd)) {
+      errors.push('One special character');
+    }
+
+    return { valid: errors.length === 0, errors };
   };
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Clear previous errors
     setError('');
-    
+    setValidationErrors([]);
+
     // Validate password
     if (!password) {
       setError('Please enter a new password');
       return;
     }
-    
-    if (!validatePasswordStrength(password)) {
-      setError('Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character');
+
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.valid) {
+      setValidationErrors(passwordValidation.errors);
+      setError('Password does not meet requirements:');
       return;
     }
-    
+
+    if (!confirmPassword) {
+      setError('Please confirm your password');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
-    
+
     try {
       setIsSubmitting(true);
-      
-      // Make API call
-      await authAPI.resetPassword(token, password);
-      
+
+      // Make API call with both password and confirmPassword
+      await authAPI.resetPassword(token, password, confirmPassword);
+
       // Display success message
       setIsSuccess(true);
       toast.success('Your password has been successfully reset');
-      
+
       // Redirect to login after 3 seconds
       setTimeout(() => {
         navigate('/login');
@@ -93,20 +120,27 @@ const ResetPassword: React.FC = () => {
     } catch (err: unknown) {
       console.error('Reset password error:', err);
       const apiError = err as ApiError;
-      
-      // Extract error message
-      const errorMessage = 
-        apiError.response?.data?.message || 
-        apiError.message || 
-        'An error occurred while resetting your password';
-      
+
+      // Extract error message - handle various error formats
+      let errorMessage = 'An error occurred while resetting your password';
+
+      if (apiError.response?.data?.errors && Array.isArray(apiError.response.data.errors)) {
+        // Handle validation errors array from backend
+        setValidationErrors(apiError.response.data.errors);
+        errorMessage = 'Password reset failed:';
+      } else if (apiError.response?.data?.message) {
+        errorMessage = apiError.response.data.message;
+      } else if (apiError.message) {
+        errorMessage = apiError.message;
+      }
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
   // Render error if token is missing
   if (error === 'Reset token is missing. Please use the link from your email.') {
     return (
@@ -119,18 +153,18 @@ const ResetPassword: React.FC = () => {
               </svg>
             </div>
           </div>
-          
+
           <h1 className="text-2xl font-bold text-[#1e1c39]">Invalid Reset Link</h1>
           <p className="text-gray-600 mt-2">
             The password reset link appears to be invalid or expired.
           </p>
         </div>
-        
+
         <div className="mt-6 text-center">
-          <Link to="/forgot-password" className="inline-block px-4 py-2 bg-[#171630] hover:bg-[#292648] text-white rounded-md font-medium focus:outline-none">
+          <Link to="/forgot-password" className="inline-block px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-medium focus:outline-none">
             Request New Reset Link
           </Link>
-          
+
           <Link to="/login" className="block mt-4 text-blue-600 hover:text-blue-800">
             Return to Login
           </Link>
@@ -138,7 +172,7 @@ const ResetPassword: React.FC = () => {
       </div>
     );
   }
-  
+
   // Render success message
   if (isSuccess) {
     return (
@@ -151,13 +185,13 @@ const ResetPassword: React.FC = () => {
               </svg>
             </div>
           </div>
-          
+
           <h1 className="text-2xl font-bold text-[#1e1c39]">Password Reset Successful</h1>
           <p className="text-gray-600 mt-2">
             Your password has been reset successfully. You will be redirected to the login page shortly.
           </p>
         </div>
-        
+
         <div className="mt-6 text-center">
           <Link to="/login" className="text-blue-600 hover:text-blue-800">
             Go to Login
@@ -166,7 +200,7 @@ const ResetPassword: React.FC = () => {
       </div>
     );
   }
-  
+
   // Render form
   return (
     <div className="w-full max-w-md mx-auto bg-white rounded-lg shadow-lg p-8">
@@ -181,19 +215,26 @@ const ResetPassword: React.FC = () => {
             </svg>
           </div>
         </div>
-        
+
         <h1 className="text-2xl font-bold text-[#1e1c39]">Reset Password</h1>
         <p className="text-sm text-gray-600 mt-1">
           Enter your new password below to reset your account.
         </p>
       </div>
-      
+
       {error && error !== 'Reset token is missing. Please use the link from your email.' && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-3 mb-4 text-sm text-red-700">
-          {error}
+        <div className="bg-red-50 border-l-4 border-red-500 p-3 mb-4 text-sm text-red-700 rounded-r">
+          <p className="font-medium">{error}</p>
+          {validationErrors.length > 0 && (
+            <ul className="mt-2 list-disc list-inside space-y-1">
+              {validationErrors.map((err, index) => (
+                <li key={index} className="text-red-600">{err}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
-      
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
@@ -202,25 +243,39 @@ const ResetPassword: React.FC = () => {
           <div className="relative">
             <input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter new password"
               required
               disabled={isSubmitting}
-              className="w-full px-4 py-2 bg-[#fcfcf6] rounded-md border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#292648] disabled:opacity-70"
+              className="w-full px-4 py-2.5 pr-12 bg-[#fcfcf6] rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-70 transition-all"
             />
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-              </svg>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none bg-transparent border-none p-0"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              tabIndex={-1}
+            >
+              {showPassword ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
+                  <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                  <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </button>
           </div>
-          <p className="mt-1 text-xs text-gray-500">
-            Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.
+          <p className="mt-1.5 text-xs text-gray-500">
+            Password must contain at least 8 characters, one uppercase, one lowercase, one number, and one special character.
           </p>
         </div>
-        
+
         <div>
           <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
             Confirm Password
@@ -228,27 +283,41 @@ const ResetPassword: React.FC = () => {
           <div className="relative">
             <input
               id="confirmPassword"
-              type="password"
+              type={showConfirmPassword ? "text" : "password"}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirm new password"
               required
               disabled={isSubmitting}
-              className="w-full px-4 py-2 bg-[#fcfcf6] rounded-md border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#292648] disabled:opacity-70"
+              className="w-full px-4 py-2.5 pr-12 bg-[#fcfcf6] rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-70 transition-all"
             />
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-              </svg>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none bg-transparent border-none p-0"
+              aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              tabIndex={-1}
+            >
+              {showConfirmPassword ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-1.473-1.473A10.014 10.014 0 0019.542 10C18.268 5.943 14.478 3 10 3a9.958 9.958 0 00-4.512 1.074l-1.78-1.781zm4.261 4.26l1.514 1.515a2.003 2.003 0 012.45 2.45l1.514 1.514a4 4 0 00-5.478-5.478z" clipRule="evenodd" />
+                  <path d="M12.454 16.697L9.75 13.992a4 4 0 01-3.742-3.741L2.335 6.578A9.98 9.98 0 00.458 10c1.274 4.057 5.065 7 9.542 7 .847 0 1.669-.105 2.454-.303z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                  <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </button>
           </div>
         </div>
-        
+
         <div className="pt-2">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-2 px-4 bg-[#171630] hover:bg-[#292648] text-white rounded-md font-medium focus:outline-none disabled:opacity-70 flex justify-center items-center"
+            className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center transition-colors"
           >
             {isSubmitting ? (
               <>
@@ -262,9 +331,9 @@ const ResetPassword: React.FC = () => {
           </button>
         </div>
       </form>
-      
+
       <div className="mt-6 text-center">
-        <Link to="/login" className="text-sm text-blue-600 hover:text-blue-800">
+        <Link to="/login" className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors">
           Return to Login
         </Link>
       </div>
@@ -272,4 +341,4 @@ const ResetPassword: React.FC = () => {
   );
 };
 
-export default ResetPassword; 
+export default ResetPassword;

@@ -558,26 +558,22 @@ class TimetableService {
         try {
             // Type validation
             if (typeof startTime !== 'string' || startTime.trim() === '') {
-                console.error('Invalid startTime:', startTime);
                 toast.error('Start time must be a valid time string');
                 return false;
             }
 
             if (typeof endTime !== 'string' || endTime.trim() === '') {
-                console.error('Invalid endTime:', endTime);
                 toast.error('End time must be a valid time string');
                 return false;
             }
 
             if (typeof isBreak !== 'boolean') {
-                console.error('Invalid isBreak (not a boolean):', isBreak);
                 toast.error('Invalid break status');
                 return false;
             }
 
             // Break type validation
             if (isBreak && (!breakType || typeof breakType !== 'string' || breakType.trim() === '')) {
-                console.error('Invalid breakType for a break period:', breakType);
                 toast.error('Break type is required for break periods');
                 return false;
             }
@@ -592,19 +588,15 @@ class TimetableService {
                 breakType: isBreak ? (breakType ? breakType.trim() : null) : null
             };
 
-            console.log('addTimeSlot payload:', JSON.stringify(payload, null, 2));
-
             // Validate time format
             const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
             if (!timeRegex.test(payload.startTime) || !timeRegex.test(payload.endTime)) {
-                console.error('Invalid time format in payload:', payload);
                 toast.error('Times must be in 24-hour format (HH:MM)');
                 return false;
             }
 
             // Validate start time is before end time
             if (payload.startTime >= payload.endTime) {
-                console.error('Start time is not before end time:', payload);
                 toast.error('Start time must be earlier than end time');
                 return false;
             }
@@ -708,10 +700,8 @@ class TimetableService {
             // Use the API function from api.ts instead of custom implementation
             let response;
             if (teacherId) {
-                console.log(`Fetching teacher timetable for teacherId: ${teacherId}`);
                 response = await timetableAPI.getTeacherTimetable(teacherId);
             } else {
-                console.log('Fetching teacher timetable for teacher');
                 response = await timetableAPI.getTeacherTimetable();
             }
 
@@ -731,8 +721,6 @@ class TimetableService {
     // Delete a time slot
     async deleteTimeSlot(timeSlotId: number): Promise<boolean> {
         try {
-            console.log(`Deleting time slot with ID: ${timeSlotId}`);
-
             await timetableAPI.deleteTimeSlot(timeSlotId);
 
             toast.success('Time slot deleted successfully');

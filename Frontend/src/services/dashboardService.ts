@@ -55,10 +55,9 @@ class DashboardService {
       
       dashboardState.isLoading = false;
       return dashboardState;
-    } catch (error) {
-      console.error('Error in student dashboard service:', error);
+    } catch {
       toast.error('Failed to load student dashboard data');
-      
+
       return {
         ...initialStudentDashboardState,
         isLoading: false,
@@ -82,10 +81,9 @@ class DashboardService {
       
       dashboardState.isLoading = false;
       return dashboardState;
-    } catch (error) {
-      console.error('Error in teacher dashboard service:', error);
+    } catch {
       toast.error('Failed to load teacher dashboard data');
-      
+
       return {
         ...initialTeacherDashboardState,
         isLoading: false,
@@ -109,10 +107,9 @@ class DashboardService {
       
       dashboardState.isLoading = false;
       return dashboardState;
-    } catch (error) {
-      console.error('Error in parent dashboard service:', error);
+    } catch {
       toast.error('Failed to load parent dashboard data');
-      
+
       return {
         ...initialParentDashboardState,
         isLoading: false,
@@ -136,10 +133,9 @@ class DashboardService {
       
       dashboardState.isLoading = false;
       return dashboardState;
-    } catch (error) {
-      console.error('Error in admin dashboard service:', error);
+    } catch {
       toast.error('Failed to load admin dashboard data');
-      
+
       return {
         ...initialAdminDashboardState,
         isLoading: false,

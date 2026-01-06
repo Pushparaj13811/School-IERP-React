@@ -6,6 +6,11 @@ import { leaveAPI, userAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { UserRole } from "../../utils/roles";
 
+// Import shared components and utilities - eliminates duplicate code
+import { PageLoadingState, PageErrorState, StatusBadge } from '../../components/common';
+import { extractLeaveData } from '../../utils/apiResponseUtils';
+import { formatTableDate } from '../../utils/dateUtils';
+
 // Define the interface for leave applications
 interface LeaveType {
   id: number;
@@ -81,8 +86,8 @@ const Leave: React.FC = () => {
               section: student.section?.name || ''
             });
           }
-        } catch (err) {
-          console.error('Error fetching student info:', err);
+        } catch {
+          // Student info fetch failed silently
         }
       }
       
@@ -91,68 +96,41 @@ const Leave: React.FC = () => {
         studentId: targetStudentId
       });
       
-      // Handle both old and new API response formats
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let leaveData: any[] = [];
-      
-      if (response.data?.status === 'success') {
-        if (Array.isArray(response.data?.data)) {
-          // New response format: data.data is the array directly
-          leaveData = response.data.data;
-          console.log('New format - leave applications received:', leaveData);
-        } else if (Array.isArray(response.data?.data?.leaveApplications)) {
-          // Old response format: data.data.leaveApplications is the array
-          leaveData = response.data.data.leaveApplications;
-          console.log('Old format - leave applications received:', leaveData);
-        }
-      }
-      
-      // Log the raw data received
-      console.log('All leave applications received:', leaveData);
-      console.log('Target student ID:', targetStudentId);
+      // Handle both old and new API response formats using shared utility
+      const leaveData = extractLeaveData<LeaveApplication>(response);
       
       if (leaveData.length > 0) {
         // Double-check filtering for the specific student in case the API doesn't filter properly
         const filteredLeaves = leaveData.filter(leave => {
-          // Log each leave object to check its structure
-          console.log('Leave application:', leave);
-          
           // When viewing as parent, filter by the application's studentId property directly
           if (leave.studentId) {
-            console.log(`Comparing leave studentId ${leave.studentId} with target ${targetStudentId}`);
             return Number(leave.studentId) === Number(targetStudentId);
           }
-          
+
           // Try student object property if it exists
           if (leave.student) {
-            console.log(`Comparing student.id ${leave.student.id} with target ${targetStudentId}`);
             return Number(leave.student.id) === Number(targetStudentId);
           }
-          
+
           // If we're the student viewing our own leaves
           if (!studentId) {
             return true;
           }
-          
+
           // If we can't determine the student, don't include it when filtering for a specific student
-          console.log('No studentId or student object found on leave application:', leave);
           return false;
         });
-        
-        console.log(`Filtered ${leaveData.length} leaves to ${filteredLeaves.length} for student ID ${targetStudentId}`);
         
         // If we filtered out leaves and we're viewing as a parent, show a warning
         if (studentId && leaveData.length > filteredLeaves.length) {
           setFilterWarning(`Filtered out ${leaveData.length - filteredLeaves.length} leave applications that didn't belong to this student.`);
         }
         
-        // Cast the filtered leaves to the expected type
-        setLeaveApplications(filteredLeaves as unknown as LeaveApplication[]);
+        setLeaveApplications(filteredLeaves);
       } else {
         setLeaveApplications([]);
       }
-    } catch (err) {
-      console.error("Error fetching leave applications:", err);
+    } catch {
       toast.error("Failed to fetch leave applications");
       setError("Failed to load leave applications. Please try again later.");
     } finally {
@@ -161,8 +139,7 @@ const Leave: React.FC = () => {
   };
 
   const handleViewDetails = (leave: LeaveApplication) => {
-    // Use a more specific type definition
-    setSelectedLeave(leave as unknown as LeaveApplication);
+    setSelectedLeave(leave);
     setIsDetailModalOpen(true);
   };
 
@@ -171,99 +148,107 @@ const Leave: React.FC = () => {
     setSelectedLeave(null);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'APPROVED': return 'bg-green-100 text-green-800';
-      case 'REJECTED': return 'bg-red-100 text-red-800';
-      case 'PENDING': return 'bg-yellow-100 text-yellow-800';
-      case 'CANCELLED': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   return (
-    <div className="w-full p-4 bg-[#EEF5FF]">
-      <div className="w-full p-6 bg-white rounded-lg shadow-sm">
-        <div className="flex justify-between mb-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+      {/* Page Header */}
+      <div className="mb-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-1">Leave Applications</h2>
+            <h1 className="text-3xl font-bold text-gray-900">Leave Applications</h1>
             {studentInfo && (
-              <p className="text-gray-600">
+              <p className="text-gray-500 mt-1">
                 {studentInfo.name} - {studentInfo.class} {studentInfo.section}
               </p>
             )}
           </div>
-          
           {!studentId && (
             <button
-              className="px-4 py-2 bg-[#292648] text-white rounded-lg hover:bg-blue-700 transition"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-xl font-medium hover:from-indigo-700 hover:to-blue-700 transition-all shadow-lg shadow-indigo-200"
               onClick={() => navigate('/leave/create')}
             >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
               Apply for Leave
             </button>
           )}
         </div>
+      </div>
 
-        {filterWarning && (
-          <div className="bg-yellow-100 p-3 rounded-md mb-4 text-yellow-800 text-sm">
-            <p>{filterWarning}</p>
-            <p className="mt-1">Only showing leave applications for this specific student.</p>
-          </div>
-        )}
+      {/* Main Content */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="p-6">
+          {filterWarning && (
+            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl mb-6 text-amber-800 text-sm">
+              <p className="font-medium">{filterWarning}</p>
+              <p className="mt-1 text-amber-600">Only showing leave applications for this specific student.</p>
+            </div>
+          )}
 
-        {isLoading && (
-          <div className="flex justify-center items-center h-40">
-            <p className="text-gray-500">Loading leave applications...</p>
-          </div>
-        )}
+          {isLoading && (
+            <div className="flex justify-center items-center py-16">
+              <PageLoadingState message="Loading leave applications..." />
+            </div>
+          )}
 
-        {error && (
-          <div className="bg-red-100 p-4 rounded-md mb-6">
-            <p className="text-red-700">{error}</p>
-          </div>
-        )}
+          {error && (
+            <PageErrorState
+              title="Error Loading Leave Applications"
+              message={error}
+              onRetry={() => fetchLeaveApplications()}
+            />
+          )}
 
-        {!isLoading && !error && leaveApplications.length === 0 && (
-          <div className="text-center py-10">
-            <p className="text-gray-500">No leave applications found.</p>
-          </div>
-        )}
-
-        {!isLoading && !error && leaveApplications.length > 0 && (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {leaveApplications.map((leave) => (
-              <div key={leave.id} className="bg-[#EBF4FF] rounded-lg border border-gray-200 overflow-hidden">
-                <div className="bg-[#292648] text-white p-3 flex justify-between items-center">
-                  <h3 className="font-medium">{leave.subject}</h3>
-                  <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(leave.status)}`}>
-                    {leave.status}
-                  </span>
-                </div>
-                <div className="p-4">
-                  <div className="mb-2">
-                    <span className="text-sm text-gray-500">Leave Type: </span>
-                    <span className="text-sm font-medium">{leave.leaveType?.name || 'N/A'}</span>
-                  </div>
-                  <div className="mb-2">
-                    <span className="text-sm text-gray-500">From: </span>
-                    <span className="text-sm font-medium">{new Date(leave.fromDate).toLocaleDateString()}</span>
-                    <span className="text-sm text-gray-500 ml-3">To: </span>
-                    <span className="text-sm font-medium">{new Date(leave.toDate).toLocaleDateString()}</span>
-                  </div>
-                  <p className="text-sm text-gray-600 line-clamp-2 mb-2">{leave.description}</p>
-                  <div className="flex justify-end mt-2">
-                    <button 
-                      onClick={() => handleViewDetails(leave)}
-                      className="text-blue-500 text-sm bg-[#EBF4FF]"
-                    >
-                      View Details
-                    </button>
-                  </div>
-                </div>
+          {!isLoading && !error && leaveApplications.length === 0 && (
+            <div className="text-center py-16">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
               </div>
-            ))}
-          </div>
-        )}
+              <p className="text-gray-500 font-medium">No leave applications found</p>
+              <p className="text-sm text-gray-400 mt-1">Your leave applications will appear here</p>
+            </div>
+          )}
+
+          {!isLoading && !error && leaveApplications.length > 0 && (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {leaveApplications.map((leave) => (
+                <div key={leave.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+                  <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white p-4 flex justify-between items-center">
+                    <h3 className="font-medium truncate">{leave.subject}</h3>
+                    <StatusBadge status={leave.status} size="sm" />
+                  </div>
+                  <div className="p-4">
+                    <div className="mb-3">
+                      <span className="text-sm text-gray-500">Leave Type: </span>
+                      <span className="text-sm font-medium text-gray-900">{leave.leaveType?.name || 'N/A'}</span>
+                    </div>
+                    <div className="mb-3 flex items-center gap-4">
+                      <div>
+                        <span className="text-sm text-gray-500">From: </span>
+                        <span className="text-sm font-medium text-gray-900">{formatTableDate(leave.fromDate)}</span>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-500">To: </span>
+                        <span className="text-sm font-medium text-gray-900">{formatTableDate(leave.toDate)}</span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600 line-clamp-2 mb-3">{leave.description}</p>
+                    <div className="flex justify-end pt-3 border-t border-gray-100">
+                      <button
+                        onClick={() => handleViewDetails(leave)}
+                        className="text-indigo-600 bg-primary/10 border border-primary text-sm font-medium hover:text-indigo-700"
+                      >
+                        View Details
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       {/* Leave Detail Modal */}
       <LeaveDetailModal 

@@ -2,7 +2,8 @@ import React from 'react';
 
 interface Column {
   header: string;
-  accessor: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  accessor: string | ((row: any) => React.ReactNode);
   className?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   cell?: (value: any) => React.ReactNode;
@@ -23,7 +24,7 @@ const Table: React.FC<TableProps> = ({
   data,
   title,
   alternateRowColors = true,
-  headerBackgroundColor = '#1D1B48',
+  headerBackgroundColor = '#4F46E5',
   headerTextColor = 'white',
 }) => {
   return (
@@ -69,17 +70,23 @@ const Table: React.FC<TableProps> = ({
                   role="row"
                   tabIndex={0}
                 >
-                  {columns.map((column, colIdx) => (
-                    <td 
-                      key={colIdx} 
-                      className={`py-2 px-3 border ${column.className || ''}`}
-                      role="cell"
-                    >
-                      {column.cell 
-                        ? column.cell(row[column.accessor]) 
-                        : row[column.accessor]}
-                    </td>
-                  ))}
+                  {columns.map((column, colIdx) => {
+                    const cellValue = typeof column.accessor === 'function'
+                      ? column.accessor(row)
+                      : row[column.accessor];
+
+                    return (
+                      <td
+                        key={colIdx}
+                        className={`py-2 px-3 border ${column.className || ''}`}
+                        role="cell"
+                      >
+                        {column.cell
+                          ? column.cell(cellValue)
+                          : cellValue}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             ) : (

@@ -16,7 +16,7 @@ const HolidayCard: React.FC<HolidayCardProps> = ({ name, from, to, description }
 
   return (
     <div className="shadow-sm rounded-lg overflow-hidden bg-white hover:shadow-md transition-shadow duration-300">
-      <div className="bg-[#292648] text-white p-4 text-center">
+      <div className="bg-indigo-600 text-white p-4 text-center">
         <div className="uppercase font-medium text-xs mb-1">
           {new Date(formatDate(from)).toLocaleString("en-US", { month: "long", year: "numeric" })}
         </div>
@@ -27,7 +27,7 @@ const HolidayCard: React.FC<HolidayCardProps> = ({ name, from, to, description }
       </div>
       
       <div className="p-4">
-        <h4 className="font-bold text-[#292648] text-lg mb-2">{name}</h4>
+        <h4 className="font-bold text-indigo-700 text-lg mb-2">{name}</h4>
         <div className="text-sm text-gray-500 mb-2 flex items-center">
           <i className="bi bi-calendar mr-2"></i>
           <span>{from} - {to}</span>

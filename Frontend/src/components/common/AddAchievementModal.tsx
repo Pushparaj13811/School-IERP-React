@@ -49,9 +49,9 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
       <div className=" bg-[#EEF5FF] rounded-lg w-full max-w-4xl p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-800">Achievement Details</h2>
-          <button 
+          <button
             onClick={onClose}
-            className="bg-[#292648] text-white px-6 py-2 rounded-md"
+            className="bg-gray-200 text-gray-700 hover:bg-gray-300 px-6 py-2 rounded-md transition-colors"
           >
             Close
           </button>
@@ -66,7 +66,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
                 name="activityType"
                 value={formData.activityType}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#292648]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
             <div>
@@ -76,7 +76,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
                 name="title"
                 value={formData.title}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#292648]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
             <div>
@@ -86,7 +86,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
                 name="organizations"
                 value={formData.organizations}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#292648]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
             <div>
@@ -96,7 +96,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
                 name="noOfDays"
                 value={formData.noOfDays}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#292648]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
             <div>
@@ -106,7 +106,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
                 name="from"
                 value={formData.from}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#292648]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
             <div>
@@ -116,7 +116,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
                 name="to"
                 value={formData.to}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#292648]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
           </div>
@@ -129,7 +129,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
                 value={formData.description}
                 onChange={handleChange}
                 rows={4}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#292648]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
               ></textarea>
             </div>
             <div>
@@ -139,7 +139,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
                 value={formData.testimonial}
                 onChange={handleChange}
                 rows={4}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#292648]"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500"
               ></textarea>
             </div>
           </div>
@@ -147,7 +147,7 @@ const AddAchievementModal: React.FC<AddAchievementModalProps> = ({ isOpen, onClo
           <div className="flex justify-end mt-6">
             <button
               type="submit"
-              className="bg-[#292648] text-white px-6 py-2 rounded-md"
+              className="bg-indigo-600 text-white hover:bg-indigo-700 px-6 py-2 rounded-md transition-colors"
             >
               Save
             </button>

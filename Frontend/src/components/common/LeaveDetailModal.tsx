@@ -51,9 +51,9 @@ const LeaveDetailModal: React.FC<LeaveDetailModalProps> = ({ isOpen, leave, onCl
               {leave.status}
             </span>
           </div>
-          <button 
+          <button
             onClick={onClose}
-            className="bg-[#292648] text-white px-6 py-2 rounded-md"
+            className="bg-gray-200 text-gray-700 hover:bg-gray-300 px-6 py-2 rounded-md transition-colors"
           >
             Close
           </button>

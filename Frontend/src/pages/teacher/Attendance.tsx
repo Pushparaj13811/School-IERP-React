@@ -911,7 +911,7 @@ const Attendance: React.FC = () => {
               className={`px-4 py-2 rounded-md text-white flex items-center gap-2 ${
                 saving || students.length === 0 || isHoliday || isSaturday || isAfter(parseISO(selectedDate), new Date())
                   ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-[#292648] hover:bg-[#3b3664]'
+                  : 'bg-indigo-600 hover:bg-indigo-700'
               }`}   
             >
               {saving ? 'Saving...' : 'Save All Attendance'}

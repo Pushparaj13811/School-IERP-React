@@ -50,6 +50,8 @@ const Contact = lazy(() => import('../pages/shared/Contact'));
 // Update the imports at the top
 const AdminAnnouncements = lazy(() => import('../pages/admin/Announcements'));
 const HolidayManagement = lazy(() => import('../pages/admin/HolidayManagement'));
+const ClassesManagement = lazy(() => import('../pages/admin/ClassesManagement'));
+const SubjectsManagement = lazy(() => import('../pages/admin/SubjectsManagement'));
 
 interface RouteComponentProps {
   user: { role: UserRole } | null;
@@ -224,6 +226,16 @@ export const routes: Route[] = [
   {
     path: '/holiday-management',
     component: HolidayManagement,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: '/classes',
+    component: ClassesManagement,
+    roles: [UserRole.ADMIN],
+  },
+  {
+    path: '/subjects',
+    component: SubjectsManagement,
     roles: [UserRole.ADMIN],
   },
   {

@@ -3,7 +3,10 @@ import { FaUserGraduate, FaCalendarCheck, FaPhoneAlt, FaBookOpen, FaFileAlt } fr
 import { useNavigate } from "react-router-dom";
 import { dashboardAPI, ParentDashboardData } from '../../services/api';
 import { toast } from 'react-toastify';
-import Spinner from '../../components/ui/Spinner';
+
+// Import shared components - eliminates duplicate Spinner
+import { PageLoadingState, PageErrorState } from '../../components/common';
+import { formatTableDate } from '../../utils/dateUtils';
 
 interface ChildData {
   student: {
@@ -65,7 +68,6 @@ const ParentDashboard: React.FC = () => {
         const errorMessage = err instanceof Error ? err.message : 'Failed to fetch dashboard data';
         setError(errorMessage);
         toast.error('Failed to load dashboard data');
-        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -76,30 +78,29 @@ const ParentDashboard: React.FC = () => {
 
   const handleNavigation = (path: string) => navigate(path);
 
+  // Loading state - using shared component
   if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Spinner size="lg" />
-      </div>
-    );
+    return <PageLoadingState message="Loading dashboard..." />;
   }
 
+  // Error state - using shared component
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <p className="text-red-500 text-lg">{error}</p>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-        >
-          Try Again
-        </button>
-      </div>
+      <PageErrorState
+        title="Error Loading Dashboard"
+        message={error}
+        onRetry={() => window.location.reload()}
+      />
     );
   }
 
   if (!dashboardData) {
-    return null;
+    return (
+      <PageErrorState
+        title="No Data Available"
+        message="Dashboard data is currently unavailable."
+      />
+    );
   }
 
   const { children, recentAnnouncements, upcomingHolidays } = dashboardData;
@@ -183,7 +184,7 @@ const ParentDashboard: React.FC = () => {
                       <div>
                         <p className="font-medium">{result.subject}</p>
                         <p className="text-xs text-gray-500">
-                          {new Date(result.date).toLocaleDateString()}
+                          {formatTableDate(result.date)}
                         </p>
                       </div>
                       <div className="text-right">
@@ -217,7 +218,7 @@ const ParentDashboard: React.FC = () => {
                   <div>
                     <p className="font-semibold text-gray-500">{announcement.content}</p>
                     <p className="mt-3 text-sm text-gray-500">
-                      {new Date(announcement.date).toLocaleDateString()}
+                      {formatTableDate(announcement.date)}
                     </p>
                   </div>
                 </div>
@@ -242,7 +243,7 @@ const ParentDashboard: React.FC = () => {
                   <div>
                     <p className="font-semibold text-gray-500">{holiday.description}</p>
                     <div className="flex items-center justify-between mt-2">
-                      <p className="text-sm text-gray-500">{new Date(holiday.date).toLocaleDateString()}</p>
+                      <p className="text-sm text-gray-500">{formatTableDate(holiday.date)}</p>
                       <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
                         {holiday.type}
                       </span>

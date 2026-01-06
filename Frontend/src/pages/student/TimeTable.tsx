@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../utils/axios';
 import { useAuth } from '../../context/AuthContext';
-
-// Define API_URL directly since the config file can't be found
-const API_URL = 'http://localhost:3000'; // Updated to correct port
 
 interface TimeSlot {
   id: number;
@@ -86,21 +83,15 @@ const TimeTable: React.FC = () => {
     const fetchTimetable = async () => {
       try {
         setLoading(true);
-        // Get token from localStorage instead of context
-        const token = localStorage.getItem('token');
-        
-        const response = await axios.get(`${API_URL}/api/v1/timetables/student`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        
+        // Use the configured api instance which handles auth and base URL
+        const response = await api.get('/timetables/student');
+
         // Check if response has the expected structure
         if (response.data && typeof response.data === 'object') {
           const apiResponse = response.data as ApiResponse;
           if (apiResponse.status === 'success' && apiResponse.data) {
             // Get all timeSlots including breaks
-            const timeSlotResponse = await axios.get<TimeSlotApiResponse>(`${API_URL}/api/v1/timetables/timeslots`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
+            const timeSlotResponse = await api.get<TimeSlotApiResponse>('/timetables/timeslots');
             
             // Add break time slots to the timetable
             if (timeSlotResponse.data?.status === 'success') {
@@ -235,7 +226,7 @@ const TimeTable: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm mt-4 overflow-auto">
           <div className="min-w-[700px]">
             <table className="w-full border-collapse">
-              <thead className="bg-[#292648] text-white">
+              <thead className="bg-indigo-600 text-white">
                 <tr>
                   <th className="p-3 text-left">Time</th>
                   <th className="p-3 text-center">Monday</th>
@@ -317,7 +308,7 @@ const TimeTable: React.FC = () => {
                     {dayPeriods.map((period, index) => (
                       <div 
                         key={index} 
-                        className="p-2 mb-2 border-l-4 border-[#292648] bg-gray-50 rounded"
+                        className="p-2 mb-2 border-l-4 border-indigo-600 bg-gray-50 rounded"
                       >
                         <div className="text-xs text-gray-500">
                           {period.timeSlot.startTime} - {period.timeSlot.endTime}

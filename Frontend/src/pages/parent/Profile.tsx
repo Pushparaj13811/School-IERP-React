@@ -6,12 +6,14 @@ import { Parent, Student } from '../../types/api';
 import Button from '../../components/ui/Button';
 import { toast } from 'react-toastify';
 
-// Create a simple spinner component since we couldn't find the import
-const Spinner: React.FC = () => (
-  <div className="flex justify-center items-center h-full">
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#292648]"></div>
-  </div>
-);
+// Import shared components - eliminates duplicate Spinner definition
+import {
+  PageLoadingState,
+  PageErrorState,
+  ProfileDetailItem,
+  ProfileDetailsGrid,
+  StatusBadge
+} from '../../components/common';
 
 const ParentProfile: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -24,37 +26,32 @@ const ParentProfile: React.FC = () => {
     const fetchParentData = async () => {
       try {
         setLoading(true);
-        
+
         // If id parameter exists, fetch specific parent (admin view)
         if (id) {
-          console.log(`Fetching parent profile with ID: ${id}`);
           const response = await userAPI.getParentById(parseInt(id));
-          
+
           if (response.data?.status === 'success' && response.data?.data?.parent) {
-            console.log('Parent data from API:', response.data.data.parent);
             setParent(response.data.data.parent);
             setIsOwnProfile(false);
           } else {
             throw new Error('Failed to load parent profile data');
           }
-        } 
+        }
         // Otherwise, try to get logged-in user's profile (parent view)
         else {
-          console.log('Fetching own parent profile');
           const profile = await userService.getUserProfile();
-          
+
           if (profile && profile.role === 'PARENT') {
-            console.log('Own parent profile found:', profile);
             setParent(profile);
             setIsOwnProfile(true);
           } else {
             throw new Error('Parent profile not found or user is not a parent');
           }
         }
-        
+
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching parent data:', err);
         setError('Failed to load parent profile. Please try again later.');
         setLoading(false);
       }
@@ -69,7 +66,7 @@ const ParentProfile: React.FC = () => {
         toast.error("Parent data not found");
         return;
       }
-      
+
       let parentId: number;
       if (isOwnProfile) {
         const profile = parent as UserProfile;
@@ -82,100 +79,123 @@ const ParentProfile: React.FC = () => {
       } else {
         parentId = (parent as Parent).id;
       }
-        
+
       await userService.downloadProfile('PARENT', parentId);
       toast.success("Profile download initiated");
-    } catch (error) {
-      console.error("Error downloading profile:", error);
+    } catch {
       toast.error("Failed to download profile");
     }
   };
 
+  // Loading state - using shared component
   if (loading) {
-    return <Spinner />;
+    return <PageLoadingState message="Loading parent profile..." />;
   }
 
+  // Error state - using shared component
   if (error) {
     return (
-      <div className="p-6 text-center">
-        <div className="p-4 bg-red-100 text-red-700 rounded-md">
-          {error}
-        </div>
-      </div>
+      <PageErrorState
+        title="Error Loading Profile"
+        message={error}
+        onRetry={() => window.location.reload()}
+      />
     );
   }
 
   if (!parent) {
     return (
-      <div className="p-6 text-center">
-        <div className="p-4 bg-yellow-100 text-yellow-700 rounded-md">
-          No parent profile data available.
-        </div>
-      </div>
+      <PageErrorState
+        title="No Data Available"
+        message="No parent profile data available."
+      />
     );
   }
 
   // Extract parent data based on whether we're viewing own profile or specific parent
-  const parentData = isOwnProfile 
-    ? (parent as UserProfile).roleSpecificData as Parent 
+  const parentData = isOwnProfile
+    ? (parent as UserProfile).roleSpecificData as Parent
     : parent as Parent;
-  
-  const displayName = isOwnProfile 
-    ? (parent as UserProfile).name 
+
+  const displayName = isOwnProfile
+    ? (parent as UserProfile).name
     : parentData.name;
-  
-  const profilePicture = isOwnProfile 
-    ? (parent as UserProfile).profilePicture 
+
+  const profilePicture = isOwnProfile
+    ? (parent as UserProfile).profilePicture
     : parentData.profilePicture;
-  
+
   const getProfileImageUrl = () => {
-    console.log("Parent component - profile picture:", profilePicture);
     if (!profilePicture) {
-      console.log("No profile picture available for parent");
-      // Return gender-specific default avatar based on parent's gender
       const gender = parentData?.gender;
       if (gender === "Male") {
         return "/assets/male.png";
       } else if (gender === "Female") {
         return "/assets/female.png";
       }
-      // Default fallback
       return "/assets/male.png";
     }
-    
     return userService.getProfileImageUrl(profilePicture);
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <div className="p-6 bg-white rounded-lg shadow-sm">
-          <div className="flex items-start gap-6">
-            <div className="flex flex-col items-center w-48">
-              <div className="w-32 h-32 mb-4 overflow-hidden bg-blue-100 rounded-full">
-                <img
-                  src={getProfileImageUrl()}
-                  alt="Parent"
-                  className="object-cover w-100 h-100"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    // Use gender-specific fallback
-                    const gender = parentData?.gender;
-                    if (gender === "Male") {
-                      target.src = "/assets/@male.jpeg";
-                    } else if (gender === "Female") {
-                      target.src = "/assets/female.png";
-                    } else {
-                      target.src = "/assets/@male.jpeg";
-                    }
-                    console.error("Error loading profile image, using default");
-                  }}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+      {/* Page Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Parent Profile</h1>
+        <p className="text-gray-500 mt-1">View and manage parent information</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column - Profile Card */}
+        <div className="lg:col-span-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {/* Profile Header */}
+            <div className="relative h-32 bg-gradient-to-r from-purple-600 to-pink-600">
+              <div className="absolute -bottom-12 left-1/2 transform -translate-x-1/2">
+                <div className="w-24 h-24 rounded-full border-4 border-white overflow-hidden bg-white shadow-lg">
+                  <img
+                    src={getProfileImageUrl()}
+                    alt={displayName || "Parent"}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const gender = parentData?.gender;
+                      if (gender === "Male") {
+                        e.currentTarget.src = "/assets/male.png";
+                      } else if (gender === "Female") {
+                        e.currentTarget.src = "/assets/female.png";
+                      } else {
+                        e.currentTarget.src = "/assets/male.png";
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="absolute top-4 right-4">
+                <StatusBadge status="ACTIVE" variant="dot" />
+              </div>
+            </div>
+
+            {/* Profile Info */}
+            <div className="pt-16 px-6 pb-6 text-center">
+              <h2 className="text-xl font-bold text-gray-900">{displayName}</h2>
+              <p className="text-gray-500">
+                {isOwnProfile ? userService.getRoleDisplayName((parent as UserProfile).role) : 'Parent'}
+              </p>
+
+              <div className="mt-6 space-y-3">
+                <ProfileDetailItem
+                  label="Email"
+                  value={parentData.email || "N/A"}
+                />
+                <ProfileDetailItem
+                  label="Contact"
+                  value={parentData.contactNo || "N/A"}
                 />
               </div>
-              <h2 className="text-xl font-semibold">{displayName}</h2>
-              <p className="text-gray-600">{isOwnProfile ? userService.getRoleDisplayName((parent as UserProfile).role) : 'Parent'}</p>
-              <div className="mt-4 space-y-2">
-                <Button 
+
+              <div className="mt-6">
+                <Button
                   variant="primary"
                   className="w-full"
                   onClick={handleDownloadProfile}
@@ -184,95 +204,84 @@ const ParentProfile: React.FC = () => {
                 </Button>
               </div>
             </div>
+          </div>
 
-            <div className="flex-1">
-              <div className="mb-6">
-                <h3 className="pb-2 mb-4 text-lg font-semibold border-b">Personal Details</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="mb-1 text-gray-600">Full Name</p>
-                    <p className="font-medium">{parentData.name || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Email</p>
-                    <p className="font-medium">{parentData.email || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Gender</p>
-                    <p className="font-medium">{parentData.gender || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-gray-600">Contact Number</p>
-                    <p className="font-medium">{parentData.contactNo || 'N/A'}</p>
-                  </div>
-                  {parentData.children && parentData.children.length > 0 && (
-                    <div className="col-span-2">
-                      <p className="mb-1 text-gray-600">Children</p>
-                      <ul className="pl-5 list-disc">
-                        {parentData.children.map((child: Student) => (
-                          <li key={child.id} className="font-medium">
-                            {child.name} 
-                          </li>
-                        ))}
-                      </ul>
+          {/* Children Card */}
+          {parentData.children && parentData.children.length > 0 && (
+            <div className="mt-6 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b border-gray-100">
+                <h3 className="text-lg font-bold text-gray-900">Children</h3>
+              </div>
+              <div className="p-4">
+                <div className="space-y-3">
+                  {parentData.children.map((child: Student) => (
+                    <div
+                      key={child.id}
+                      className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center">
+                        <span className="text-white font-medium text-sm">
+                          {child.name?.charAt(0)?.toUpperCase() || '?'}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{child.name}</p>
+                        <p className="text-sm text-gray-500">
+                          {child.class?.name || 'N/A'} - {child.section?.name || 'N/A'}
+                        </p>
+                      </div>
+                      <StatusBadge status="ACTIVE" size="sm" variant="dot" />
                     </div>
-                  )}
+                  ))}
                 </div>
               </div>
+            </div>
+          )}
+        </div>
 
-              {parentData.address && (
-                <div className="mb-6">
-                  <h3 className="pb-2 mb-4 text-lg font-semibold border-b">Address</h3>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <p className="mb-1 text-gray-600">Address Line 1</p>
-                      <p className="font-medium">{parentData.address.addressLine1 || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-gray-600">Address Line 2</p>
-                      <p className="font-medium">{parentData.address.addressLine2 || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-gray-600">Street</p>
-                      <p className="font-medium">{parentData.address.street || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-gray-600">City</p>
-                      <p className="font-medium">{parentData.address.city || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-gray-600">Ward</p>
-                      <p className="font-medium">{parentData.address.ward || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-gray-600">Municipality</p>
-                      <p className="font-medium">{parentData.address.municipality || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-gray-600">District</p>
-                      <p className="font-medium">{parentData.address.district || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-gray-600">Province</p>
-                      <p className="font-medium">{parentData.address.province || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-gray-600">Country</p>
-                      <p className="font-medium">{parentData.address.country || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="mb-1 text-gray-600">Postal Code</p>
-                      <p className="font-medium">{parentData.address.postalCode || 'N/A'}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
+        {/* Right Column - Details */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* Personal Details */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900">Personal Details</h3>
+            </div>
+            <div className="p-6">
+              <ProfileDetailsGrid columns={2}>
+                <ProfileDetailItem label="Full Name" value={parentData.name || "N/A"} />
+                <ProfileDetailItem label="Email" value={parentData.email || "N/A"} />
+                <ProfileDetailItem label="Gender" value={parentData.gender || "N/A"} />
+                <ProfileDetailItem label="Contact Number" value={parentData.contactNo || "N/A"} />
+              </ProfileDetailsGrid>
             </div>
           </div>
+
+          {/* Address Details */}
+          {parentData.address && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b border-gray-100">
+                <h3 className="text-lg font-bold text-gray-900">Address Details</h3>
+              </div>
+              <div className="p-6">
+                <ProfileDetailsGrid columns={2}>
+                  <ProfileDetailItem label="Address Line 1" value={parentData.address.addressLine1 || "N/A"} />
+                  <ProfileDetailItem label="Address Line 2" value={parentData.address.addressLine2 || "N/A"} />
+                  <ProfileDetailItem label="Street" value={parentData.address.street || "N/A"} />
+                  <ProfileDetailItem label="City" value={parentData.address.city || "N/A"} />
+                  <ProfileDetailItem label="Ward" value={parentData.address.ward || "N/A"} />
+                  <ProfileDetailItem label="Municipality" value={parentData.address.municipality || "N/A"} />
+                  <ProfileDetailItem label="District" value={parentData.address.district || "N/A"} />
+                  <ProfileDetailItem label="Province" value={parentData.address.province || "N/A"} />
+                  <ProfileDetailItem label="Country" value={parentData.address.country || "N/A"} />
+                  <ProfileDetailItem label="Postal Code" value={parentData.address.postalCode || "N/A"} />
+                </ProfileDetailsGrid>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-export default ParentProfile; 
+export default ParentProfile;

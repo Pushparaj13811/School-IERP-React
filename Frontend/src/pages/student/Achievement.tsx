@@ -72,7 +72,7 @@ const Achievement: React.FC = () => {
           <h2 className="text-2xl font-bold text-gray-800">Achievements</h2>
           <button 
             onClick={handleAddAchievement}
-            className="bg-[#292648] text-white px-6 py-2 rounded-md"
+            className="bg-indigo-600 text-white hover:bg-indigo-700 px-6 py-2 rounded-md transition-colors"
           >
             Add Achievements
           </button>

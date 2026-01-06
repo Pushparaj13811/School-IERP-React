@@ -52,7 +52,7 @@ const HolidayCard: React.FC<HolidayCardProps> = ({
   
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow duration-300">
-      <div className="bg-[#292648] p-4 text-white">
+      <div className="bg-indigo-600 p-4 text-white">
         <div className="flex justify-between items-center">
           <div>
             <div className="text-sm font-medium">
@@ -79,7 +79,7 @@ const HolidayCard: React.FC<HolidayCardProps> = ({
       </div>
       
       <div className="p-4">
-        <h3 className="text-md font-bold mb-2 text-[#292648] truncate">
+        <h3 className="text-md font-bold mb-2 text-indigo-700 truncate">
           {title}
         </h3>
         

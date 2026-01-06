@@ -26,7 +26,7 @@ const TimetableGrid: React.FC<TimetableGridProps> = ({ periodGrid, onDeletePerio
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse min-w-[700px]">
-        <thead className="bg-[#292648] text-white">
+        <thead className="bg-indigo-600 text-white">
           <tr>
             <th className="p-3 text-left">Time Slot</th>
             {daysOfWeek.map(day => (

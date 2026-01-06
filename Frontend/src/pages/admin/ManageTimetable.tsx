@@ -608,7 +608,7 @@ const ManageTimetable: React.FC = () => {
               <button 
                 onClick={createTimetable}
                 disabled={!selectedClass || !selectedSection || isCreatingTimetable}
-                className={`px-4 py-2 rounded-md text-white ${!selectedClass || !selectedSection || isCreatingTimetable ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#292648] hover:bg-[#3b3664]'}`}
+                className={`px-4 py-2 rounded-md text-white ${!selectedClass || !selectedSection || isCreatingTimetable ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
               >
                 {isCreatingTimetable ? (
                   <span className="flex items-center">
@@ -631,7 +631,7 @@ const ManageTimetable: React.FC = () => {
               </h3>
               <button
                 onClick={handleOpenPeriodDialog}
-                className="px-4 py-2 bg-[#292648] text-white rounded-md hover:bg-[#3b3664] flex items-center"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center"
               >
                 <span className="mr-1">+</span> Add Period
               </button>

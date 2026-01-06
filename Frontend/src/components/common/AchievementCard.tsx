@@ -27,7 +27,7 @@ const AchievementCard: React.FC<AchievementCardProps> = ({ achievement, onViewDe
         <p className="mb-4 text-sm text-gray-600 line-clamp-2">{achievement.description}</p>
         <button 
           onClick={() => onViewDetails(achievement)}
-          className="bg-[#292648] text-white px-4 py-2 rounded-md text-sm"
+          className="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-md text-sm transition-colors"
         >
           View File
         </button>

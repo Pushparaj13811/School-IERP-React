@@ -6,6 +6,15 @@ import { Teacher, Subject } from '../../types/api';
 import Button from '../../components/ui/Button';
 import { toast } from 'react-toastify';
 
+// Import shared components - eliminates duplicate Spinner definition
+import {
+  PageLoadingState,
+  PageErrorState,
+  ProfileDetailItem,
+  ProfileDetailsGrid,
+  StatusBadge
+} from '../../components/common';
+
 // Define interface for teacher profile data from API response
 interface TeacherWithAddress extends Teacher {
   address?: {
@@ -22,13 +31,6 @@ interface TeacherWithAddress extends Teacher {
   };
 }
 
-// Create a simple spinner component
-const Spinner: React.FC = () => (
-  <div className="flex justify-center items-center h-full">
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-900"></div>
-  </div>
-);
-
 const TeacherProfile: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const [teacher, setTeacher] = useState<UserProfile | TeacherWithAddress | null>(null);
@@ -43,11 +45,9 @@ const TeacherProfile: React.FC = () => {
 
         // If id parameter exists, fetch specific teacher (admin view)
         if (id) {
-          console.log(`Fetching teacher profile with ID: ${id}`);
           const response = await userAPI.getTeacherById(parseInt(id));
 
           if (response.data?.status === 'success' && response.data?.data?.teacher) {
-            console.log('Teacher data from API:', response.data.data.teacher);
             setTeacher(response.data.data.teacher as TeacherWithAddress);
             setIsOwnProfile(false);
           } else {
@@ -56,11 +56,9 @@ const TeacherProfile: React.FC = () => {
         }
         // Otherwise, try to get logged-in user's profile (teacher view)
         else {
-          console.log('Fetching own teacher profile');
           const profile = await userService.getUserProfile();
 
           if (profile && profile.role === 'TEACHER') {
-            console.log('Own teacher profile found:', profile);
             setTeacher(profile);
             setIsOwnProfile(true);
           } else {
@@ -70,7 +68,6 @@ const TeacherProfile: React.FC = () => {
 
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching teacher data:', err);
         setError('Failed to load teacher profile. Please try again later.');
         setLoading(false);
       }
@@ -85,7 +82,7 @@ const TeacherProfile: React.FC = () => {
         toast.error("Teacher data not found");
         return;
       }
-      
+
       let teacherId: number;
       if (isOwnProfile) {
         const profile = teacher as UserProfile;
@@ -98,36 +95,36 @@ const TeacherProfile: React.FC = () => {
       } else {
         teacherId = (teacher as TeacherWithAddress).id;
       }
-      
+
       await userService.downloadProfile('TEACHER', teacherId);
       toast.success("Profile download initiated");
-    } catch (error) {
-      console.error("Error downloading profile:", error);
+    } catch {
       toast.error("Failed to download profile");
     }
   };
 
+  // Loading state - using shared component
   if (loading) {
-    return <Spinner />;
+    return <PageLoadingState message="Loading teacher profile..." />;
   }
 
+  // Error state - using shared component
   if (error) {
     return (
-      <div className="p-6 text-center">
-        <div className="p-4 bg-red-100 text-red-700 rounded-md">
-          {error}
-        </div>
-      </div>
+      <PageErrorState
+        title="Error Loading Profile"
+        message={error}
+        onRetry={() => window.location.reload()}
+      />
     );
   }
 
   if (!teacher) {
     return (
-      <div className="p-6 text-center">
-        <div className="p-4 bg-yellow-100 text-yellow-700 rounded-md">
-          No teacher profile data available.
-        </div>
-      </div>
+      <PageErrorState
+        title="No Data Available"
+        message="No teacher profile data available."
+      />
     );
   }
 
@@ -144,35 +141,111 @@ const TeacherProfile: React.FC = () => {
     ? (teacher as UserProfile).profilePicture
     : teacherData.profilePicture;
 
+  const getProfileImageUrl = () => {
+    if (!profilePicture) {
+      const gender = teacherData?.gender;
+      if (gender === "Male") {
+        return "/assets/male.png";
+      } else if (gender === "Female") {
+        return "/assets/female.png";
+      }
+      return "/assets/male.png";
+    }
+    return userService.getProfileImageUrl(profilePicture);
+  };
+
+  // Extract classes and sections names
+  const getClassNames = () => {
+    if (!teacherData.classes || teacherData.classes.length === 0) return 'N/A';
+    return teacherData.classes.map((cls) => {
+      if (cls && typeof cls === 'object' && 'class' in cls && cls.class) {
+        return cls.class.name;
+      } else if (cls && typeof cls === 'object' && 'name' in cls) {
+        return cls.name as string;
+      }
+      return '';
+    }).filter(Boolean).join(', ') || 'N/A';
+  };
+
+  const getSectionNames = () => {
+    if (!teacherData.sections || teacherData.sections.length === 0) return 'N/A';
+    return teacherData.sections.map((sec) => {
+      if (sec && typeof sec === 'object' && 'section' in sec && sec.section) {
+        return sec.section.name;
+      } else if (sec && typeof sec === 'object' && 'name' in sec) {
+        return sec.name as string;
+      }
+      return '';
+    }).filter(Boolean).join(', ') || 'N/A';
+  };
+
+  const getSubjectNames = () => {
+    if (!teacherData.subjects || teacherData.subjects.length === 0) return 'N/A';
+    return teacherData.subjects.map((subject: Subject) => subject.name || 'Unnamed').join(', ');
+  };
+
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-start gap-6">
-            <div className="w-48 flex flex-col items-center">
-              <div className="w-32 h-32 bg-blue-100 rounded-full mb-4 overflow-hidden">
-                <img
-                  src={userService.getProfileImageUrl(profilePicture)}
-                  alt="Teacher"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    // Use gender-specific fallback
-                    const gender = teacherData?.gender;
-                    if (gender === "Male") {
-                      target.src = "/assets/male.png";
-                    } else if (gender === "Female") {
-                      target.src = "/assets/female.png";
-                    } else {
-                      target.src = "/assets/male.png";
-                    }
-                    console.error("Error loading profile image, using default");
-                  }}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+      {/* Page Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Teacher Profile</h1>
+        <p className="text-gray-500 mt-1">View and manage teacher information</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column - Profile Card */}
+        <div className="lg:col-span-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {/* Profile Header */}
+            <div className="relative h-32 bg-gradient-to-r from-emerald-600 to-teal-600">
+              <div className="absolute -bottom-12 left-1/2 transform -translate-x-1/2">
+                <div className="w-24 h-24 rounded-full border-4 border-white overflow-hidden bg-white shadow-lg">
+                  <img
+                    src={getProfileImageUrl()}
+                    alt={displayName || "Teacher"}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const gender = teacherData?.gender;
+                      if (gender === "Male") {
+                        e.currentTarget.src = "/assets/male.png";
+                      } else if (gender === "Female") {
+                        e.currentTarget.src = "/assets/female.png";
+                      } else {
+                        e.currentTarget.src = "/assets/male.png";
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="absolute top-4 right-4">
+                <StatusBadge status="ACTIVE" variant="dot" />
+              </div>
+            </div>
+
+            {/* Profile Info */}
+            <div className="pt-16 px-6 pb-6 text-center">
+              <h2 className="text-xl font-bold text-gray-900">{displayName}</h2>
+              <p className="text-gray-500">
+                {isOwnProfile ? userService.getRoleDisplayName((teacher as UserProfile).role) : 'Teacher'}
+              </p>
+              {teacherData.designation?.name && (
+                <span className="inline-block mt-2 px-3 py-1 bg-emerald-50 text-emerald-700 text-sm font-medium rounded-full">
+                  {teacherData.designation.name}
+                </span>
+              )}
+
+              <div className="mt-6 space-y-3">
+                <ProfileDetailItem
+                  label="Email"
+                  value={teacherData.email || "N/A"}
+                />
+                <ProfileDetailItem
+                  label="Contact"
+                  value={teacherData.contactNo || "N/A"}
                 />
               </div>
-              <h2 className="text-xl font-semibold">{displayName}</h2>
-              <p className="text-gray-600">{isOwnProfile ? userService.getRoleDisplayName((teacher as UserProfile).role) : 'Teacher'}</p>
-              <div className="mt-4 space-y-2">
+
+              <div className="mt-6 space-y-2">
                 <Button
                   variant='primary'
                   className='w-full'
@@ -187,133 +260,70 @@ const TeacherProfile: React.FC = () => {
                   >
                     Edit Profile
                   </Button>
-
                 )}
               </div>
             </div>
+          </div>
+        </div>
 
-            <div className="flex-1">
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold border-b pb-2 mb-4">Personal Details</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-gray-600 mb-1">Full Name</p>
-                    <p className="font-medium">{teacherData.name || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 mb-1">Email</p>
-                    <p className="font-medium">{teacherData.email || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 mb-1">Gender</p>
-                    <p className="font-medium">{teacherData.gender || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 mb-1">Contact Number</p>
-                    <p className="font-medium">{teacherData.contactNo || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 mb-1">Designation</p>
-                    <p className="font-medium">{teacherData.designation?.name || 'N/A'}</p>
-                  </div>
-                  {teacherData.subjects && teacherData.subjects.length > 0 && (
-                    <div>
-                      <p className="text-gray-600 mb-1">Subjects</p>
-                      <p className="font-medium">
-                        {teacherData.subjects.map((subject: Subject) => subject.name || 'Unnamed').join(', ')}
-                      </p>
-                    </div>
-                  )}
-                  {teacherData.classes && teacherData.classes.length > 0 && (
-                    <div>
-                      <p className="text-gray-600 mb-1">Classes</p>
-                      <p className="font-medium">
-                        {teacherData.classes.map((cls) => {
-                          // Handle both potential data structures
-                          if (cls && typeof cls === 'object' && 'class' in cls && cls.class) {
-                            return cls.class.name;
-                          } else if (cls && typeof cls === 'object' && 'name' in cls) {
-                            // If classes is an array of direct class objects
-                            return cls.name as string;
-                          }
-                          return '';
-                        }).filter(Boolean).join(', ') || 'N/A'}
-                      </p>
-                    </div>
-                  )}
-                  {teacherData.sections && teacherData.sections.length > 0 && (
-                    <div>
-                      <p className="text-gray-600 mb-1">Sections</p>
-                      <p className="font-medium">
-                        {teacherData.sections.map((sec) => {
-                          // Handle both potential data structures
-                          if (sec && typeof sec === 'object' && 'section' in sec && sec.section) {
-                            return sec.section.name;
-                          } else if (sec && typeof sec === 'object' && 'name' in sec) {
-                            // If sections is an array of direct section objects
-                            return sec.name as string;
-                          }
-                          return '';
-                        }).filter(Boolean).join(', ') || 'N/A'}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {teacherData.address && (
-                <div>
-                  <h3 className="text-lg font-semibold border-b pb-2 mb-4">Address</h3>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-gray-600 mb-1">Address Line 1</p>
-                      <p className="font-medium">{teacherData.address.addressLine1 || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 mb-1">Address Line 2</p>
-                      <p className="font-medium">{teacherData.address.addressLine2 || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 mb-1">Street</p>
-                      <p className="font-medium">{teacherData.address.street || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 mb-1">City</p>
-                      <p className="font-medium">{teacherData.address.city || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 mb-1">Ward</p>
-                      <p className="font-medium">{teacherData.address.ward || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 mb-1">Municipality</p>
-                      <p className="font-medium">{teacherData.address.municipality || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 mb-1">District</p>
-                      <p className="font-medium">{teacherData.address.district || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 mb-1">Province</p>
-                      <p className="font-medium">{teacherData.address.province || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 mb-1">Country</p>
-                      <p className="font-medium">{teacherData.address.country || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600 mb-1">Postal Code</p>
-                      <p className="font-medium">{teacherData.address.postalCode || 'N/A'}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
+        {/* Right Column - Details */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* Personal Details */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900">Personal Details</h3>
+            </div>
+            <div className="p-6">
+              <ProfileDetailsGrid columns={2}>
+                <ProfileDetailItem label="Full Name" value={teacherData.name || "N/A"} />
+                <ProfileDetailItem label="Email" value={teacherData.email || "N/A"} />
+                <ProfileDetailItem label="Gender" value={teacherData.gender || "N/A"} />
+                <ProfileDetailItem label="Contact Number" value={teacherData.contactNo || "N/A"} />
+                <ProfileDetailItem label="Designation" value={teacherData.designation?.name || "N/A"} />
+              </ProfileDetailsGrid>
             </div>
           </div>
+
+          {/* Academic Details */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900">Academic Details</h3>
+            </div>
+            <div className="p-6">
+              <ProfileDetailsGrid columns={2}>
+                <ProfileDetailItem label="Subjects" value={getSubjectNames()} />
+                <ProfileDetailItem label="Classes" value={getClassNames()} />
+                <ProfileDetailItem label="Sections" value={getSectionNames()} />
+              </ProfileDetailsGrid>
+            </div>
+          </div>
+
+          {/* Address Details */}
+          {teacherData.address && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b border-gray-100">
+                <h3 className="text-lg font-bold text-gray-900">Address Details</h3>
+              </div>
+              <div className="p-6">
+                <ProfileDetailsGrid columns={2}>
+                  <ProfileDetailItem label="Address Line 1" value={teacherData.address.addressLine1 || "N/A"} />
+                  <ProfileDetailItem label="Address Line 2" value={teacherData.address.addressLine2 || "N/A"} />
+                  <ProfileDetailItem label="Street" value={teacherData.address.street || "N/A"} />
+                  <ProfileDetailItem label="City" value={teacherData.address.city || "N/A"} />
+                  <ProfileDetailItem label="Ward" value={teacherData.address.ward || "N/A"} />
+                  <ProfileDetailItem label="Municipality" value={teacherData.address.municipality || "N/A"} />
+                  <ProfileDetailItem label="District" value={teacherData.address.district || "N/A"} />
+                  <ProfileDetailItem label="Province" value={teacherData.address.province || "N/A"} />
+                  <ProfileDetailItem label="Country" value={teacherData.address.country || "N/A"} />
+                  <ProfileDetailItem label="Postal Code" value={teacherData.address.postalCode || "N/A"} />
+                </ProfileDetailsGrid>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-export default TeacherProfile; 
+export default TeacherProfile;

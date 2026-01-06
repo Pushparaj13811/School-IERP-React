@@ -39,8 +39,7 @@ class FeedbackService {
       } else {
         throw new Error(response.data.message || 'Failed to fetch feedbacks');
       }
-    } catch (error) {
-      console.error('Error fetching student feedbacks:', error);
+    } catch {
       toast.error('Failed to load feedback data');
       return [];
     }
@@ -60,8 +59,7 @@ class FeedbackService {
       } else {
         throw new Error(response.data.message || 'Failed to submit feedback');
       }
-    } catch (error) {
-      console.error('Error submitting feedback:', error);
+    } catch {
       toast.error('Failed to submit feedback');
       return null;
     }

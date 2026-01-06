@@ -71,7 +71,7 @@ const ClassTeacherManager: React.FC<ClassTeacherManagerProps> = ({
                   variant="primary"
                   onClick={onCreateTimetable}
                   disabled={loading}
-                  className={`px-4 py-2 rounded-md text-white ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#292648] hover:bg-[#3b3664]'}`}
+                  className={`px-4 py-2 rounded-md text-white ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
                 >
                   {loading ? (
                     <span className="flex items-center">
@@ -85,7 +85,7 @@ const ClassTeacherManager: React.FC<ClassTeacherManagerProps> = ({
                 <Button
                   variant="primary"
                   onClick={onOpenPeriodDialog}
-                  className="px-4 py-2 bg-[#292648] text-white rounded-md hover:bg-[#3b3664] flex items-center"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center"
                 >
                   <span className="mr-1">+</span> Add Period
                 </Button>
@@ -99,7 +99,7 @@ const ClassTeacherManager: React.FC<ClassTeacherManagerProps> = ({
                 </h3>
                 <Button
                   onClick={onOpenPeriodDialog}
-                  className="px-4 py-2 bg-[#292648] text-white rounded-md hover:bg-[#3b3664] flex items-center"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 flex items-center"
                 >
                   <span className="mr-1">+</span> Add Period
                 </Button>

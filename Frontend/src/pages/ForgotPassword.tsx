@@ -13,28 +13,32 @@ const ForgotPassword: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Clear previous errors
     setError('');
-    
+
+    // Sanitize email - trim whitespace and convert to lowercase
+    const sanitizedEmail = email.trim().toLowerCase();
+
     // Validate email
-    if (!email) {
+    if (!sanitizedEmail) {
       setError('Please enter your email address');
       return;
     }
 
-    // Simple email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    // Permissive email validation - accepts various formats
+    // Accepts: user@domain.com, User@Domain.COM, user.name+tag@domain.co.uk, etc.
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(sanitizedEmail)) {
       setError('Please enter a valid email address');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      
-      // Make API call
-      await authAPI.forgotPassword(email);
+
+      // Make API call with sanitized email
+      await authAPI.forgotPassword(sanitizedEmail);
       
       // Display success message
       setIsSuccess(true);

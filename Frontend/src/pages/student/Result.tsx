@@ -300,7 +300,7 @@ const Result: React.FC = () => {
                 <select
                   value={selectedTerm}
                   onChange={(e) => setSelectedTerm(e.target.value)}
-                  className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:outline-none focus:ring-1 focus:ring-[#292648]"
+                  className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 >
                   {terms.map((term) => (
                     <option key={term} value={term}>
@@ -320,7 +320,7 @@ const Result: React.FC = () => {
         
         {isLoading && (
           <div className="flex justify-center my-8">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#292648]"></div>
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
           </div>
         )}
         
@@ -344,13 +344,13 @@ const Result: React.FC = () => {
                 title="Subject Results"
                 columns={resultColumns}
                 data={subjects}
-                headerBackgroundColor="#292648"
+                headerBackgroundColor="#4F46E5"
               />
             </div>
               
             {/* Result summary */}
             <div className="grid w-full grid-cols-1 gap-4 mt-6 rounded md:grid-cols-12">
-              <div className="md:col-span-8 bg-[#292648] rounded-lg p-5 text-dark ">
+              <div className="md:col-span-8 bg-indigo-600 rounded-lg p-5 text-dark ">
                 <div className="bg-[#EEF5FF] p-3 rounded">
                   <div className="grid grid-cols-2 gap-5 md:grid-cols-3">
                     <div>
@@ -382,7 +382,7 @@ const Result: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <div className="p-5 rounded-lg bg-[#292648] text-centerborder md:col-span-4">
+              <div className="p-5 rounded-lg bg-indigo-600 text-centerborder md:col-span-4">
                 <div className="bg-[#EEF5FF] p-8 flex flex-row gap-3 rounded md:flex-col lg:flex-row">
                   <div>
                     <p className="mb-1 font-semibold">Class Teacher:</p>

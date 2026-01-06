@@ -143,7 +143,7 @@ const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
               name="leaveTypeId"
               value={formData.leaveTypeId}
               onChange={onChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#292648]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
               required
               aria-required="true"
               aria-invalid={formData.leaveTypeId ? "false" : "true"}
@@ -171,7 +171,7 @@ const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
             name="subject"
             value={formData.subject}
             onChange={onChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#292648]"
+            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
             required
             aria-required="true"
             aria-invalid={formData.subject ? "false" : "true"}
@@ -193,7 +193,7 @@ const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
               value={formData.fromDate}
               onChange={handleDateChange}
               min={today}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#292648]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
               required
               aria-required="true"
               aria-invalid={formData.fromDate && !dateError ? "false" : "true"}
@@ -214,7 +214,7 @@ const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
               value={formData.toDate}
               onChange={handleDateChange}
               min={formData.fromDate || today}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#292648]"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
               required
               aria-required="true"
               aria-invalid={formData.toDate && !dateError ? "false" : "true"}
@@ -248,7 +248,7 @@ const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
           value={formData.description}
           onChange={onChange}
           rows={6}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#292648]"
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
           required
           aria-required="true"
           aria-invalid={formData.description ? "false" : "true"}
@@ -267,7 +267,7 @@ const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
         </button>
         <button
           type="submit"
-          className="bg-[#292648] text-white px-4 sm:px-6 py-2 rounded-md hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#292648]"
+          className="bg-indigo-600 text-white px-4 sm:px-6 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
           disabled={isSubmitting || !!dateError}
           aria-label="Submit leave application"
           aria-busy={isSubmitting ? "true" : "false"}

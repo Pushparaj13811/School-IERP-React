@@ -488,7 +488,7 @@ const Holiday: React.FC = () => {
           
           {/* Holiday calendar - right side */}
           <div className="overflow-hidden md:col-span-7">
-            <div className="bg-[#292648] text-white py-3 px-6 flex justify-between items-center">
+            <div className="bg-indigo-600 text-white py-3 px-6 flex justify-between items-center">
               <div className="font-semibold">Holiday Name</div>
                 <div className="font-semibold">Holiday Type</div>
               <div className="flex pr-5 mr-8">

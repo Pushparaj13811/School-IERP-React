@@ -183,7 +183,7 @@ const PeriodDialog: React.FC<PeriodDialogProps> = ({
           <Button 
             onClick={handleSubmit}
             disabled={!selectedTimeSlot || !selectedSubject || !selectedTeacher || loading}
-            className={`px-4 py-2 rounded-md text-white ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#292648] hover:bg-[#3b3664]'}`}
+            className={`px-4 py-2 rounded-md text-white ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
           >
             {loading ? (
               <span className="flex items-center">
