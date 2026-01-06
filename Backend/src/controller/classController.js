@@ -18,9 +18,18 @@ export const getAllClasses = async (req, res, next) => {
         const classes = await prisma.class.findMany({
             orderBy: {
                 name: 'asc'
+            },
+            include: {
+                sections: true,
+                _count: {
+                    select: {
+                        students: true,
+                        sections: true
+                    }
+                }
             }
         });
-        
+
         res.status(200).json({
             status: 'success',
             data: {

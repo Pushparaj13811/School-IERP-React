@@ -94,17 +94,19 @@ export const getSubjectsByClassId = async (req, res, next) => {
 export const assignSubjectToClasses = async (req, res, next) => {
   try {
     const { subjectId } = req.params;
-    const { classes } = req.body;
+    // Accept both 'classes' and 'classIds' for frontend compatibility
+    const classIds = req.body.classIds || req.body.classes;
 
     if (!subjectId || isNaN(parseInt(subjectId))) {
       return next(new ApiError(400, "Invalid subject ID provided"));
     }
 
-    if (!classes || !Array.isArray(classes) || classes.length === 0) {
-      return next(new ApiError(400, "Classes array is required"));
+    if (!classIds || !Array.isArray(classIds)) {
+      return next(new ApiError(400, "Class IDs array is required"));
     }
 
-    const result = await subjectService.assignSubjectToClasses(subjectId, classes);
+    // Allow empty array to unassign all classes
+    const result = await subjectService.assignSubjectToClasses(subjectId, classIds);
 
     return res.status(200).json(
       new ApiResponse(

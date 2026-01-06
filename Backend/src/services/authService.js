@@ -8,12 +8,15 @@ import { emailService } from './emailService.js';
 import {
     validateEmail,
     validatePassword,
+    validatePasswordExists,
     validateRole,
     validateAddress,
     validateStudentData,
     validateTeacherData,
     validateAdminData,
-    validateParentData
+    validateParentData,
+    sanitizeEmail,
+    sanitizeInput
 } from '../utils/validators.js';
 
 export class AuthService {
@@ -31,6 +34,9 @@ export class AuthService {
         validatePassword(password);
         validateRole(role);
         validateAddress(profileData);
+
+        // Sanitize email
+        const sanitizedEmail = sanitizeEmail(email);
 
         // Validate role-specific data
         switch (role) {
@@ -50,7 +56,7 @@ export class AuthService {
 
         // Check if user exists
         const existingUser = await prisma.user.findUnique({
-            where: { email }
+            where: { email: sanitizedEmail }
         });
 
         if (existingUser) {
@@ -80,7 +86,7 @@ export class AuthService {
         // Create user with role-specific profile
         const user = await prisma.user.create({
             data: {
-                email,
+                email: sanitizedEmail,
                 password: hashedPassword,
                 role,
                 ...(role === 'STUDENT' && {
@@ -167,13 +173,16 @@ export class AuthService {
     }
 
     async login(email, password) {
-        // Validate input
+        // Validate input - use permissive validation for login
         validateEmail(email);
-        validatePassword(password);
+        validatePasswordExists(password);
+
+        // Sanitize email for lookup
+        const sanitizedEmail = sanitizeEmail(email);
 
         // Check if user exists && password is correct
         const user = await prisma.user.findUnique({
-            where: { email },
+            where: { email: sanitizedEmail },
             include: {
                 student: {
                     include: {
@@ -247,9 +256,12 @@ export class AuthService {
         // Validate email
         validateEmail(email);
 
+        // Sanitize email for lookup
+        const sanitizedEmail = sanitizeEmail(email);
+
         // Get user by email
         const user = await prisma.user.findUnique({
-            where: { email },
+            where: { email: sanitizedEmail },
             include: {
                 student: true,
                 teacher: true,

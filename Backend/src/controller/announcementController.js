@@ -377,9 +377,9 @@ export const updateAnnouncement = async (req, res, next) => {
             priority,
             expiresAt,
             isActive,
-            targetClassIds = [],
-            targetSectionIds = [],
-            targetRoles = [],
+            targetClassIds,
+            targetSectionIds,
+            targetRoles,
             attachments = []
         } = req.body;
 
@@ -439,7 +439,7 @@ export const updateAnnouncement = async (req, res, next) => {
             });
 
             // If targetClassIds is provided, update class relations
-            if (targetClassIds.length >= 0) {
+            if (Array.isArray(targetClassIds)) {
                 // Delete existing relations
                 await tx.announcementClass.deleteMany({
                     where: { announcementId: Number(id) }
@@ -459,7 +459,7 @@ export const updateAnnouncement = async (req, res, next) => {
             }
 
             // If targetSectionIds is provided, update section relations
-            if (targetSectionIds.length >= 0) {
+            if (Array.isArray(targetSectionIds)) {
                 // Delete existing relations
                 await tx.announcementSection.deleteMany({
                     where: { announcementId: Number(id) }
@@ -479,7 +479,7 @@ export const updateAnnouncement = async (req, res, next) => {
             }
 
             // If targetRoles is provided, update role relations
-            if (targetRoles.length >= 0) {
+            if (Array.isArray(targetRoles)) {
                 // Delete existing relations
                 await tx.announcementRole.deleteMany({
                     where: { announcementId: Number(id) }

@@ -11,10 +11,9 @@ import {
 import { getSectionsByClass } from '../controller/sectionController.js';
 import { getSubjectsByClassId } from '../controller/subjectController.js';
 import { protect, restrictTo } from '../middlewares/authMiddleware.js';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../databases/prismaClient.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Protect all routes
 router.use(protect);

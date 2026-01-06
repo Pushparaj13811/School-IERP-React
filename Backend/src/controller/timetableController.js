@@ -1,6 +1,7 @@
 import timetableService from '../services/timetableService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiResponse } from '../utils/apiResponse.js';
+import { prisma } from '../databases/prismaClient.js';
 
 class TimetableController {
   /**
@@ -63,9 +64,6 @@ class TimetableController {
         if (req.user && req.user.role === 'STUDENT') {
           // Get student ID from the user record
           try {
-            const { PrismaClient } = await import('@prisma/client');
-            const prisma = new PrismaClient();
-            
             const student = await prisma.student.findFirst({
               where: { 
                 userId: req.user.id 
@@ -109,9 +107,6 @@ class TimetableController {
     if (!teacherId) {
       if (req.user && req.user.role === 'TEACHER') {
         try {
-          const { PrismaClient } = await import('@prisma/client');
-          const prisma = new PrismaClient();
-
           const teacher = await prisma.teacher.findFirst({
             where: {
               userId: req.user.id

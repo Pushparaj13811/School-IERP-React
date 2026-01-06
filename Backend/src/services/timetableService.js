@@ -1,5 +1,6 @@
 import { prisma } from '../databases/prismaClient.js';
 import { ApiError } from '../utils/apiError.js';
+import { config } from '../config/config.js';
 
 class TimetableService {
     /**
@@ -15,7 +16,7 @@ class TimetableService {
             });
 
             if (!classExists) {
-                throw new ApiError('Class not found', 404);
+                throw new ApiError(404, 'Class not found');
             }
 
             // Check if section exists
@@ -24,7 +25,7 @@ class TimetableService {
             });
 
             if (!sectionExists) {
-                throw new ApiError('Section not found', 404);
+                throw new ApiError(404, 'Section not found');
             }
 
             // Check if timetable already exists
@@ -38,7 +39,7 @@ class TimetableService {
             });
 
             if (existingTimetable) {
-                throw new ApiError('Timetable already exists for this class, section, academic year and term', 400);
+                throw new ApiError(400, 'Timetable already exists for this class, section, academic year and term');
             }
 
             // Create new timetable
@@ -54,7 +55,7 @@ class TimetableService {
             return timetable;
         } catch (error) {
             if (error instanceof ApiError) throw error;
-            throw new ApiError(error.message || 'Error creating timetable', 500);
+            throw new ApiError(500, error.message || 'Error creating timetable');
         }
     }
 
@@ -80,13 +81,13 @@ class TimetableService {
             });
 
             if (!timetable) {
-                throw new ApiError('Timetable not found', 404);
+                throw new ApiError(404, 'Timetable not found');
             }
 
             return timetable;
         } catch (error) {
             if (error instanceof ApiError) throw error;
-            throw new ApiError(error.message || 'Error retrieving timetable', 500);
+            throw new ApiError(500, error.message || 'Error retrieving timetable');
         }
     }
 
@@ -193,9 +194,9 @@ class TimetableService {
                 return null;
             }
 
-            // Get current academic year and term
-            const currentAcademicYear = "2023-2024"; // This should be retrieved from your system
-            const currentTerm = "First Term"; // This should be retrieved from your system
+            // Get current academic year and term from configuration
+            const currentAcademicYear = config.academic.currentYear;
+            const currentTerm = config.academic.currentTerm;
 
             console.log(`Looking up timetable for classId=${student.classId}, sectionId=${student.sectionId}, year=${currentAcademicYear}, term=${currentTerm}`);
 
@@ -260,7 +261,7 @@ class TimetableService {
             });
 
             if (!timetable) {
-                throw new ApiError('Timetable not found', 404);
+                throw new ApiError(404, 'Timetable not found');
             }
 
             // Check if time slot exists
@@ -269,7 +270,7 @@ class TimetableService {
             });
 
             if (!timeSlot) {
-                throw new ApiError('Time slot not found', 404);
+                throw new ApiError(404, 'Time slot not found');
             }
 
             // Check if teacher exists
@@ -278,7 +279,7 @@ class TimetableService {
             });
 
             if (!teacher) {
-                throw new ApiError('Teacher not found', 404);
+                throw new ApiError(404, 'Teacher not found');
             }
 
             // Check if subject exists
@@ -287,7 +288,7 @@ class TimetableService {
             });
 
             if (!subject) {
-                throw new ApiError('Subject not found', 404);
+                throw new ApiError(404, 'Subject not found');
             }
 
             // Check if teacher is already assigned to another class during the same time slot on the same day
@@ -310,7 +311,7 @@ class TimetableService {
             });
 
             if (teacherConflict) {
-                throw new ApiError(`Teacher is already assigned to ${teacherConflict.class.name} - ${teacherConflict.section.name} during this time slot on this day`, 400);
+                throw new ApiError(400, `Teacher is already assigned to ${teacherConflict.class.name} - ${teacherConflict.section.name} during this time slot on this day`);
             }
 
             // Check if period already exists for this day and time slot for this class and section
@@ -367,7 +368,7 @@ class TimetableService {
         } catch (error) {
             console.error('Error in addPeriod:', error);
             if (error instanceof ApiError) throw error;
-            throw new ApiError(error.message || 'Error adding period to timetable', 500);
+            throw new ApiError(500, error.message || 'Error adding period to timetable');
         }
     }
 
@@ -381,7 +382,7 @@ class TimetableService {
             });
 
             if (!period) {
-                throw new ApiError('Period not found', 404);
+                throw new ApiError(404, 'Period not found');
             }
 
             await prisma.period.delete({
@@ -391,7 +392,7 @@ class TimetableService {
             return { message: 'Period deleted successfully' };
         } catch (error) {
             if (error instanceof ApiError) throw error;
-            throw new ApiError(error.message || 'Error deleting period', 500);
+            throw new ApiError(500, error.message || 'Error deleting period');
         }
     }
 
@@ -410,13 +411,13 @@ class TimetableService {
             const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
             if (!timeRegex.test(startTime) || !timeRegex.test(endTime)) {
                 console.error('Invalid time format:', { startTime, endTime });
-                throw new ApiError('Invalid time format. Use HH:mm format', 400);
+                throw new ApiError(400, 'Invalid time format. Use HH:mm format');
             }
 
             // Check if start time is before end time
             if (startTime >= endTime) {
                 console.error('Start time is not before end time:', { startTime, endTime });
-                throw new ApiError('Start time must be before end time', 400);
+                throw new ApiError(400, 'Start time must be before end time');
             }
 
             // Format data for database
@@ -439,7 +440,7 @@ class TimetableService {
         } catch (error) {
             console.error('Error in createTimeSlot:', error);
             if (error instanceof ApiError) throw error;
-            throw new ApiError(error.message || 'Error creating time slot', 500);
+            throw new ApiError(500, error.message || 'Error creating time slot');
         }
     }
 
@@ -454,7 +455,7 @@ class TimetableService {
 
             return timeSlots;
         } catch (error) {
-            throw new ApiError(error.message || 'Error retrieving time slots', 500);
+            throw new ApiError(500, error.message || 'Error retrieving time slots');
         }
     }
 
@@ -472,12 +473,12 @@ class TimetableService {
             });
 
             if (!timeSlot) {
-                throw new ApiError('Time slot not found', 404);
+                throw new ApiError(404, 'Time slot not found');
             }
 
             // Check if the time slot is being used in any periods
             if (timeSlot.periods && timeSlot.periods.length > 0) {
-                throw new ApiError('Cannot delete time slot as it is being used in timetable periods', 400);
+                throw new ApiError(400, 'Cannot delete time slot as it is being used in timetable periods');
             }
 
             // Delete the time slot
@@ -490,7 +491,7 @@ class TimetableService {
         } catch (error) {
             console.error('Error in deleteTimeSlot:', error);
             if (error instanceof ApiError) throw error;
-            throw new ApiError(error.message || 'Error deleting time slot', 500);
+            throw new ApiError(500, error.message || 'Error deleting time slot');
         }
     }
 
@@ -504,7 +505,7 @@ class TimetableService {
             });
 
             if (!teacher) {
-                throw new ApiError('Teacher not found', 404);
+                throw new ApiError(404, 'Teacher not found');
             }
 
             // Get all periods assigned to this teacher
@@ -572,7 +573,7 @@ class TimetableService {
             return timetable;
         } catch (error) {
             if (error instanceof ApiError) throw error;
-            throw new ApiError(error.message || 'Error retrieving teacher timetable', 500);
+            throw new ApiError(500, error.message || 'Error retrieving teacher timetable');
         }
     }
 }

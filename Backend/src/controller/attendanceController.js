@@ -64,6 +64,9 @@ export const getMonthlyAttendance = async (req, res, next) => {
         // If studentId is not provided but user is a student, use their ID
         let targetStudentId = studentId;
         if (!targetStudentId && req.user?.role === 'STUDENT') {
+            if (!req.user.student?.id) {
+                return next(new ApiError(400, 'Student profile not found'));
+            }
             targetStudentId = req.user.student.id;
         }
 
@@ -208,8 +211,10 @@ export const markDailyAttendance = async (req, res, next) => {
             attendanceData
         );
 
-        // Use the same formatted date for updating monthly attendance
-        updateMonthlyAttendance(classId, sectionId, formattedDate);
+        // Use the same formatted date for updating monthly attendance (fire and forget but logged)
+        await updateMonthlyAttendance(classId, sectionId, formattedDate).catch(err => {
+            console.error('Error updating monthly attendance:', err);
+        });
 
         return res
             .status(200)

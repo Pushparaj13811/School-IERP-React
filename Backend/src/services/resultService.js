@@ -334,6 +334,10 @@ export class ResultService {
     }
 
     async calculateGrade(totalMarks, fullMarks) {
+        // Prevent division by zero
+        if (!fullMarks || fullMarks <= 0) {
+            return { id: 1, grade: 'N/A' };
+        }
         const percentage = (totalMarks / fullMarks) * 100;
 
         try {

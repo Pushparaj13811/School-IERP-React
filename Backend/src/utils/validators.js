@@ -1,18 +1,78 @@
 import { ApiError } from './apiError.js';
 
+/**
+ * Sanitize email input - trim whitespace and convert to lowercase
+ * @param {string} email - The email to sanitize
+ * @returns {string} - Sanitized email
+ */
+export const sanitizeEmail = (email) => {
+    if (!email || typeof email !== 'string') {
+        return '';
+    }
+    return email.trim().toLowerCase();
+};
+
+/**
+ * Sanitize general string input - trim whitespace
+ * @param {string} input - The string to sanitize
+ * @returns {string} - Sanitized string
+ */
+export const sanitizeInput = (input) => {
+    if (!input || typeof input !== 'string') {
+        return '';
+    }
+    return input.trim();
+};
+
+/**
+ * Validate email format - permissive validation accepting various email formats
+ * Accepts: user@domain.com, User@Domain.COM, user.name+tag@domain.co.uk, etc.
+ * @param {string} email - The email to validate
+ * @returns {boolean}
+ */
 export const validateEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
+    // More permissive email regex that accepts:
+    // - Various TLDs (.com, .co.uk, .museum, etc.)
+    // - Subdomains
+    // - Plus addressing (user+tag@domain.com)
+    // - Dots in local part
+    // - Numbers and hyphens in domain
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+    if (!email || typeof email !== 'string') {
+        throw new ApiError(400, 'Please provide an email address');
+    }
+
+    const sanitizedEmail = sanitizeEmail(email);
+
+    if (!emailRegex.test(sanitizedEmail)) {
         throw new ApiError(400, 'Please provide a valid email address');
     }
     return true;
 };
 
+/**
+ * Validate password strength - used for registration and password reset
+ * @param {string} password - The password to validate
+ * @returns {boolean}
+ */
 export const validatePassword = (password) => {
     // Check if password is at least 8 chars and contains uppercase, lowercase, number, and special character
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$/;
     if (!password || !passwordRegex.test(password)) {
         throw new ApiError(400, 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character');
+    }
+    return true;
+};
+
+/**
+ * Validate password exists - used for login (doesn't check strength)
+ * @param {string} password - The password to validate
+ * @returns {boolean}
+ */
+export const validatePasswordExists = (password) => {
+    if (!password || typeof password !== 'string' || password.trim().length === 0) {
+        throw new ApiError(400, 'Please provide a password');
     }
     return true;
 };

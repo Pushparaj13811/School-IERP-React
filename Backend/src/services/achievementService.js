@@ -73,6 +73,22 @@ export class AchievementService {
         }
     }
 
+    async getAchievementById(id) {
+        try {
+            const achievement = await prisma.achievement.findUnique({
+                where: { id: parseInt(id) },
+                include: {
+                    achievementType: true,
+                    student: true,
+                    teacher: true
+                }
+            });
+            return achievement;
+        } catch (error) {
+            throw error;
+        }
+    }
+
     async getAchievements(filters) {
         try {
             const { studentId, teacherId, achievementTypeId, startDate, endDate } = filters;

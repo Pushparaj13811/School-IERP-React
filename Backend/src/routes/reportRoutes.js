@@ -7,11 +7,31 @@ import {
     getRecentReports,
     downloadReport,
     getAttendanceReportDataController,
-    getPerformanceReportDataController
+    getPerformanceReportDataController,
+    getChartData
 } from '../controller/reportController.js';
 import { protect, restrictTo } from '../middlewares/authMiddleware.js';
+import { sanitize, validate, schemas } from '../middlewares/validateRequest.js';
+import { createRateLimiter } from '../middlewares/rateLimiter.js';
 
 const router = Router();
+
+// Rate limiter for report generation (computationally expensive)
+const reportGenerationLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    maxRequests: 10,
+    message: 'Too many report generation requests, please try again later.'
+});
+
+// Rate limiter for report data fetching
+const reportDataLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    maxRequests: 30,
+    message: 'Too many report data requests, please try again later.'
+});
+
+// Apply sanitization to all routes
+router.use(sanitize);
 
 // All routes are protected and require authentication
 router.use(protect);
@@ -20,6 +40,7 @@ router.use(protect);
 router.post(
     '/attendance',
     restrictTo('ADMIN', 'TEACHER'),
+    reportGenerationLimiter,
     generateAttendanceReport
 );
 
@@ -27,6 +48,7 @@ router.post(
 router.post(
     '/performance',
     restrictTo('ADMIN'),
+    reportGenerationLimiter,
     generatePerformanceReport
 );
 
@@ -34,6 +56,7 @@ router.post(
 router.post(
     '/financial',
     restrictTo('ADMIN'),
+    reportGenerationLimiter,
     generateFinancialReport
 );
 
@@ -41,6 +64,7 @@ router.post(
 router.post(
     '/exam',
     restrictTo('ADMIN', 'TEACHER'),
+    reportGenerationLimiter,
     generateExamReport
 );
 
@@ -56,9 +80,11 @@ router.get(
     downloadReport
 );
 
-// --- NEW Data Fetching Routes ---
-router.get('/data/attendance', restrictTo('ADMIN', 'TEACHER'), getAttendanceReportDataController);
-router.get('/data/performance', restrictTo('ADMIN'), getPerformanceReportDataController);
-// Add routes for financial and exam data later if needed
+// --- Data Fetching Routes with rate limiting ---
+router.get('/data/attendance', restrictTo('ADMIN', 'TEACHER'), reportDataLimiter, validate(schemas.reportQuery, 'query'), getAttendanceReportDataController);
+router.get('/data/performance', restrictTo('ADMIN'), reportDataLimiter, validate(schemas.reportQuery, 'query'), getPerformanceReportDataController);
+
+// Chart data route for visualizations
+router.get('/chart/:type', reportDataLimiter, getChartData);
 
 export default router; 

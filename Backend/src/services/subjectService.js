@@ -37,9 +37,29 @@ export class SubjectService {
             const subjects = await prisma.subject.findMany({
                 orderBy: {
                     name: 'asc'
+                },
+                include: {
+                    classes: {
+                        include: {
+                            class: {
+                                select: {
+                                    id: true,
+                                    name: true
+                                }
+                            }
+                        }
+                    }
                 }
             });
-            return subjects;
+
+            // Transform data to flatten the classes array for frontend compatibility
+            // Frontend expects: row.classes?.map(c => c.name)
+            const transformedSubjects = subjects.map(subject => ({
+                ...subject,
+                classes: subject.classes.map(cs => cs.class)
+            }));
+
+            return transformedSubjects;
         } catch (error) {
             throw new ApiError(500, 'Failed to fetch subjects');
         }
@@ -52,7 +72,12 @@ export class SubjectService {
                 include: {
                     classes: {
                         include: {
-                            class: true
+                            class: {
+                                select: {
+                                    id: true,
+                                    name: true
+                                }
+                            }
                         }
                     }
                 }
@@ -62,7 +87,11 @@ export class SubjectService {
                 throw new ApiError(404, 'Subject not found');
             }
 
-            return subject;
+            // Transform data to flatten the classes array for frontend compatibility
+            return {
+                ...subject,
+                classes: subject.classes.map(cs => cs.class)
+            };
         } catch (error) {
             if (error instanceof ApiError) throw error;
             throw new ApiError(500, 'Failed to fetch subject');

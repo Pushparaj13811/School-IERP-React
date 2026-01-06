@@ -565,12 +565,13 @@ export class ReportService {
 
     /**
      * Generate financial report
+     * Note: No FinancialTransaction model exists, so we generate enrollment-based report
      */
     generateFinancialReport = async (options) => {
         const { month, year, dateRange, format, userId } = options;
 
         try {
-            console.info(`Generating financial report for ${month}/${year}`);
+            console.info(`Generating financial report (enrollment-based) for ${month}/${year}`);
 
             // Get month name
             const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -580,62 +581,44 @@ export class ReportService {
             // Generate file name
             const fileName = `Financial_Report_${monthName}_${year}`;
 
-            // Fetch financial data
+            // Fetch enrollment data as proxy for financial metrics
             const startDate = new Date(year, month - 1, 1);
             const endDate = new Date(year, month, 0); // Last day of month
 
-            // Query financial transactions for the given period
-            const revenues = await prisma.financialTransaction.findMany({
+            // Count students enrolled during this period
+            const newStudents = await prisma.student.count({
                 where: {
-                    date: {
+                    createdAt: {
                         gte: startDate,
                         lte: endDate
-                    },
-                    type: 'INCOME'
+                    }
                 }
             });
 
-            const expenses = await prisma.financialTransaction.findMany({
-                where: {
-                    date: {
-                        gte: startDate,
-                        lte: endDate
-                    },
-                    type: 'EXPENSE'
+            // Get total students
+            const totalStudents = await prisma.student.count();
+
+            // Get class-wise enrollment
+            const classEnrollment = await prisma.class.findMany({
+                select: {
+                    name: true,
+                    _count: {
+                        select: { students: true }
+                    }
                 }
             });
 
-            // Calculate statistics
-            const totalRevenue = revenues.reduce((sum, transaction) => sum + transaction.amount, 0);
-            const totalExpenses = expenses.reduce((sum, transaction) => sum + transaction.amount, 0);
-            const balance = totalRevenue - totalExpenses;
-
-            // Group by category
-            const categories = await prisma.financialTransaction.groupBy({
-                by: ['category'],
-                where: {
-                    date: {
-                        gte: startDate,
-                        lte: endDate
-                    },
-                    type: 'INCOME'
-                },
-                _sum: {
-                    amount: true
-                }
-            });
-
-            // Format category data
-            const categoryData = categories.map(category => ({
-                category: category.category,
-                amount: `$${category._sum.amount.toFixed(2)}`
+            // Format category data (class-wise enrollment)
+            const categoryData = classEnrollment.map(cls => ({
+                category: cls.name,
+                amount: `${cls._count.students} students`
             }));
 
             // Prepare data for report
             const reportData = {
-                totalRevenue: `$${totalRevenue.toFixed(2)}`,
-                expenses: `$${totalExpenses.toFixed(2)}`,
-                balance: `$${balance.toFixed(2)}`,
+                totalRevenue: `${totalStudents} Total Students`,
+                expenses: `${newStudents} New Enrollments`,
+                balance: `${totalStudents - newStudents} Existing Students`,
                 categories: categoryData,
                 // Add raw records for CSV export
                 records: categoryData
@@ -657,7 +640,7 @@ export class ReportService {
     };
 
     /**
-     * Generate exam report
+     * Generate exam report using SubjectResult model
      */
     generateExamReport = async (options) => {
         const { month, year, classId, sectionId, format, userId } = options;
@@ -674,35 +657,45 @@ export class ReportService {
             let fileName = `Exam_Report_${monthName}_${year}`;
             if (classId) {
                 const classData = await prisma.class.findUnique({ where: { id: parseInt(classId) } });
-                fileName += `_${classData.name}`;
+                if (classData) {
+                    fileName += `_${classData.name}`;
+                }
 
                 if (sectionId) {
                     const sectionData = await prisma.section.findUnique({ where: { id: parseInt(sectionId) } });
-                    fileName += `_${sectionData.name}`;
+                    if (sectionData) {
+                        fileName += `_${sectionData.name}`;
+                    }
                 }
             }
 
-            // Fetch exam data
-            const startDate = new Date(year, month - 1, 1);
-            const endDate = new Date(year, month, 0); // Last day of month
+            // Build query for subject results using academicYear
+            const academicYear = `${year}-${parseInt(year) + 1}`; // e.g., "2024-2025"
 
-            // Get exams in the given period
-            const exams = await prisma.exam.findMany({
-                where: {
-                    date: {
-                        gte: startDate,
-                        lte: endDate
-                    },
-                    ...(classId ? { classId: parseInt(classId) } : {}),
-                    ...(sectionId ? { sectionId: parseInt(sectionId) } : {})
-                },
+            let resultQuery = {
+                academicYear: academicYear
+            };
+
+            // Add class and section filters if provided
+            if (classId) {
+                resultQuery.student = {
+                    classId: parseInt(classId)
+                };
+            }
+
+            if (sectionId) {
+                resultQuery.student = {
+                    ...resultQuery.student,
+                    sectionId: parseInt(sectionId)
+                };
+            }
+
+            // Fetch subject results
+            const subjectResults = await prisma.subjectResult.findMany({
+                where: resultQuery,
                 include: {
-                    results: {
-                        include: {
-                            student: true
-                        }
-                    },
-                    subject: true
+                    subject: true,
+                    student: true
                 }
             });
 
@@ -714,47 +707,45 @@ export class ReportService {
                 }
             });
 
-            // Process results
-            let allResults = [];
-            exams.forEach(exam => {
-                allResults = [...allResults, ...exam.results];
-            });
+            // Calculate pass percentage (passMarks field is used)
+            const passedResults = subjectResults.filter(result => result.totalMarks >= result.passMarks);
+            const passPercentage = subjectResults.length > 0
+                ? `${((passedResults.length / subjectResults.length) * 100).toFixed(2)}%`
+                : '0.00%';
 
-            // Calculate pass percentage
-            const passingScore = 40; // Assume 40% is passing
-            const passedCount = allResults.filter(result => (result.marksObtained / result.totalMarks) * 100 >= passingScore).length;
-            const passPercentage = `${((passedCount / allResults.length) * 100).toFixed(2)}%`;
-
-            // Calculate distinction percentage
-            const distinctionScore = 75; // Assume 75% is distinction
-            const distinctionCount = allResults.filter(result => (result.marksObtained / result.totalMarks) * 100 >= distinctionScore).length;
-            const distinctionPercentage = `${((distinctionCount / allResults.length) * 100).toFixed(2)}%`;
+            // Calculate distinction percentage (75%+ of fullMarks)
+            const distinctionResults = subjectResults.filter(result =>
+                result.fullMarks > 0 && (result.totalMarks / result.fullMarks) * 100 >= 75
+            );
+            const distinctionPercentage = subjectResults.length > 0
+                ? `${((distinctionResults.length / subjectResults.length) * 100).toFixed(2)}%`
+                : '0.00%';
 
             // Group by subject
-            const subjectResults = {};
-            exams.forEach(exam => {
-                if (!exam.subject) return;
+            const subjectScores = {};
+            subjectResults.forEach(result => {
+                if (!result.subject) return;
 
-                const subjectName = exam.subject.name;
-                if (!subjectResults[subjectName]) {
-                    subjectResults[subjectName] = {
-                        totalMarks: 0,
-                        marksObtained: 0,
+                const subjectName = result.subject.name;
+                if (!subjectScores[subjectName]) {
+                    subjectScores[subjectName] = {
+                        totalObtained: 0,
+                        totalFull: 0,
                         count: 0
                     };
                 }
 
-                exam.results.forEach(result => {
-                    subjectResults[subjectName].totalMarks += result.totalMarks;
-                    subjectResults[subjectName].marksObtained += result.marksObtained;
-                    subjectResults[subjectName].count++;
-                });
+                subjectScores[subjectName].totalObtained += result.totalMarks;
+                subjectScores[subjectName].totalFull += result.fullMarks;
+                subjectScores[subjectName].count++;
             });
 
             // Format subject-wise data
-            const subjectWisePerformance = Object.keys(subjectResults).map(subject => {
-                const data = subjectResults[subject];
-                const average = (data.marksObtained / data.totalMarks * 100).toFixed(2);
+            const subjectWisePerformance = Object.keys(subjectScores).map(subject => {
+                const data = subjectScores[subject];
+                const average = data.totalFull > 0
+                    ? ((data.totalObtained / data.totalFull) * 100).toFixed(2)
+                    : '0.00';
                 return {
                     subject,
                     average
@@ -973,13 +964,13 @@ export class ReportService {
     };
 
     /**
-     * Get attendance chart data
+     * Get attendance chart data - Returns data in frontend expected format
      */
     getAttendanceChartData = async (month, year, classId, sectionId) => {
         // Format the start and end dates for the month
         const startDate = new Date(year, month - 1, 1);
         const endDate = new Date(year, month, 0); // Last day of the month
-        
+
         // Build the query for attendance records
         let attendanceQuery = {
             date: {
@@ -987,92 +978,48 @@ export class ReportService {
                 lte: endDate
             }
         };
-        
+
         // Add class and section filters if provided
-        let studentQuery = {};
         if (classId) {
-            studentQuery.classId = classId;
+            attendanceQuery.classId = classId;
         }
         if (sectionId) {
-            studentQuery.sectionId = sectionId;
+            attendanceQuery.sectionId = sectionId;
         }
-        
+
         // Fetch attendance data for the month
         const attendanceRecords = await prisma.dailyAttendance.findMany({
-            where: attendanceQuery,
-            include: {
-                student: {
-                    where: studentQuery,
-                    select: {
-                        id: true,
-                        firstName: true,
-                        lastName: true,
-                        classId: true,
-                        sectionId: true
-                    }
-                }
+            where: attendanceQuery
+        });
+
+        // Count by status
+        let presentCount = 0;
+        let absentCount = 0;
+        let lateCount = 0;
+
+        attendanceRecords.forEach(record => {
+            if (record.status === 'PRESENT') {
+                presentCount++;
+            } else if (record.status === 'ABSENT') {
+                absentCount++;
+            } else if (record.status === 'LATE') {
+                lateCount++;
             }
         });
-        
-        // Filter out records that don't match student criteria
-        const filteredRecords = attendanceRecords.filter(record => record.student);
-        
-        // Calculate daily attendance statistics
-        const dailyStats = {};
-        const totalStudentsCount = await prisma.student.count({
-            where: studentQuery
-        });
-        
-        // Initialize data for each day of the month
-        for (let day = 1; day <= endDate.getDate(); day++) {
-            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            dailyStats[dateStr] = {
-                present: 0,
-                absent: 0,
-                late: 0,
-                totalStudents: totalStudentsCount
-            };
-        }
-        
-        // Populate the daily statistics
-        filteredRecords.forEach(record => {
-            const dateStr = record.date.toISOString().split('T')[0];
-            if (dailyStats[dateStr]) {
-                if (record.status === 'PRESENT') {
-                    dailyStats[dateStr].present += 1;
-                } else if (record.status === 'ABSENT') {
-                    dailyStats[dateStr].absent += 1;
-                } else if (record.status === 'LATE') {
-                    dailyStats[dateStr].late += 1;
-                }
-            }
-        });
-        
-        // Format for chart consumption
-        const chartData = {
-            labels: Object.keys(dailyStats).map(date => date.split('-')[2]), // Day of month
-            datasets: [
-                {
-                    label: 'Present',
-                    data: Object.values(dailyStats).map(stats => stats.present),
-                    backgroundColor: 'rgba(75, 192, 192, 0.7)'
-                },
-                {
-                    label: 'Absent',
-                    data: Object.values(dailyStats).map(stats => stats.absent),
-                    backgroundColor: 'rgba(255, 99, 132, 0.7)'
-                },
-                {
-                    label: 'Late',
-                    data: Object.values(dailyStats).map(stats => stats.late),
-                    backgroundColor: 'rgba(255, 205, 86, 0.7)'
-                }
-            ],
-            totalStudents: totalStudentsCount,
-            attendanceRate: this.calculateAttendanceRate(dailyStats)
+
+        const total = presentCount + absentCount + lateCount;
+
+        // Calculate percentages
+        const presentPercent = total > 0 ? Math.round((presentCount / total) * 100) : 0;
+        const absentPercent = total > 0 ? Math.round((absentCount / total) * 100) : 0;
+        const latePercent = total > 0 ? Math.round((lateCount / total) * 100) : 0;
+
+        // Return in frontend expected format
+        return {
+            labels: ['Present', 'Absent', 'Late'],
+            data: [presentPercent, absentPercent, latePercent],
+            colors: ['#10B981', '#EF4444', '#F59E0B']
         };
-        
-        return chartData;
     };
 
     // Calculate overall attendance rate from daily stats
@@ -1089,141 +1036,79 @@ export class ReportService {
     };
 
     /**
-     * Get performance chart data
+     * Get performance chart data - Returns grade distribution based on SubjectResult model
      */
     getPerformanceChartData = async (month, year, classId, sectionId) => {
-        // Format the start and end dates for the month
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0); // Last day of the month
-        
-        // Build query for results within the month
+        // Build query for subject results - use academicYear and term instead of date
+        // Since SubjectResult doesn't have createdAt for filtering by month, we'll use academicYear
+        const academicYear = `${year}-${parseInt(year) + 1}`; // e.g., "2024-2025"
+
         let resultQuery = {
-            createdAt: {
-                gte: startDate,
-                lte: endDate
-            }
+            academicYear: academicYear
         };
-        
+
         // Add class and section filters if provided
         if (classId) {
             resultQuery.student = {
-                classId: classId
+                classId: parseInt(classId)
             };
         }
-        
+
         if (sectionId) {
             resultQuery.student = {
                 ...resultQuery.student,
-                sectionId: sectionId
+                sectionId: parseInt(sectionId)
             };
         }
-        
-        // Fetch results data
-        const results = await prisma.result.findMany({
+
+        // Fetch subject results data using the correct model
+        const results = await prisma.subjectResult.findMany({
             where: resultQuery,
             include: {
-                student: {
-                    select: {
-                        id: true,
-                        firstName: true,
-                        lastName: true,
-                        classId: true,
-                        sectionId: true
-                    }
-                },
-                exam: {
-                    select: {
-                        name: true,
-                        subjectId: true,
-                        maxMarks: true,
-                        passingMarks: true
-                    }
-                }
+                student: true,
+                grade: true
             }
         });
-        
-        // Group by subjects
-        const subjectPerformance = {};
-        const subjects = new Set();
-        
+
+        // Calculate grade distribution based on percentage (totalMarks / fullMarks)
+        let gradeA = 0; // 90-100%
+        let gradeB = 0; // 75-89%
+        let gradeC = 0; // 60-74%
+        let gradeD = 0; // 40-59%
+        let gradeF = 0; // 0-39%
+
         results.forEach(result => {
-            const subjectId = result.exam.subjectId;
-            subjects.add(subjectId);
-            
-            if (!subjectPerformance[subjectId]) {
-                subjectPerformance[subjectId] = {
-                    totalMarks: 0,
-                    maxPossibleMarks: 0,
-                    passCount: 0,
-                    failCount: 0,
-                    examCount: 0
-                };
-            }
-            
-            subjectPerformance[subjectId].totalMarks += result.marksObtained;
-            subjectPerformance[subjectId].maxPossibleMarks += result.exam.maxMarks;
-            subjectPerformance[subjectId].examCount += 1;
-            
-            if (result.marksObtained >= result.exam.passingMarks) {
-                subjectPerformance[subjectId].passCount += 1;
-            } else {
-                subjectPerformance[subjectId].failCount += 1;
-            }
-        });
-        
-        // Get subject names from IDs
-        const subjectIds = Array.from(subjects);
-        const subjectData = await prisma.subject.findMany({
-            where: {
-                id: {
-                    in: subjectIds
-                }
-            },
-            select: {
-                id: true,
-                name: true
-            }
-        });
-        
-        const subjectNames = {};
-        subjectData.forEach(subject => {
-            subjectNames[subject.id] = subject.name;
-        });
-        
-        // Format chart data
-        const averagePerformance = subjectIds.map(subjectId => {
-            const data = subjectPerformance[subjectId];
-            const avgPercentage = data.maxPossibleMarks > 0 
-                ? (data.totalMarks / data.maxPossibleMarks) * 100 
+            const percentage = result.fullMarks > 0
+                ? (result.totalMarks / result.fullMarks) * 100
                 : 0;
-            
-            return {
-                subject: subjectNames[subjectId] || `Subject ${subjectId}`,
-                averagePercentage: Math.round(avgPercentage * 10) / 10, // Round to 1 decimal place
-                passRate: data.examCount > 0 
-                    ? (data.passCount / data.examCount) * 100 
-                    : 0,
-                examCount: data.examCount
-            };
+
+            if (percentage >= 90) {
+                gradeA++;
+            } else if (percentage >= 75) {
+                gradeB++;
+            } else if (percentage >= 60) {
+                gradeC++;
+            } else if (percentage >= 40) {
+                gradeD++;
+            } else {
+                gradeF++;
+            }
         });
-        
-        // Format for chart consumption
+
+        const total = results.length;
+
+        // Calculate percentages (if no data, show zeros)
+        const aPercent = total > 0 ? Math.round((gradeA / total) * 100) : 0;
+        const bPercent = total > 0 ? Math.round((gradeB / total) * 100) : 0;
+        const cPercent = total > 0 ? Math.round((gradeC / total) * 100) : 0;
+        const dPercent = total > 0 ? Math.round((gradeD / total) * 100) : 0;
+        const fPercent = total > 0 ? Math.round((gradeF / total) * 100) : 0;
+
+        // Return in frontend expected format
         return {
-            labels: averagePerformance.map(item => item.subject),
-            datasets: [
-                {
-                    label: 'Average Score (%)',
-                    data: averagePerformance.map(item => item.averagePercentage),
-                    backgroundColor: 'rgba(75, 192, 192, 0.7)'
-                },
-                {
-                    label: 'Pass Rate (%)',
-                    data: averagePerformance.map(item => item.passRate),
-                    backgroundColor: 'rgba(54, 162, 235, 0.7)'
-                }
-            ],
-            examCount: averagePerformance.reduce((sum, item) => sum + item.examCount, 0),
-            averageScore: this.calculateAverageScore(averagePerformance)
+            labels: ['A (90%+)', 'B (75-89%)', 'C (60-74%)', 'D (40-59%)', 'F (<40%)'],
+            data: [aPercent, bPercent, cPercent, dPercent, fPercent],
+            colors: ['#10B981', '#34D399', '#FBBF24', '#F97316', '#EF4444']
         };
     };
 
@@ -1236,280 +1121,148 @@ export class ReportService {
     };
 
     /**
-     * Get financial chart data
+     * Get financial chart data - Returns student enrollment by month as proxy for revenue
+     * Note: No FinancialTransaction model exists, so we use student enrollment data
      */
     getFinancialChartData = async (year, dateRange) => {
-        let startDate, endDate;
-        
-        if (dateRange) {
-            // Parse custom date range if provided
-            const [start, end] = dateRange.split(',');
-            startDate = new Date(start);
-            endDate = new Date(end);
-        } else {
-            // Use the entire year
-            startDate = new Date(year, 0, 1); // January 1st
-            endDate = new Date(year, 11, 31); // December 31st
-        }
-        
-        // Query for fee transactions within the date range
-        const feeTransactions = await prisma.financialTransaction.findMany({
-            where: {
-                date: {
-                    gte: startDate,
-                    lte: endDate
-                },
-                type: 'INCOME'
-            },
-            select: {
-                id: true,
-                amount: true,
-                date: true,
-                category: true
-            }
-        });
-        
-        // Query for expense transactions within the date range
-        const expenseTransactions = await prisma.financialTransaction.findMany({
-            where: {
-                date: {
-                    gte: startDate,
-                    lte: endDate
-                },
-                type: 'EXPENSE'
-            },
-            select: {
-                id: true,
-                amount: true,
-                date: true,
-                category: true
-            }
-        });
-        
-        // Group by month
-        const monthlyData = {};
-        
-        // Initialize data for all months in the range
-        const months = [];
-        let currentDate = new Date(startDate);
-        while (currentDate <= endDate) {
-            const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-            months.push(monthKey);
-            
-            monthlyData[monthKey] = {
-                income: 0,
-                expenses: 0,
-                monthName: new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).toLocaleString('default', { month: 'short' })
-            };
-            
-            // Move to next month
-            currentDate.setMonth(currentDate.getMonth() + 1);
-        }
-        
-        // Aggregate fee transactions by month
-        feeTransactions.forEach(transaction => {
-            const date = transaction.date;
-            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            
-            if (monthlyData[monthKey]) {
-                monthlyData[monthKey].income += transaction.amount;
-            }
-        });
-        
-        // Aggregate expense transactions by month
-        expenseTransactions.forEach(expense => {
-            const date = expense.date;
-            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            
-            if (monthlyData[monthKey]) {
-                monthlyData[monthKey].expenses += expense.amount;
-            }
-        });
-        
-        // Calculate total income, expenses, and profit
-        let totalIncome = 0;
-        let totalExpenses = 0;
-        
-        Object.values(monthlyData).forEach(data => {
-            totalIncome += data.income;
-            totalExpenses += data.expenses;
-        });
-        
-        // Sort months chronologically
-        const sortedMonths = months.sort();
-        
-        // Format for chart consumption
-        return {
-            labels: sortedMonths.map(month => monthlyData[month].monthName),
-            datasets: [
-                {
-                    label: 'Income',
-                    data: sortedMonths.map(month => monthlyData[month].income),
-                    backgroundColor: 'rgba(75, 192, 192, 0.7)'
-                },
-                {
-                    label: 'Expenses',
-                    data: sortedMonths.map(month => monthlyData[month].expenses),
-                    backgroundColor: 'rgba(255, 99, 132, 0.7)'
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        // Since there's no financial model, we'll show student enrollment trends
+        // which can represent potential fee collection
+        const currentMonth = new Date().getMonth();
+        const labels = [];
+        const data = [];
+
+        // Get last 6 months of student enrollment data
+        for (let i = 5; i >= 0; i--) {
+            const monthIndex = (currentMonth - i + 12) % 12;
+            const targetYear = monthIndex > currentMonth ? parseInt(year) - 1 : parseInt(year);
+
+            const startDate = new Date(targetYear, monthIndex, 1);
+            const endDate = new Date(targetYear, monthIndex + 1, 0);
+
+            // Count students enrolled by createdAt date
+            const studentCount = await prisma.student.count({
+                where: {
+                    createdAt: {
+                        gte: startDate,
+                        lte: endDate
+                    }
                 }
-            ],
-            summary: {
-                totalIncome,
-                totalExpenses,
-                netProfit: totalIncome - totalExpenses
-            }
+            });
+
+            labels.push(monthNames[monthIndex]);
+            data.push(studentCount);
+        }
+
+        // Return in frontend expected format
+        // Note: This shows student enrollment per month, not actual financial data
+        return {
+            labels: labels,
+            data: data,
+            barColors: ['#8B5CF6', '#8B5CF6', '#8B5CF6', '#8B5CF6', '#8B5CF6', '#8B5CF6']
         };
     };
 
     /**
-     * Get exam chart data
+     * Get exam chart data - Returns subject-wise average scores using SubjectResult model
      */
     getExamChartData = async (month, year, classId, sectionId) => {
-        // Format the start and end dates for the month
-        const startDate = new Date(year, month - 1, 1);
-        const endDate = new Date(year, month, 0); // Last day of the month
-        
-        // Build query for exams within the month
-        let examQuery = {
-            date: {
-                gte: startDate,
-                lte: endDate
-            }
+        // Build query for subject results using academicYear
+        const academicYear = `${year}-${parseInt(year) + 1}`; // e.g., "2024-2025"
+
+        let resultQuery = {
+            academicYear: academicYear
         };
-        
-        // Add class filter if provided
+
+        // Add class and section filters if provided
         if (classId) {
-            examQuery.classId = classId;
+            resultQuery.student = {
+                classId: parseInt(classId)
+            };
         }
-        
-        // Fetch exams conducted in the month
-        const exams = await prisma.exam.findMany({
-            where: examQuery,
+
+        if (sectionId) {
+            resultQuery.student = {
+                ...resultQuery.student,
+                sectionId: parseInt(sectionId)
+            };
+        }
+
+        // Fetch subject results with subject information
+        const subjectResults = await prisma.subjectResult.findMany({
+            where: resultQuery,
             include: {
                 subject: {
                     select: {
                         name: true
                     }
                 },
-                results: {
-                    where: sectionId ? {
-                        student: {
-                            sectionId: sectionId
-                        }
-                    } : {},
-                    include: {
-                        student: {
-                            select: {
-                                id: true,
-                                firstName: true,
-                                lastName: true,
-                                sectionId: true
-                            }
-                        }
-                    }
-                }
+                student: true
             }
         });
-        
-        // Process exam performance data
-        const examPerformance = exams.map(exam => {
-            // Calculate performance metrics
-            const totalStudents = exam.results.length;
-            const passingCount = exam.results.filter(result => 
-                result.marksObtained >= exam.passingMarks
-            ).length;
-            
-            // Calculate score distribution
-            const scoreDistribution = {
-                excellent: 0, // 90-100%
-                good: 0,      // 75-89%
-                average: 0,   // 60-74%
-                belowAverage: 0, // 35-59%
-                poor: 0       // 0-34%
-            };
-            
-            exam.results.forEach(result => {
-                const percentage = (result.marksObtained / exam.maxMarks) * 100;
-                
-                if (percentage >= 90) {
-                    scoreDistribution.excellent += 1;
-                } else if (percentage >= 75) {
-                    scoreDistribution.good += 1;
-                } else if (percentage >= 60) {
-                    scoreDistribution.average += 1;
-                } else if (percentage >= 35) {
-                    scoreDistribution.belowAverage += 1;
-                } else {
-                    scoreDistribution.poor += 1;
-                }
+
+        // Group results by subject and calculate average scores
+        const subjectScores = {};
+
+        subjectResults.forEach(result => {
+            if (!result.subject) return;
+
+            const subjectName = result.subject.name;
+            if (!subjectScores[subjectName]) {
+                subjectScores[subjectName] = {
+                    totalObtained: 0,
+                    totalFull: 0,
+                    count: 0
+                };
+            }
+
+            subjectScores[subjectName].totalObtained += result.totalMarks;
+            subjectScores[subjectName].totalFull += result.fullMarks;
+            subjectScores[subjectName].count++;
+        });
+
+        // Calculate average percentage for each subject
+        const labels = [];
+        const data = [];
+
+        Object.keys(subjectScores).forEach(subject => {
+            const scores = subjectScores[subject];
+            const avgPercentage = scores.totalFull > 0
+                ? Math.round((scores.totalObtained / scores.totalFull) * 100)
+                : 0;
+            labels.push(subject);
+            data.push(avgPercentage);
+        });
+
+        // If no data, fetch available subjects from the database
+        if (labels.length === 0) {
+            const subjects = await prisma.subject.findMany({
+                take: 5,
+                select: { name: true }
             });
-            
-            // Calculate average score
-            const totalScore = exam.results.reduce((sum, result) => sum + result.marksObtained, 0);
-            const averageScore = totalStudents > 0 ? totalScore / totalStudents : 0;
-            const averagePercentage = (averageScore / exam.maxMarks) * 100;
-            
+
+            if (subjects.length > 0) {
+                return {
+                    labels: subjects.map(s => s.name),
+                    data: subjects.map(() => 0),
+                    lineColor: '#F97316'
+                };
+            }
+
+            // Fallback if no subjects exist
             return {
-                examName: exam.name,
-                subject: exam.subject.name,
-                date: exam.date.toISOString().split('T')[0],
-                totalStudents,
-                passingCount,
-                passingRate: totalStudents > 0 ? (passingCount / totalStudents) * 100 : 0,
-                averageScore,
-                averagePercentage: Math.round(averagePercentage * 10) / 10, // Round to 1 decimal place
-                scoreDistribution
+                labels: ['No Data'],
+                data: [0],
+                lineColor: '#F97316'
             };
-        });
-        
-        // Filter out exams with no results
-        const validExams = examPerformance.filter(exam => exam.totalStudents > 0);
-        
-        // Prepare chart data
-        const scoreDistributionData = {
-            excellent: 0,
-            good: 0,
-            average: 0,
-            belowAverage: 0,
-            poor: 0
-        };
-        
-        // Aggregate score distribution across all exams
-        validExams.forEach(exam => {
-            Object.keys(scoreDistributionData).forEach(category => {
-                scoreDistributionData[category] += exam.scoreDistribution[category];
-            });
-        });
-        
-        // Format for chart consumption
+        }
+
+        // Return in frontend expected format
         return {
-            exams: validExams.map(exam => ({
-                name: `${exam.examName} (${exam.subject})`,
-                passingRate: exam.passingRate,
-                averagePercentage: exam.averagePercentage
-            })),
-            scoreDistribution: {
-                labels: ['Excellent (90-100%)', 'Good (75-89%)', 'Average (60-74%)', 'Below Average (35-59%)', 'Poor (0-34%)'],
-                data: [
-                    scoreDistributionData.excellent,
-                    scoreDistributionData.good,
-                    scoreDistributionData.average,
-                    scoreDistributionData.belowAverage,
-                    scoreDistributionData.poor
-                ],
-                backgroundColor: [
-                    'rgba(75, 192, 192, 0.7)',  // Excellent
-                    'rgba(54, 162, 235, 0.7)',  // Good
-                    'rgba(255, 205, 86, 0.7)',  // Average
-                    'rgba(255, 159, 64, 0.7)',  // Below Average
-                    'rgba(255, 99, 132, 0.7)'   // Poor
-                ]
-            },
-            examCount: validExams.length,
-            totalStudents: validExams.reduce((sum, exam) => sum + exam.totalStudents, 0),
-            averagePassRate: validExams.length > 0 
-                ? validExams.reduce((sum, exam) => sum + exam.passingRate, 0) / validExams.length 
-                : 0
+            labels: labels,
+            data: data,
+            lineColor: '#F97316'
         };
     };
 }
